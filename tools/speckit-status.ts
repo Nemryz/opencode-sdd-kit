@@ -2,6 +2,38 @@ import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
 
+interface ApprovalState {
+  generated: boolean
+  approved: boolean
+}
+
+interface SpecJson {
+  feature_name: string
+  feature_number: number
+  created_at: string
+  updated_at: string
+  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
+  approvals: {
+    spec: ApprovalState
+    plan: ApprovalState
+    tasks: ApprovalState
+  }
+  ready_for_implementation: boolean
+}
+
+function specJsonPath(featureDir: string): string {
+  return path.join(featureDir, "spec.json")
+}
+
+async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
+  try {
+    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
+    return JSON.parse(data) as SpecJson
+  } catch {
+    return null
+  }
+}
+
 interface SessionState {
   command: string | null
   phase: string
@@ -105,45 +137,64 @@ export default tool({
       const session = await readSession(projectRoot)
       const constitutionExists = await exists(path.join(projectRoot, ".opencode", "spec-memory", "constitution.md"))
       const dirs = await getFeatureDirs(projectRoot)
-      const latest = session.featureDir && dirs.includes(session.featureDir)
+
+      const featurePhases: { dir: string; phase: string }[] = []
+      const phaseCounts: Record<string, number> = {}
+      let latest = session.featureDir && dirs.includes(session.featureDir)
         ? session.featureDir
         : dirs.length > 0 ? dirs[dirs.length - 1] : null
 
-      let phase: string, nextStep: string
-
-      if (latest) {
-        const base = path.join(projectRoot, "specs", latest)
+      for (const dir of dirs) {
+        const base = path.join(projectRoot, "specs", dir)
+        const sj = await readSpecJson(base)
         const specOk = await exists(path.join(base, "spec.md"))
         const planOk = await exists(path.join(base, "plan.md"))
         const tasksOk = await exists(path.join(base, "tasks.md"))
-        ;({ phase, nextStep } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
-      } else {
-        ;({ phase, nextStep } = detectPhase(false, false, false, constitutionExists))
+
+        let phase: string
+        if (sj) {
+          phase = sj.phase
+        } else {
+          ;({ phase } = detectPhase(specOk, planOk, tasksOk, false))
+        }
+        featurePhases.push({ dir, phase })
+        phaseCounts[phase] = (phaseCounts[phase] || 0) + 1
       }
 
+      const latestPhase = latest
+        ? (featurePhases.find(f => f.dir === latest)?.phase ?? "unknown")
+        : "none"
+      const summary = dirs.length === 0
+        ? "No features yet."
+        : `Features: ${dirs.length} | ` + Object.entries(phaseCounts)
+            .map(([p, c]) => `${p}: ${c}`)
+            .join(", ")
+
       session.command = "/status"
-      session.phase = phase
+      session.phase = latestPhase
       session.featureDir = latest || session.featureDir
-      session.nextStep = nextStep
-      session.lastResult = `Phase: ${phase} | ${dirs.length} features`
+      session.nextStep = session.phase === "ready" ? "/impl or /review" : "/spec <description>"
+      session.lastResult = summary
       session.history.push("/status")
       if (session.history.length > 20) session.history = session.history.slice(-20)
       await writeSession(projectRoot, session)
 
+      const dashboard = featurePhases.map(f => `${f.dir} (${f.phase})`).join("  ")
       const line = dirs.length === 0
         ? "No features yet. Next: /spec <description>"
-        : `Phase: ${phase} | ${dirs.length} feature(s)${latest ? " | Latest: " + latest : ""} | Next: ${nextStep}`
+        : `${summary}  ${dashboard}`
 
       return {
-        title: `Status: ${phase}`,
+        title: `Status: ${dirs.length} feature(s)`,
         output: line,
         metadata: {
-          phase,
+          phase: latestPhase,
           featureCount: dirs.length,
-          features: dirs,
+          features: featurePhases.map(f => ({ dir: f.dir, phase: f.phase })),
           latestFeature: latest,
           constitutionExists,
-          nextCommand: nextStep,
+          phaseCounts,
+          nextCommand: session.nextStep,
         },
       }
     } catch (err) {

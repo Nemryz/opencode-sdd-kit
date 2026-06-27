@@ -63,6 +63,19 @@ Wait for user confirmation before proceeding to Step 3.
 8. Define measurable success criteria
 9. Identify edge cases in a dedicated section
 
+### Step 4: Update spec.json
+
+After writing the spec, update the feature's `spec.json`:
+- Set `approvals.spec.generated = true`
+- Set `updated_at` to current UTC ISO-8601
+- Keep `phase` as `"spec"` (scaffold already sets this)
+
+The spec.json is at `specs/NNN-feature-name/spec.json`. Read it first, modify fields, then write back.
+
+## Phase Gate
+
+Before generating, read `spec.json` (if it exists). If `phase` indicates this feature already has a spec, propose overwriting or creating a new feature instead of proceeding silently.
+
 ## Safety & Fallback
 
 ### Error: No constitution exists

@@ -2,6 +2,50 @@ import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
 
+interface ApprovalState {
+  generated: boolean
+  approved: boolean
+}
+
+interface SpecJson {
+  feature_name: string
+  feature_number: number
+  created_at: string
+  updated_at: string
+  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
+  approvals: {
+    spec: ApprovalState
+    plan: ApprovalState
+    tasks: ApprovalState
+  }
+  ready_for_implementation: boolean
+}
+
+function specJsonPath(featureDir: string): string {
+  return path.join(featureDir, "spec.json")
+}
+
+async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
+  try {
+    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
+    return JSON.parse(data) as SpecJson
+  } catch {
+    return null
+  }
+}
+
+async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
+  sj.updated_at = new Date().toISOString()
+  await fs.writeFile(specJsonPath(featureDir), JSON.stringify(sj, null, 2), "utf-8")
+}
+
+function detectPhaseFromFiles(specOk: boolean, planOk: boolean, tasksOk: boolean): string {
+  if (!specOk) return "spec"
+  if (!planOk) return "plan"
+  if (!tasksOk) return "tasks"
+  return "ready"
+}
+
 interface SessionState {
   command: string | null
   phase: string
@@ -99,6 +143,7 @@ export default tool({
         const specOk = await exists(path.join(base, "spec.md"))
         const planOk = await exists(path.join(base, "plan.md"))
         const tasksOk = await exists(path.join(base, "tasks.md"))
+        const sj = await readSpecJson(base)
 
         let status: "ok" | "incomplete" | "orphan"
         if (specOk && planOk && tasksOk) {
@@ -130,11 +175,39 @@ export default tool({
         } else if (status === "orphan") {
           issues.push(`${dir}: empty directory (no artifacts)`)
         }
+
+        if (sj) {
+          const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+          if (sj.phase !== filesPhase) {
+            issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
+          }
+          if (sj.ready_for_implementation && filesPhase !== "ready") {
+            issues.push(`${dir}: marked ready_for_implementation but files show phase "${filesPhase}"`)
+          }
+        }
       }
 
       if (args.fix) {
         const session = await readSession(projectRoot)
         const fixedFields: string[] = []
+
+        for (const dir of entries) {
+          const base = path.join(specsDir, dir)
+          const specOk = await exists(path.join(base, "spec.md"))
+          const planOk = await exists(path.join(base, "plan.md"))
+          const tasksOk = await exists(path.join(base, "tasks.md"))
+          const sj = await readSpecJson(base)
+
+          if (sj) {
+            const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+            if (sj.phase !== filesPhase) {
+              sj.phase = filesPhase as SpecJson["phase"]
+              sj.ready_for_implementation = filesPhase === "ready"
+              await writeSpecJson(sj, base)
+              fixedFields.push(`${dir}: phase → ${filesPhase}`)
+            }
+          }
+        }
 
         if (session.featureDir) {
           const stillExists = reports.some(r => r.dir === session.featureDir)
@@ -161,26 +234,22 @@ export default tool({
         if (session.featureDir) {
           const report = reports.find(r => r.dir === session.featureDir)
           if (report) {
-            let expectedPhase: string, expectedNext: string
-            if (!report.spec) {
-              expectedPhase = "spec"; expectedNext = "/spec <description>"
-            } else if (!report.plan) {
-              expectedPhase = "plan"; expectedNext = "/plan <tech stack>"
-            } else if (!report.tasks) {
-              expectedPhase = "tasks"; expectedNext = "/tasks"
-            } else {
-              expectedPhase = "ready"; expectedNext = "/impl or /review"
-            }
-            if (session.phase !== expectedPhase) {
-              session.phase = expectedPhase
+            const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+            let expectedNext: string
+            if (filesPhase === "spec") expectedNext = "/spec <description>"
+            else if (filesPhase === "plan") expectedNext = "/plan <tech stack>"
+            else if (filesPhase === "tasks") expectedNext = "/tasks"
+            else expectedNext = "/impl or /review"
+            if (session.phase !== filesPhase) {
+              session.phase = filesPhase
               session.nextStep = expectedNext
-              fixedFields.push("phase")
+              fixedFields.push("session phase")
             }
           }
         }
 
         if (fixedFields.length > 0) {
-          session.lastResult = "session.json repaired: " + fixedFields.join(", ")
+          session.lastResult = "repaired: " + fixedFields.join(", ")
           session.history.push("/clean")
           if (session.history.length > 20) session.history = session.history.slice(-20)
           await writeSession(projectRoot, session)
@@ -195,6 +264,9 @@ export default tool({
       const incompleteCount = reports.filter(r => r.status === "incomplete").length
       const orphanCount = reports.filter(r => r.status === "orphan").length
 
+      const specJsonIssues = issues.filter(i => i.includes("spec.json"))
+      const fileIssues = issues.filter(i => !i.includes("spec.json"))
+
       return {
         title: `Clean: ${reports.length} features, ${issues.length} issues`,
         output: `${summary}  Next: /status`,
@@ -203,6 +275,7 @@ export default tool({
           ok: okCount,
           incomplete: incompleteCount,
           orphan: orphanCount,
+          specJsonMismatches: specJsonIssues.length,
           issues,
           reports: reports.map(r => ({
             dir: r.dir,

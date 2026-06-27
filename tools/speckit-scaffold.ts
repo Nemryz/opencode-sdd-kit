@@ -5,6 +5,60 @@ import os from "node:os"
 
 const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
 
+interface ApprovalState {
+  generated: boolean
+  approved: boolean
+}
+
+interface SpecJson {
+  feature_name: string
+  feature_number: number
+  created_at: string
+  updated_at: string
+  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
+  approvals: {
+    spec: ApprovalState
+    plan: ApprovalState
+    tasks: ApprovalState
+  }
+  ready_for_implementation: boolean
+}
+
+function makeSpecJson(featureName: string, featureNumber: number): SpecJson {
+  const now = new Date().toISOString()
+  return {
+    feature_name: featureName,
+    feature_number: featureNumber,
+    created_at: now,
+    updated_at: now,
+    phase: "spec",
+    approvals: {
+      spec: { generated: false, approved: false },
+      plan: { generated: false, approved: false },
+      tasks: { generated: false, approved: false },
+    },
+    ready_for_implementation: false,
+  }
+}
+
+function specJsonPath(featureDir: string): string {
+  return path.join(featureDir, "spec.json")
+}
+
+async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
+  try {
+    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
+    return JSON.parse(data) as SpecJson
+  } catch {
+    return null
+  }
+}
+
+async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
+  sj.updated_at = new Date().toISOString()
+  await fs.writeFile(specJsonPath(featureDir), JSON.stringify(sj, null, 2), "utf-8")
+}
+
 interface SessionState {
   command: string | null
   phase: string
@@ -165,6 +219,29 @@ export default tool({
         .replace(/NNN/g, String(featureNumber).padStart(3, "0"))
 
       await fs.writeFile(filePath, content, "utf-8")
+
+      const sjPath = specJsonPath(featurePath)
+      let sj = await readSpecJson(featurePath)
+      if (!sj) {
+        sj = makeSpecJson(args.featureName, featureNumber)
+      }
+      if (args.template === "spec") {
+        sj.phase = "spec"
+        sj.approvals.spec.generated = true
+      } else if (args.template === "plan") {
+        sj.approvals.spec.approved = true
+        sj.approvals.plan.generated = true
+        sj.phase = "plan"
+      } else if (args.template === "tasks") {
+        sj.approvals.plan.approved = true
+        sj.approvals.tasks.generated = true
+        sj.phase = "tasks"
+        if (sj.approvals.tasks.approved) {
+          sj.phase = "ready"
+          sj.ready_for_implementation = true
+        }
+      }
+      await writeSpecJson(sj, featurePath)
 
       const nextHint = args.template === "spec"
         ? "/plan <tech stack>"

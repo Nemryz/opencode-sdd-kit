@@ -15,6 +15,8 @@ Call `speckit-validate` with `command`: `"plan"`
 If `metadata.artifacts.spec` is `false`, stop and tell the user to run `/spec` first.
 Use `metadata.featureDir` as the feature directory for all subsequent steps.
 
+Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.spec.approved` is not `true`, tell the user the spec needs approval before planning can proceed and stop.
+
 ## Task
 
 1. Load the `speckit-plan-engineer` skill to guide your planning

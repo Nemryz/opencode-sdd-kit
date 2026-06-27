@@ -19,6 +19,14 @@ Use after the spec is complete and approved. The user provides their tech stack 
 
 ## How to use me
 
+### Step 0: Phase Gate
+
+Before starting, read `specs/NNN-feature-name/spec.json`. Check that:
+- `approvals.spec.approved === true` — the spec must be approved before planning
+- `phase` is `"spec"` or `"plan"` — otherwise the feature has already passed planning
+
+If the gate fails, stop and tell the user what needs to happen first.
+
 ### Step 1: Load Context
 
 Read all necessary context:
@@ -76,6 +84,13 @@ Wait for user confirmation before proceeding.
 6. Create `data-model.md` if entities are involved
 7. Create `contracts/` for API definitions if applicable
 8. Mark the plan as IMMUTABLE once written (do not modify after approval)
+
+### Step 5: Update spec.json
+
+After writing all plan artifacts, update `specs/NNN-feature-name/spec.json`:
+- Set `approvals.plan.generated = true`
+- Set `phase = "plan"`
+- Set `updated_at` to current UTC ISO-8601
 
 ## Safety & Fallback
 

@@ -27,7 +27,9 @@ Read all task documentation:
 
 ### Step 2: Preflight Checks
 
-- Validate tasks are approved (check phase status)
+- Read `specs/NNN-feature-name/spec.json` and verify:
+  - `approvals.tasks.approved === true` — tasks must be approved before implementation
+  - `phase` is `"tasks"` or `"ready"` — otherwise implementation has already started
 - Run `git status --porcelain` to note pre-existing uncommitted changes
 - Discover validation commands: check `package.json`, `Makefile`, `README*`, CI configs
 
@@ -62,7 +64,14 @@ After all tasks in a phase complete, run:
 
 If tests fail, fix before proceeding to the next phase.
 
-### Step 5: Final Verification
+### Step 5: Update spec.json
+
+After all phases complete, update `specs/NNN-feature-name/spec.json`:
+- Set `phase = "complete"`
+- Set `ready_for_implementation = true`
+- Set `updated_at` to current UTC ISO-8601
+
+### Step 6: Final Verification
 
 After all phases complete:
 1. Run full test suite (final)

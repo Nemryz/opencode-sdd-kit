@@ -17,6 +17,8 @@ Call `speckit-validate` with:
 If `metadata.artifacts.spec` or `metadata.artifacts.plan` is `false`, stop and tell the user what's needed.
 Use `metadata.featureDir` as the feature directory.
 
+Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.plan.approved` is not `true`, tell the user the plan needs approval before task decomposition can proceed and stop.
+
 ## Task
 
 1. Load the `speckit-task-decomposer` skill to guide your decomposition

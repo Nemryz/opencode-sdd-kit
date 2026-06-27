@@ -16,6 +16,8 @@ Call `speckit-validate` with `command`: `"impl"`
 If any of `metadata.artifacts.spec`, `metadata.artifacts.plan`, or `metadata.artifacts.tasks` is `false`, stop.
 Use `metadata.featureDir` as the feature directory.
 
+Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.tasks.approved` is not `true`, tell the user tasks need approval before implementation can proceed and stop.
+
 ## Task
 
 1. Load the `speckit-implementer` skill to guide your implementation

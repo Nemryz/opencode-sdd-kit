@@ -12,6 +12,8 @@ Read `.opencode/spec-memory/constitution.md` if it exists. The `$ARGUMENTS` vari
 
 If `$ARGUMENTS` is empty or blank, tell the user: "Provide a feature description. Example: /spec create a task management system with users" and stop.
 
+If the feature already has a `spec.json` with `phase` beyond `"spec"`, warn the user and ask if they want to create a new feature or overwrite.
+
 ## Task
 
 1. Load the `speckit-spec-writer` skill to guide your spec creation

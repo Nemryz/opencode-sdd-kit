@@ -26,8 +26,9 @@ Use at any point in the workflow to validate work done so far:
 ### Step 1: Load Context
 
 1. Read all available artifacts (spec, plan, tasks, constitution)
-2. Read domain map from `.opencode/domain-map.md` (if exists)
-3. Read steering context from `.opencode/` (if exists)
+2. Read `specs/NNN-feature-name/spec.json` — check `phase` and `approvals` to understand what has been completed
+3. Read domain map from `.opencode/domain-map.md` (if exists)
+4. Read steering context from `.opencode/` (if exists)
 
 ### Step 2: Review Dimensions (expanded)
 
@@ -70,6 +71,8 @@ Use at any point in the workflow to validate work done so far:
 - [ ] No orphan requirements (spec says X, plan doesn't address it)
 - [ ] No orphan tasks (task T-NNN doesn't map to any story)
 - [ ] Domain terms from domain-map.md are used consistently
+- [ ] spec.json phase matches actual file existence (all declared artifacts present)
+- [ ] spec.json approvals match review outcome
 
 ### Step 3: Ownership Classification (NEW)
 

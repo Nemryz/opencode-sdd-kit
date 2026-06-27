@@ -2,6 +2,38 @@ import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
 
+interface ApprovalState {
+  generated: boolean
+  approved: boolean
+}
+
+interface SpecJson {
+  feature_name: string
+  feature_number: number
+  created_at: string
+  updated_at: string
+  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
+  approvals: {
+    spec: ApprovalState
+    plan: ApprovalState
+    tasks: ApprovalState
+  }
+  ready_for_implementation: boolean
+}
+
+function specJsonPath(featureDir: string): string {
+  return path.join(featureDir, "spec.json")
+}
+
+async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
+  try {
+    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
+    return JSON.parse(data) as SpecJson
+  } catch {
+    return null
+  }
+}
+
 interface SessionState {
   command: string | null
   phase: string
@@ -110,26 +142,43 @@ export default tool({
       let specOk = false
       let planOk = false
       let tasksOk = false
-      let researchOk = false
-      let dataModelOk = false
-      let contractsOk = false
+      let specJson: SpecJson | null = null
+      let specJsonPhase: string | null = null
+      let mismatch = false
 
       if (featureDir) {
         const base = path.join(projectRoot, "specs", featureDir)
         specOk = await exists(path.join(base, "spec.md"))
         planOk = await exists(path.join(base, "plan.md"))
         tasksOk = await exists(path.join(base, "tasks.md"))
-        researchOk = await exists(path.join(base, "research.md"))
-        dataModelOk = await exists(path.join(base, "data-model.md"))
-        contractsOk = await exists(path.join(base, "contracts"))
+        specJson = await readSpecJson(base)
+        if (specJson) {
+          specJsonPhase = specJson.phase
+          const filesOk = specOk && planOk && tasksOk
+          if (specJson.phase === "ready" && !filesOk) {
+            mismatch = true
+          } else if (specJson.phase === "spec" && (planOk || tasksOk)) {
+            mismatch = true
+          } else if (specJson.phase === "plan" && !planOk) {
+            mismatch = true
+          } else if (specJson.phase === "tasks" && !tasksOk) {
+            mismatch = true
+          }
+        }
       }
 
       const parts: string[] = []
       if (!constitutionExists) parts.push("constitution missing")
       if (featureDir) {
+        if (specJsonPhase) {
+          parts.push(`spec.json phase: ${specJsonPhase}`)
+        }
         parts.push(specOk ? "spec ok" : "spec missing")
         parts.push(planOk ? "plan ok" : "plan missing")
         parts.push(tasksOk ? "tasks ok" : "tasks missing")
+        if (mismatch) {
+          parts.push("WARN: spec.json phase ≠ reality")
+        }
       } else {
         parts.push("no features")
       }
@@ -138,6 +187,14 @@ export default tool({
       if (!featureDir) {
         phase = "empty"
         nextStep = constitutionExists ? "/spec <description>" : "create constitution.md first"
+      } else if (specJsonPhase && !mismatch) {
+        phase = specJsonPhase
+        if (phase === "spec") nextStep = "/plan <tech stack>"
+        else if (phase === "plan") nextStep = "/tasks"
+        else if (phase === "tasks") nextStep = "/tasks (approve) or /impl"
+        else if (phase === "ready") nextStep = "/impl or /review"
+        else if (phase === "impl") nextStep = "/impl (continue)"
+        else nextStep = "/review"
       } else {
         ;({ phase, nextStep } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
       }
@@ -154,12 +211,16 @@ export default tool({
         await writeSession(projectRoot, session)
       }
 
+      const valid = phase === "ready"
+
       return {
-        title: phase === "ready" ? "Ready to implement" : "Phase: " + phase,
+        title: valid ? "Ready to implement" : "Phase: " + phase,
         output: parts.join(" | ") + " | Next: " + nextStep,
         metadata: {
-          valid: phase === "ready",
+          valid,
           phase,
+          specJsonPhase: specJsonPhase ?? null,
+          mismatch,
           nextCommand: nextStep,
           featureDir: featureDir ?? null,
           artifacts: { constitution: constitutionExists, spec: specOk, plan: planOk, tasks: tasksOk },

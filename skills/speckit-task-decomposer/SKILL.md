@@ -19,6 +19,14 @@ Use after the plan is complete and approved. The spec and plan must both exist b
 
 ## How to use me
 
+### Step 0: Phase Gate
+
+Before starting, read `specs/NNN-feature-name/spec.json`. Check that:
+- `approvals.plan.approved === true` — the plan must be approved before task decomposition
+- `phase` is `"plan"` or `"tasks"` — otherwise tasks have already been generated
+
+If the gate fails, stop and tell the user what needs to happen first.
+
 ### Step 1: Load Context
 
 Read all necessary artifacts:
@@ -62,7 +70,14 @@ Wait for user confirmation before writing.
 8. Include test tasks (tests are written BEFORE implementation)
 9. Verify each task has a clear file path or deliverable with observable done state
 
-### Step 4: Task-Graph Sanity Review (NEW)
+### Step 4: Update spec.json
+
+After writing tasks.md, update `specs/NNN-feature-name/spec.json`:
+- Set `approvals.tasks.generated = true`
+- Set `phase = "tasks"`
+- Set `updated_at` to current UTC ISO-8601
+
+### Step 5: Task-Graph Sanity Review (NEW)
 
 Before finalizing, run a lightweight review:
 
