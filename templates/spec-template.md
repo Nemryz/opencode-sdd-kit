@@ -1,6 +1,6 @@
 # Feature Specification: [FEATURE NAME]
 
-> Branch: `NNN-feature-name`
+> Branch: NNN-feature-name
 > Status: Draft | Clarifying | Approved
 
 ## Input
@@ -11,30 +11,33 @@
 
 ## User Stories
 
-### P1 — MVP (must have)
-**As a** [role],
-**I want** [capability],
-**So that** [benefit].
+### P1 - MVP (must have)
 
-**Acceptance (Gherkin):**
+As a [role],
+I want [capability],
+So that [benefit].
+
+Acceptance (Gherkin):
 - GIVEN [precondition]
 - WHEN [action]
 - THEN [expected result]
 
-### P2 — Important (should have)
-**As a** [role],
-**I want** [capability],
-**So that** [benefit].
+### P2 - Important (should have)
 
-**Acceptance (Gherkin):**
+As a [role],
+I want [capability],
+So that [benefit].
+
+Acceptance (Gherkin):
 - GIVEN [precondition]
 - WHEN [action]
 - THEN [expected result]
 
-### P3 — Nice to have
-**As a** [role],
-**I want** [capability],
-**So that** [benefit].
+### P3 - Nice to have
+
+As a [role],
+I want [capability],
+So that [benefit].
 
 ---
 
@@ -58,7 +61,21 @@
 
 ## Key Entities
 
-- **[Entity]**: [description without implementation details]
+| Entity | Description | Key Attributes | Relationships |
+|--------|-------------|----------------|---------------|
+| [EntityName] | [description] | [attr1, attr2] | [Related] |
+
+```mermaid
+classDiagram
+    class EntityName {
+        +type attribute1
+        +type attribute2
+    }
+    class RelatedEntity {
+        +type attr1
+    }
+    EntityName --> RelatedEntity : relation
+```
 
 ---
 
@@ -73,5 +90,5 @@
 
 ## Assumptions
 
-- [Assumption 1 — reasonable default where the user didn't specify]
+- [Assumption 1, reasonable default where the user did not specify]
 - [Assumption 2]

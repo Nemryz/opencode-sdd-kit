@@ -40,15 +40,15 @@
 specs/NNN-feature-name/
 ├── spec.md
 ├── plan.md
-├── research.md        (optional — technology research notes)
-├── data-model.md      (optional — schema / entities)
-├── contracts/         (optional — API contracts)
+├── research.md        (optional, technology research notes)
+├── data-model.md      (optional, schema / entities)
+├── contracts/         (optional, API contracts)
 
 ```
 
 ### Source Code Layout
 
-**Option: Single Project**
+Option: Single Project
 
 ```
 src/
@@ -56,7 +56,7 @@ src/
 └── ...
 ```
 
-**Option: Web Application**
+Option: Web Application
 
 ```
 frontend/

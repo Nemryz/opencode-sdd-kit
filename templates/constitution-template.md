@@ -26,9 +26,9 @@ Specs, plans, and decisions live in the repository alongside code. Update docs w
 
 ### Project-specific notes
 
-- **Simplicity**: [add project-specific constraints]
-- **Test approach**: [describe testing tools / patterns]
-- **Explicit config**: [document configuration approach]
-- **Integration tests**: [document integration test setup]
-- **Quality tools**: [list lint/format/type-check tools]
-- **Docs**: [document any doc conventions]
+- Simplicity: [add project-specific constraints]
+- Test approach: [describe testing tools / patterns]
+- Explicit config: [document configuration approach]
+- Integration tests: [document integration test setup]
+- Quality tools: [list lint/format/type-check tools]
+- Docs: [document any doc conventions]
