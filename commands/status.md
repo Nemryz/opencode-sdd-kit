@@ -5,7 +5,7 @@ description: Show current workflow phase and artifact status
 ## Task
 
 1. Call the `speckit-status` tool to get a concise status report
-2. If the tool output says "No hay features", suggest `/spec <descripcion>`
+2. If the tool output says "No features yet", suggest `/spec <description>`
 3. Otherwise, report the phase and next step based on the tool output
 
 ## Output format
