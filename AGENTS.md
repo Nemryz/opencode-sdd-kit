@@ -21,6 +21,9 @@ You MUST follow this order. Never skip a phase.
 
 Support: `/status` — show concise current phase and next step.
 
+### Optional: Clarify Phase
+If the spec contains `[NEEDS CLARIFICATION]` markers, insert a dedicated **Clarify** step between /spec and /plan. The agent stops, presents each ambiguity to the user, and resolves all markers before proceeding to planning. This prevents cascading bad assumptions.
+
 ---
 
 ## Quality Gates — Non-Negotiable
@@ -101,6 +104,27 @@ It can invoke subagents `@speckit-reviewer` and `@explore`.
 
 Switch with Tab. If you are in the wrong agent for the task, tell the user.
 
+### Agent Model Tiers (Recommended)
+
+For better cost/quality ratio, assign different models to different agents in your opencode.json:
+
+| Agent | Model | Why |
+|-------|-------|-----|
+| `build` | Fast model (e.g., gpt-4o-mini, claude-haiku) | Rapid iteration, code generation |
+| `plan` | Heavy reasoner (e.g., gpt-4o, claude-sonnet) | Architecture decisions, risk analysis |
+| `spec` | Heavy reasoner (e.g., gpt-4o, claude-sonnet) | Requirements analysis, writing artifacts |
+
+Example opencode.json config:
+```
+{
+  "agents": {
+    "build": { "model": "fast-model" },
+    "plan":  { "model": "heavy-reasoner" },
+    "spec":  { "model": "heavy-reasoner" }
+  }
+}
+```
+
 ---
 
 ## Artifact Locations
@@ -108,6 +132,8 @@ Switch with Tab. If you are in the wrong agent for the task, tell the user.
 ```
 Constitution:    .opencode/spec-memory/constitution.md
 Feature state:   .opencode/spec-memory/session.json
+Domain map:      .opencode/domain-map.md           — Glossary of domain terms (optional)
+Shared types:    .opencode/artifacts.schema.json   — JSON Schema for all artifacts (optional)
 
 specs/
 └── NNN-feature-name/
@@ -224,7 +250,7 @@ Examples:
 3. ALWAYS apply Constitution Gates before planning.
 4. ALWAYS run tests after each implementation phase.
 5. If the user asks for implementation while in the `spec` agent, suggest switching to `build`.
-All artifacts are written in English by default.
+6. All artifacts are written in English by default.
 7. The `[NEEDS CLARIFICATION]` marker means stop and ask the user before proceeding.
 
 ---

@@ -19,9 +19,11 @@ Use this skill FIRST, before any specification or planning. Every project needs 
 ## How to use me
 
 1. Read the project's AGENTS.md and existing context
-2. Ask clarifying questions about project preferences
-3. Create or update `.opencode/spec-memory/constitution.md`
-4. Validate each article against the project's real needs
+2. Read domain map from `.opencode/domain-map.md` (if exists) for domain-specific terminology and constraints
+3. Read steering context: `product.md`, `tech.md`, `structure.md` in `.opencode/` (if exists)
+4. Ask clarifying questions about project preferences
+5. Create or update `.opencode/spec-memory/constitution.md`
+6. Validate each article against the project's real needs
 
 ## Constitution template
 

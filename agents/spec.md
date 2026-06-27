@@ -60,7 +60,7 @@ When working on a project, follow this order:
 3. Planning - `/plan <tech stack>` creates the plan
 4. Tasks - `/tasks` breaks down into tasks
 5. Review - `/review` verifies consistency before implementation
-6. Implementation - suggest switching to the **build** agent to implement
+6. Implementation - suggest switching to the build agent to implement
 
 ## Quality
 
