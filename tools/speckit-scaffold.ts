@@ -66,7 +66,7 @@ export default tool({
   description: "Create a new feature scaffold: create specs/NNN-name/ or constitution with the appropriate template",
   args: {
     featureName: tool.schema.string().describe("Feature name or description to scaffold"),
-    template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering"]).describe("Which template to use"),
+    template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering", "data-model", "domain-map", "glossary"]).describe("Which template to use"),
     techStack: tool.schema.string().optional().describe("Tech stack description (for plan template)"),
     overwrite: tool.schema.boolean().optional().describe("Overwrite existing files if they exist"),
   },
@@ -136,6 +136,86 @@ export default tool({
           title: "Constitution created",
           output: "constitution.md created in .opencode/spec-memory/  Next: /spec <description>",
           metadata: { path: filePath },
+        }
+      }
+
+      // --- Project-level optional artifacts: domain-map, glossary ---
+
+      if (args.template === "domain-map" || args.template === "glossary") {
+        const dir = path.join(projectRoot, ".opencode")
+        const filePath = path.join(dir, `${args.template}.md`)
+        if (!args.overwrite) {
+          try {
+            await fs.access(filePath)
+            return {
+              title: `${args.template}.md exists`,
+              output: `${args.template}.md already exists in .opencode/  Use overwrite: true to overwrite`,
+              metadata: { exists: true, path: filePath },
+            }
+          } catch (err: unknown) {
+            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+          }
+        }
+        await fs.mkdir(dir, { recursive: true })
+        let content = template ?? `# ${args.template === "domain-map" ? "Domain Map" : "Domain Glossary"}\n\nOptional ${args.template} for the project.\n`
+        content = content.replace(/\[PROJECT NAME\]/g, args.featureName)
+        await fs.writeFile(filePath, content, "utf-8")
+        return {
+          title: `${args.template}.md created`,
+          output: `${args.template}.md created in .opencode/  Next: /spec <description>`,
+          metadata: { path: filePath },
+        }
+      }
+
+      // --- Per-feature optional artifact: data-model ---
+
+      if (args.template === "data-model") {
+        const specsDir = specsDirPath(projectRoot)
+        let targetDir: string | null = null
+        try {
+          const entries = await fs.readdir(specsDir, { withFileTypes: true })
+          const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
+          if (dirs.length === 0) {
+            return {
+              title: "Error",
+              output: "No feature directories found in specs/. Create a spec first with /spec <description>",
+              metadata: { error: "no features exist" },
+            }
+          }
+          const exact = dirs.find(d => d === args.featureName || d.endsWith(`-${args.featureName}`))
+          if (exact) {
+            targetDir = exact
+          } else {
+            targetDir = dirs[dirs.length - 1]
+          }
+        } catch {
+          return {
+            title: "Error",
+            output: "Cannot access specs/ directory. Create a feature first with /spec <description>",
+            metadata: { error: "specs dir not found or empty" },
+          }
+        }
+        const featurePath = path.join(projectRoot, "specs", targetDir!)
+        const filePath = path.join(featurePath, "data-model.md")
+        if (!args.overwrite) {
+          try {
+            await fs.access(filePath)
+            return {
+              title: "data-model.md exists",
+              output: `data-model.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
+              metadata: { exists: true, path: filePath },
+            }
+          } catch (err: unknown) {
+            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+          }
+        }
+        let content = template ?? "# Data Model\n\nData model for the feature.\n"
+        content = content.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
+        await fs.writeFile(filePath, content, "utf-8")
+        return {
+          title: "data-model.md created",
+          output: `data-model.md created in specs/${targetDir}/  Next: continue with your workflow`,
+          metadata: { path: filePath, featureDir: targetDir },
         }
       }
 
