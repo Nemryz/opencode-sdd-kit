@@ -13,7 +13,7 @@
 
 | Aspect | Decision | Notes |
 |--------|----------|-------|
-| Language / Version | | |
+| Language / Version | [TECH STACK] | |
 | Primary Dependencies | | |
 | Data Storage | | |
 | Testing Strategy | | |

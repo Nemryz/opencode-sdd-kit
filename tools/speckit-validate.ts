@@ -90,9 +90,7 @@ export default tool({
       session.history.push(args.command ? "/" + args.command : "/review")
       if (session.history.length > 20) session.history = session.history.slice(-20)
 
-      if (!args.command) {
-        await writeSession(projectRoot, session)
-      }
+      await writeSession(projectRoot, session)
 
       const valid = phase === "ready"
 

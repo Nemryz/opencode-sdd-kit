@@ -71,7 +71,7 @@ T-008
 
 ### T-008 Create spec.json schema and template
 - **Story**: 7 (Phase Tracking)
-- **File**: `templates/spec-json-template.md`, `tools/speckit-scaffold.ts` (schema constant)
+- **File**: `docs/spec-json-schema.md`, `tools/speckit-scaffold.ts` (schema constant)
 - **Deliverable**: spec.json schema defined as constant in scaffold; template file created; format matches cc-sdd pattern with `phase`, `approvals`, `updated_at`
 - **Dependencies**: none
 

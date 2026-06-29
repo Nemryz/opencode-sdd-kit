@@ -321,6 +321,7 @@ export default tool({
       }
       content = content
         .replace(/\[FEATURE NAME\]/g, args.featureName)
+        .replace(/\[TECH STACK\]/g, args.techStack ?? "")
         .replace(/NNN-feature-name/g, featureDirName)
         .replace(/NNN/g, String(featureNumber).padStart(3, "0"))
 
