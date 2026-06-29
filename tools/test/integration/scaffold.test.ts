@@ -206,6 +206,53 @@ describe("scaffold tasks", () => {
   })
 })
 
+// ── Lifecycle: spec → plan → tasks in same directory ─────────
+
+describe("spec to plan to tasks lifecycle", () => {
+  it("places plan.md and tasks.md in the same directory as spec.md", async () => {
+    const r1 = await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    expect(r1.metadata?.featureDir).toBe("001-auth")
+
+    const r2 = await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    expect(r2.metadata?.featureDir).toBe("001-auth")
+    expect(r2.metadata?.phase).toBe("plan")
+
+    const r3 = await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    expect(r3.metadata?.featureDir).toBe("001-auth")
+    expect(r3.metadata?.phase).toBe("tasks")
+
+    const specPath = path.join(worktree, "specs", "001-auth", "spec.md")
+    const planPath = path.join(worktree, "specs", "001-auth", "plan.md")
+    const tasksPath = path.join(worktree, "specs", "001-auth", "tasks.md")
+    const specExists = await fs.access(specPath).then(() => true).catch(() => false)
+    const planExists = await fs.access(planPath).then(() => true).catch(() => false)
+    const tasksExists = await fs.access(tasksPath).then(() => true).catch(() => false)
+    expect(specExists).toBe(true)
+    expect(planExists).toBe(true)
+    expect(tasksExists).toBe(true)
+
+    const sj = await readSpecJson(path.join(worktree, "specs", "001-auth"))
+    expect(sj?.phase).toBe("tasks")
+    expect(sj?.approvals.spec.generated).toBe(true)
+    expect(sj?.approvals.spec.approved).toBe(true)
+    expect(sj?.approvals.plan.generated).toBe(true)
+    expect(sj?.approvals.plan.approved).toBe(true)
+    expect(sj?.approvals.tasks.generated).toBe(true)
+  })
+
+  it("creates new directory when plan is called without a prior spec", async () => {
+    const result = await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    expect(result.metadata?.featureDir).toBe("001-auth")
+    expect(result.metadata?.phase).toBe("plan")
+  })
+
+  it("creates new directory when tasks is called without a prior spec", async () => {
+    const result = await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    expect(result.metadata?.featureDir).toBe("001-auth")
+    expect(result.metadata?.phase).toBe("tasks")
+  })
+})
+
 // ── Per-feature optional scaffolds ───────────────────────────
 
 describe("scaffold data-model", () => {

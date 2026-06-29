@@ -68,11 +68,32 @@ async function findTargetFeatureDir(projectRoot: string, featureName: string): P
     const entries = await fs.readdir(specsDir, { withFileTypes: true })
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
     if (dirs.length === 0) return null
-    const exact = dirs.find(d => d === featureName || d.endsWith(`-${featureName}`))
+    const { slug } = slugify(featureName)
+    const exact = dirs.find(d => {
+      const dirSlug = d.replace(/^\d+-/, "")
+      return dirSlug === slug
+    })
     return exact ?? dirs[dirs.length - 1]
   } catch {
     return null
   }
+}
+
+async function findExactFeatureBySlug(projectRoot: string, featureName: string): Promise<string | null> {
+  const specsDir = specsDirPath(projectRoot)
+  const { slug } = slugify(featureName)
+  try {
+    const entries = await fs.readdir(specsDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const dirSlug = entry.name.replace(/^\d+-/, "")
+        if (dirSlug === slug) {
+          return entry.name
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return null
 }
 
 async function safeToWrite(filePath: string, overwrite?: boolean): Promise<boolean> {
@@ -266,12 +287,33 @@ export default tool({
         }
       }
 
-      const featureNumber = await getNextFeatureNumber(projectRoot)
-      const { dir: slug, truncated: slugTruncated } = makeFeatureDirName(args.featureName, featureNumber)
-      const featureDirName = slug
-      const featurePath = path.join(projectRoot, "specs", featureDirName)
+      let featureDirName: string
+      let featureNumber: number
+      let featurePath: string
+      let slugTruncated = false
 
-      await fs.mkdir(featurePath, { recursive: true })
+      if (args.template === "plan" || args.template === "tasks") {
+        const existing = await findExactFeatureBySlug(projectRoot, args.featureName)
+        if (existing) {
+          featureDirName = existing
+          featurePath = path.join(specsDirPath(projectRoot), existing)
+          featureNumber = parseInt(existing.match(/^(\d+)/)?.[1] ?? "0", 10)
+        } else {
+          featureNumber = await getNextFeatureNumber(projectRoot)
+          const r = makeFeatureDirName(args.featureName, featureNumber)
+          featureDirName = r.dir
+          featurePath = path.join(projectRoot, "specs", featureDirName)
+          slugTruncated = r.truncated
+          await fs.mkdir(featurePath, { recursive: true })
+        }
+      } else {
+        featureNumber = await getNextFeatureNumber(projectRoot)
+        const r = makeFeatureDirName(args.featureName, featureNumber)
+        featureDirName = r.dir
+        featurePath = path.join(projectRoot, "specs", featureDirName)
+        slugTruncated = r.truncated
+        await fs.mkdir(featurePath, { recursive: true })
+      }
 
       const fileName = `${args.template}.md`
       const filePath = path.join(featurePath, fileName)
