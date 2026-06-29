@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { mockContext, createTempWorktree, destroyTempWorktree } from "./setup"
+import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "./setup"
 import fs from "node:fs/promises"
 import path from "node:path"
 
@@ -16,12 +16,11 @@ describe("mockContext", () => {
 })
 
 describe("createTempWorktree", () => {
-  it("creates a temp directory with constitution.md", async () => {
+  it("creates an empty temp directory", async () => {
     const dir = await createTempWorktree()
     try {
-      const constitutionPath = path.join(dir, ".opencode", "spec-memory", "constitution.md")
-      const content = await fs.readFile(constitutionPath, "utf-8")
-      expect(content).toContain("Test Constitution")
+      const entries = await fs.readdir(dir)
+      expect(entries).toEqual([])
     } finally {
       await destroyTempWorktree(dir)
     }
@@ -33,5 +32,19 @@ describe("createTempWorktree", () => {
     expect(dir1).not.toBe(dir2)
     await destroyTempWorktree(dir1)
     await destroyTempWorktree(dir2)
+  })
+})
+
+describe("createConstitution", () => {
+  it("creates constitution.md at the expected path", async () => {
+    const dir = await createTempWorktree()
+    try {
+      await createConstitution(dir)
+      const filePath = path.join(dir, ".opencode", "spec-memory", "constitution.md")
+      const content = await fs.readFile(filePath, "utf-8")
+      expect(content).toContain("Test Constitution")
+    } finally {
+      await destroyTempWorktree(dir)
+    }
   })
 })

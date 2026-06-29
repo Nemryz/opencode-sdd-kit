@@ -18,10 +18,13 @@ export function mockContext(worktree: string): ToolContext {
 
 export async function createTempWorktree(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sdd-test-"))
-  const specMemory = path.join(dir, ".opencode", "spec-memory")
+  return dir
+}
+
+export async function createConstitution(worktree: string): Promise<void> {
+  const specMemory = path.join(worktree, ".opencode", "spec-memory")
   await fs.mkdir(specMemory, { recursive: true })
   await fs.writeFile(path.join(specMemory, "constitution.md"), "# Test Constitution\n", "utf-8")
-  return dir
 }
 
 export async function destroyTempWorktree(dir: string): Promise<void> {
