@@ -12,7 +12,7 @@ import {
   getFeatureDirs,
   PHASE_NEXT_STEP,
   specsDirPath,
-  SpecJson,
+  parsePhase,
 } from "./shared/types"
 
 export default tool({
@@ -106,16 +106,15 @@ export default tool({
         const fixedFields: string[] = []
 
         for (const dir of entries) {
+          const report = reports.find(r => r.dir === dir)
+          if (!report) continue
           const base = path.join(specsDir, dir)
-          const specOk = await exists(path.join(base, "spec.md"))
-          const planOk = await exists(path.join(base, "plan.md"))
-          const tasksOk = await exists(path.join(base, "tasks.md"))
           const sj = await readSpecJson(base)
 
           if (sj) {
-            const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+            const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
             if (sj.phase !== filesPhase) {
-              sj.phase = filesPhase as SpecJson["phase"]
+              sj.phase = parsePhase(filesPhase)
               sj.ready_for_implementation = filesPhase === "ready" && sj.approvals.tasks.approved
               await writeSpecJson(sj, base)
               fixedFields.push(`${dir}: phase → ${filesPhase}`)
@@ -134,7 +133,7 @@ export default tool({
         } else if (reports.length > 0) {
           session.featureDir = reports[reports.length - 1].dir
           session.featureNumber = parseNNN(session.featureDir)
-          fixedFields.push("featureDir (asignado)")
+          fixedFields.push("featureDir (assigned)")
         }
 
         if (session.featureNumber != null && session.featureDir) {
@@ -174,8 +173,7 @@ export default tool({
       const incompleteCount = reports.filter(r => r.status === "incomplete").length
       const orphanCount = reports.filter(r => r.status === "orphan").length
 
-      const specJsonIssues = issues.filter(i => i.includes("spec.json"))
-      const fileIssues = issues.filter(i => !i.includes("spec.json"))
+      const specJsonMismatches = issues.filter(i => i.includes("spec.json")).length
 
       return {
         title: `Clean: ${reports.length} features, ${issues.length} issues`,
@@ -185,7 +183,7 @@ export default tool({
           ok: okCount,
           incomplete: incompleteCount,
           orphan: orphanCount,
-          specJsonMismatches: specJsonIssues.length,
+          specJsonMismatches,
           issues,
           reports: reports.map(r => ({
             dir: r.dir,

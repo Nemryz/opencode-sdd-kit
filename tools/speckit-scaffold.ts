@@ -8,10 +8,10 @@ import {
   readSpecJson,
   writeSpecJson,
   makeSpecJson,
-  SpecJson,
   specsDirPath,
   steeringDirPath,
   exists,
+  isENOENT,
 } from "./shared/types"
 
 const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
@@ -59,6 +59,30 @@ async function readTemplate(name: string): Promise<string | null> {
     return await fs.readFile(templatePath, "utf-8")
   } catch {
     return null
+  }
+}
+
+async function findTargetFeatureDir(projectRoot: string, featureName: string): Promise<string | null> {
+  const specsDir = specsDirPath(projectRoot)
+  try {
+    const entries = await fs.readdir(specsDir, { withFileTypes: true })
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
+    if (dirs.length === 0) return null
+    const exact = dirs.find(d => d === featureName || d.endsWith(`-${featureName}`))
+    return exact ?? dirs[dirs.length - 1]
+  } catch {
+    return null
+  }
+}
+
+async function safeToWrite(filePath: string, overwrite?: boolean): Promise<boolean> {
+  if (overwrite) return true
+  try {
+    await fs.access(filePath)
+    return false
+  } catch (err) {
+    if (!isENOENT(err)) throw err
+    return true
   }
 }
 
@@ -116,16 +140,12 @@ export default tool({
       if (args.template === "constitution") {
         const dir = path.join(projectRoot, ".opencode", "spec-memory")
         const filePath = path.join(dir, "constitution.md")
-        if (!args.overwrite) {
-          try {
-            await fs.access(filePath)
-            return {
-              title: "Constitution exists",
-              output: "constitution.md already exists in .opencode/spec-memory/  Use overwrite: true to overwrite",
-              metadata: { exists: true, path: filePath },
-            }
-          } catch (err: unknown) {
-            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+        const canWrite = await safeToWrite(filePath, args.overwrite)
+        if (!canWrite) {
+          return {
+            title: "Constitution exists",
+            output: "constitution.md already exists in .opencode/spec-memory/  Use overwrite: true to overwrite",
+            metadata: { exists: true, path: filePath },
           }
         }
         await fs.mkdir(dir, { recursive: true })
@@ -144,16 +164,12 @@ export default tool({
       if (args.template === "domain-map" || args.template === "glossary") {
         const dir = path.join(projectRoot, ".opencode")
         const filePath = path.join(dir, `${args.template}.md`)
-        if (!args.overwrite) {
-          try {
-            await fs.access(filePath)
-            return {
-              title: `${args.template}.md exists`,
-              output: `${args.template}.md already exists in .opencode/  Use overwrite: true to overwrite`,
-              metadata: { exists: true, path: filePath },
-            }
-          } catch (err: unknown) {
-            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+        const canWrite = await safeToWrite(filePath, args.overwrite)
+        if (!canWrite) {
+          return {
+            title: `${args.template}.md exists`,
+            output: `${args.template}.md already exists in .opencode/  Use overwrite: true to overwrite`,
+            metadata: { exists: true, path: filePath },
           }
         }
         await fs.mkdir(dir, { recursive: true })
@@ -170,43 +186,22 @@ export default tool({
       // --- Per-feature optional artifact: data-model ---
 
       if (args.template === "data-model") {
-        const specsDir = specsDirPath(projectRoot)
-        let targetDir: string | null = null
-        try {
-          const entries = await fs.readdir(specsDir, { withFileTypes: true })
-          const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
-          if (dirs.length === 0) {
-            return {
-              title: "Error",
-              output: "No feature directories found in specs/. Create a spec first with /spec <description>",
-              metadata: { error: "no features exist" },
-            }
-          }
-          const exact = dirs.find(d => d === args.featureName || d.endsWith(`-${args.featureName}`))
-          if (exact) {
-            targetDir = exact
-          } else {
-            targetDir = dirs[dirs.length - 1]
-          }
-        } catch {
+        const targetDir = await findTargetFeatureDir(projectRoot, args.featureName)
+        if (!targetDir) {
           return {
             title: "Error",
-            output: "Cannot access specs/ directory. Create a feature first with /spec <description>",
-            metadata: { error: "specs dir not found or empty" },
+            output: "No feature directories found in specs/. Create a spec first with /spec <description>",
+            metadata: { error: "no features exist" },
           }
         }
-        const featurePath = path.join(projectRoot, "specs", targetDir!)
+        const featurePath = path.join(specsDirPath(projectRoot), targetDir)
         const filePath = path.join(featurePath, "data-model.md")
-        if (!args.overwrite) {
-          try {
-            await fs.access(filePath)
-            return {
-              title: "data-model.md exists",
-              output: `data-model.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
-              metadata: { exists: true, path: filePath },
-            }
-          } catch (err: unknown) {
-            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+        const canWrite = await safeToWrite(filePath, args.overwrite)
+        if (!canWrite) {
+          return {
+            title: "data-model.md exists",
+            output: `data-model.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
+            metadata: { exists: true, path: filePath },
           }
         }
         let content = template ?? "# Data Model\n\nData model for the feature.\n"
@@ -222,41 +217,24 @@ export default tool({
       // --- Per-feature optional artifacts: research, contracts ---
 
       if (args.template === "research" || args.template === "contracts") {
-        const specsDir = specsDirPath(projectRoot)
-        let targetDir: string | null = null
-        try {
-          const entries = await fs.readdir(specsDir, { withFileTypes: true })
-          const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
-          if (dirs.length === 0) {
-            return {
-              title: "Error",
-              output: "No feature directories found in specs/. Create a spec first with /spec <description>",
-              metadata: { error: "no features exist" },
-            }
-          }
-          const exact = dirs.find(d => d === args.featureName || d.endsWith(`-${args.featureName}`))
-          targetDir = exact ?? dirs[dirs.length - 1]
-        } catch {
+        const targetDir = await findTargetFeatureDir(projectRoot, args.featureName)
+        if (!targetDir) {
           return {
             title: "Error",
-            output: "Cannot access specs/ directory. Create a feature first with /spec <description>",
-            metadata: { error: "specs dir not found or empty" },
+            output: "No feature directories found in specs/. Create a spec first with /spec <description>",
+            metadata: { error: "no features exist" },
           }
         }
 
         if (args.template === "research") {
           const featurePath = path.join(projectRoot, "specs", targetDir!)
           const filePath = path.join(featurePath, "research.md")
-          if (!args.overwrite) {
-            try {
-              await fs.access(filePath)
-              return {
-                title: "research.md exists",
-                output: `research.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
-                metadata: { exists: true, path: filePath },
-              }
-            } catch (err: unknown) {
-              if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+          const canWrite = await safeToWrite(filePath, args.overwrite)
+          if (!canWrite) {
+            return {
+              title: "research.md exists",
+              output: `research.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
+              metadata: { exists: true, path: filePath },
             }
           }
           let content = template ?? "# Research\n\nTechnology research notes.\n"
@@ -275,7 +253,7 @@ export default tool({
           await fs.mkdir(dirPath, { recursive: true })
           if (template) {
             const indexPath = path.join(dirPath, "_template.md")
-            if (args.overwrite || !(await exists(indexPath).catch(() => false))) {
+            if (args.overwrite || !(await exists(indexPath))) {
               let content = template.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
               await fs.writeFile(indexPath, content, "utf-8")
             }
@@ -298,16 +276,12 @@ export default tool({
       const fileName = `${args.template}.md`
       const filePath = path.join(featurePath, fileName)
 
-      if (!args.overwrite) {
-        try {
-          await fs.access(filePath)
-          return {
-            title: "File exists",
-            output: `${fileName} already exists in specs/${featureDirName}/  Use overwrite: true to overwrite`,
-            metadata: { exists: true, path: filePath },
-          }
-        } catch (err: unknown) {
-          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+      const canWrite = await safeToWrite(filePath, args.overwrite)
+      if (!canWrite) {
+        return {
+          title: "File exists",
+          output: `${fileName} already exists in specs/${featureDirName}/  Use overwrite: true to overwrite`,
+          metadata: { exists: true, path: filePath },
         }
       }
 

@@ -32,9 +32,11 @@ export default tool({
       for (const dir of dirs) {
         const base = path.join(specsDirPath(projectRoot), dir)
         const sj = await readSpecJson(base)
-        const specOk = await exists(path.join(base, "spec.md"))
-        const planOk = await exists(path.join(base, "plan.md"))
-        const tasksOk = await exists(path.join(base, "tasks.md"))
+        const [specOk, planOk, tasksOk] = await Promise.all([
+          exists(path.join(base, "spec.md")),
+          exists(path.join(base, "plan.md")),
+          exists(path.join(base, "tasks.md")),
+        ])
 
         let phase: string
         if (sj) {

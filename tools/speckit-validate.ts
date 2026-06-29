@@ -51,6 +51,8 @@ export default tool({
             mismatch = true
           } else if (specJson.phase === "tasks" && !tasksOk) {
             mismatch = true
+          } else if ((specJson.phase === "impl" || specJson.phase === "complete") && !filesOk) {
+            mismatch = true
           }
         }
       }

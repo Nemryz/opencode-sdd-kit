@@ -59,7 +59,11 @@ export default tool({
       }
 
       if (args.key) {
-        const raw = cfg.preferences[args.key] ?? (cfg as unknown as Record<string, unknown>)[args.key] ?? null
+        const knownKeys: Record<string, string | null> = {
+          defaultTechStack: cfg.defaultTechStack,
+          lastUsedLanguage: cfg.lastUsedLanguage,
+        }
+        const raw = cfg.preferences[args.key] ?? knownKeys[args.key] ?? null
         const val = typeof raw === "object" ? JSON.stringify(raw) : raw
         return {
           title: "Configuration read",

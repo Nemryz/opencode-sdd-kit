@@ -191,6 +191,17 @@ export function detectPhaseFromFiles(
   return "ready"
 }
 
+// ─────────────────────────── Error / Cast helpers ───────────────────────────
+
+export function isENOENT(err: unknown): boolean {
+  return err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT"
+}
+
+export function parsePhase(s: string): Phase {
+  const valid: Phase[] = ["spec", "plan", "tasks", "ready", "impl", "complete"]
+  return valid.includes(s as Phase) ? (s as Phase) : "spec"
+}
+
 // ─────────────────────────── Session I/O ───────────────────────────
 
 export async function readSession(root: string): Promise<SessionState> {
@@ -216,10 +227,10 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
     const parsed = JSON.parse(data)
     const result = SpecJsonSchema.safeParse(parsed)
     if (result.success) {
-      return result.data as SpecJson
+      return result.data
     }
     console.warn(`spec.json validation failed for ${featureDir}:`, result.error)
-    return parsed as SpecJson
+    return null
   } catch {
     return null
   }
@@ -253,23 +264,8 @@ export async function getFeatureDirs(projectRoot: string): Promise<string[]> {
 }
 
 export async function getLatestFeatureDir(projectRoot: string): Promise<string | null> {
-  const sDir = specsDirPath(projectRoot)
-  try {
-    const entries = await fs.readdir(sDir, { withFileTypes: true })
-    const dirs: { name: string; nnn: number }[] = []
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const nnn = parseNNN(entry.name)
-        if (nnn > 0) {
-          dirs.push({ name: entry.name, nnn })
-        }
-      }
-    }
-    dirs.sort((a, b) => b.nnn - a.nnn)
-    return dirs.length > 0 ? dirs[0].name : null
-  } catch {
-    return null
-  }
+  const dirs = await getFeatureDirs(projectRoot)
+  return dirs.length > 0 ? dirs[dirs.length - 1] : null
 }
 
 export function makeSpecJson(featureName: string, featureNumber: number): SpecJson {

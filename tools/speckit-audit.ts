@@ -10,7 +10,8 @@ import {
   specsDirPath,
   steeringDirPath,
   PATHS,
-  SpecJson,
+  detectPhaseFromFiles,
+  parsePhase,
 } from "./shared/types"
 
 interface AuditFinding {
@@ -51,38 +52,36 @@ async function auditFeature(
     return
   }
 
-  if (sj.phase === "complete" || sj.phase === "impl") {
-    return
-  }
-
-  if (sj.phase === "ready" && !(specOk && planOk && tasksOk)) {
-    findings.push({
-      severity: "error",
-      category: "phase-mismatch",
-      message: `${dirName}: spec.json says ready but files missing (spec=${specOk}, plan=${planOk}, tasks=${tasksOk})`,
-      file: path.join(base, "spec.json"),
-    })
-  } else if (sj.phase === "tasks" && !tasksOk) {
-    findings.push({
-      severity: "error",
-      category: "phase-mismatch",
-      message: `${dirName}: spec.json says tasks but tasks.md missing`,
-      file: path.join(base, "spec.json"),
-    })
-  } else if (sj.phase === "plan" && !planOk) {
-    findings.push({
-      severity: "error",
-      category: "phase-mismatch",
-      message: `${dirName}: spec.json says plan but plan.md missing`,
-      file: path.join(base, "spec.json"),
-    })
-  } else if (sj.phase === "spec" && !specOk) {
-    findings.push({
-      severity: "error",
-      category: "phase-mismatch",
-      message: `${dirName}: spec.json says spec but spec.md missing`,
-      file: path.join(base, "spec.json"),
-    })
+  if (sj.phase !== "complete" && sj.phase !== "impl") {
+    if (sj.phase === "ready" && !(specOk && planOk && tasksOk)) {
+      findings.push({
+        severity: "error",
+        category: "phase-mismatch",
+        message: `${dirName}: spec.json says ready but files missing (spec=${specOk}, plan=${planOk}, tasks=${tasksOk})`,
+        file: path.join(base, "spec.json"),
+      })
+    } else if (sj.phase === "tasks" && !tasksOk) {
+      findings.push({
+        severity: "error",
+        category: "phase-mismatch",
+        message: `${dirName}: spec.json says tasks but tasks.md missing`,
+        file: path.join(base, "spec.json"),
+      })
+    } else if (sj.phase === "plan" && !planOk) {
+      findings.push({
+        severity: "error",
+        category: "phase-mismatch",
+        message: `${dirName}: spec.json says plan but plan.md missing`,
+        file: path.join(base, "spec.json"),
+      })
+    } else if (sj.phase === "spec" && !specOk) {
+      findings.push({
+        severity: "error",
+        category: "phase-mismatch",
+        message: `${dirName}: spec.json says spec but spec.md missing`,
+        file: path.join(base, "spec.json"),
+      })
+    }
   }
 
   if (!sj.approvals.spec.generated && specOk) {
@@ -283,10 +282,10 @@ export default tool({
                 const specOk = await exists(path.join(base, "spec.md"))
                 const planOk = await exists(path.join(base, "plan.md"))
                 const tasksOk = await exists(path.join(base, "tasks.md"))
-                const newPhase = !specOk ? "spec" : !planOk ? "plan" : !tasksOk ? "tasks" : "ready"
+                const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
                 const sjPrev = await readSpecJson(base)
                 if (sjPrev && sjPrev.phase !== newPhase) {
-                  sjPrev.phase = newPhase as SpecJson["phase"]
+                  sjPrev.phase = parsePhase(newPhase)
                   await writeSpecJson(sjPrev, base)
                   finding.message += " (auto-fixed)"
                 }
