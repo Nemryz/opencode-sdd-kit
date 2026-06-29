@@ -68,7 +68,6 @@ If tests fail, fix before proceeding to the next phase.
 
 After all phases complete, update `specs/NNN-feature-name/spec.json`:
 - Set `phase = "complete"`
-- Set `ready_for_implementation = true`
 - Set `updated_at` to current UTC ISO-8601
 
 ### Step 6: Final Verification

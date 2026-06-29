@@ -155,7 +155,7 @@ export default tool({
         if (sj) {
           phase = sj.phase
         } else {
-          ;({ phase } = detectPhase(specOk, planOk, tasksOk, false))
+          ;({ phase } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
         }
         featurePhases.push({ dir, phase })
         phaseCounts[phase] = (phaseCounts[phase] || 0) + 1
@@ -173,7 +173,16 @@ export default tool({
       session.command = "/status"
       session.phase = latestPhase
       session.featureDir = latest || session.featureDir
-      session.nextStep = session.phase === "ready" ? "/impl or /review" : "/spec <description>"
+      const nextStepMap: Record<string, string> = {
+        init: "/spec <description>",
+        spec: "/plan <tech stack>",
+        plan: "/tasks",
+        tasks: "/tasks (approve) or /impl",
+        ready: "/impl or /review",
+        impl: "/impl (continue)",
+        complete: "/review or start a new feature",
+      }
+      session.nextStep = nextStepMap[session.phase] ?? "/spec <description>"
       session.lastResult = summary
       session.history.push("/status")
       if (session.history.length > 20) session.history = session.history.slice(-20)

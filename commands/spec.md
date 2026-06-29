@@ -12,7 +12,9 @@ Read `.opencode/spec-memory/constitution.md` if it exists. The `$ARGUMENTS` vari
 
 If `$ARGUMENTS` is empty or blank, tell the user: "Provide a feature description. Example: /spec create a task management system with users" and stop.
 
-If the feature already has a `spec.json` with `phase` beyond `"spec"`, warn the user and ask if they want to create a new feature or overwrite.
+Call `speckit-validate` with `command`: `"spec"`
+
+If `metadata.artifacts.spec` is `true` for the latest feature, warn the user and ask if they want to create a new feature or overwrite. Use `metadata.featureDir` to determine the latest feature.
 
 ## Task
 

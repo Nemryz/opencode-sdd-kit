@@ -171,7 +171,9 @@ export default tool({
               output: "constitution.md already exists in .opencode/spec-memory/  Use overwrite: true to overwrite",
               metadata: { exists: true, path: filePath },
             }
-          } catch { }
+          } catch (err: unknown) {
+            if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+          }
         }
         await fs.mkdir(dir, { recursive: true })
         let content = template ?? "# Project Constitution\n\nDefault articles TBD."
@@ -202,7 +204,9 @@ export default tool({
             output: `${fileName} already exists in specs/${featureDirName}/  Use overwrite: true to overwrite`,
             metadata: { exists: true, path: filePath },
           }
-        } catch { }
+        } catch (err: unknown) {
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+        }
       }
 
       let content = template ?? ""
