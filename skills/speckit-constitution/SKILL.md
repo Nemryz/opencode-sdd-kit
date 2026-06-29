@@ -18,13 +18,20 @@ Use this skill FIRST, before any specification or planning. Every project needs 
 
 ## How to use me
 
-1. Read the project's AGENTS.md and existing context
-2. Read domain map from `.opencode/domain-map.md` (if exists) for domain-specific terminology and constraints
-3. Read steering context: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
-4. Optionally scan `specs/*/spec.json` to understand current project state and phase
-5. Ask clarifying questions about project preferences
-6. Create or update `.opencode/spec-memory/constitution.md`
-7. Validate each article against the project's real needs
+### Step 0: Phase Gate
+
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, inform the user and resolve them before creating a constitution.
+
+### Step 1: Load Context
+
+Read the project's AGENTS.md and existing context.
+
+1. Read domain map from `.opencode/domain-map.md` (if exists) for domain-specific terminology and constraints
+2. Read steering context: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
+3. Scan `specs/*/spec.json` to understand current project state and phase
+4. Ask clarifying questions about project preferences
+5. Create or update `.opencode/spec-memory/constitution.md`
+6. Validate each article against the project's real needs
 
 ## Constitution template
 

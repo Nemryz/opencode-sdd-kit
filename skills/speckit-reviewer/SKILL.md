@@ -23,6 +23,10 @@ Use at any point in the workflow to validate work done so far:
 
 ## How to use me
 
+### Step 0: Phase Gate
+
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, note them as input to the review.
+
 ### Step 1: Load Context
 
 1. Read all available artifacts (spec, plan, tasks, constitution)

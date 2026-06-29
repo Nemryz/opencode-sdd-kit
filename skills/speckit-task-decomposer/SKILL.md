@@ -21,7 +21,9 @@ Use after the plan is complete and approved. The spec and plan must both exist b
 
 ### Step 0: Phase Gate
 
-Before starting, read `specs/NNN-feature-name/spec.json`. Check that:
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, inform the user and resolve them first.
+
+Then read `specs/NNN-feature-name/spec.json`. Check that:
 - `approvals.plan.approved === true` — the plan must be approved before task decomposition
 - `phase` is `"plan"` or `"tasks"` — otherwise tasks have already been generated
 

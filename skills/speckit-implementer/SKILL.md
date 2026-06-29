@@ -20,7 +20,9 @@ Use when spec, plan, and tasks are all complete and approved. I implement the fe
 
 ### Step 0: Phase Gate
 
-Before starting, read `specs/NNN-feature-name/spec.json` and verify:
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, inform the user and resolve them before implementing.
+
+Then read `specs/NNN-feature-name/spec.json` and verify:
 - `approvals.tasks.approved === true` — tasks must be approved before implementation
 - `phase` is `"tasks"` or `"ready"` — otherwise implementation has already started
 - Run `git status --porcelain` to note pre-existing uncommitted changes

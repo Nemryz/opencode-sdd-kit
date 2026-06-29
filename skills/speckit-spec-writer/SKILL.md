@@ -21,7 +21,9 @@ Use after the constitution is created. Use whenever you need to define a new fea
 
 ### Step 0: Phase Gate
 
-Before starting, read `spec.json` (if it exists). If `phase` indicates this feature already has a spec, propose overwriting or creating a new feature instead of proceeding silently.
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, inform the user and resolve them first.
+
+Then read `spec.json` (if it exists). If `phase` indicates this feature already has a spec, propose overwriting or creating a new feature instead of proceeding silently.
 
 ### Step 1: Load Context
 

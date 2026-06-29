@@ -21,7 +21,9 @@ Use after the spec is complete and approved. The user provides their tech stack 
 
 ### Step 0: Phase Gate
 
-Before starting, read `specs/NNN-feature-name/spec.json`. Check that:
+Before starting, call `speckit-audit` to detect existing project issues. If the audit reports errors, inform the user and resolve them first.
+
+Then read `specs/NNN-feature-name/spec.json`. Check that:
 - `approvals.spec.approved === true` — the spec must be approved before planning
 - `phase` is `"spec"` or `"plan"` — otherwise the feature has already passed planning
 
