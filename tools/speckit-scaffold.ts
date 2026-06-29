@@ -10,6 +10,8 @@ import {
   makeSpecJson,
   SpecJson,
   specsDirPath,
+  steeringDirPath,
+  exists,
 } from "./shared/types"
 
 const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
@@ -64,7 +66,7 @@ export default tool({
   description: "Create a new feature scaffold: create specs/NNN-name/ or constitution with the appropriate template",
   args: {
     featureName: tool.schema.string().describe("Feature name or description to scaffold"),
-    template: tool.schema.enum(["spec", "plan", "tasks", "constitution"]).describe("Which template to use"),
+    template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering"]).describe("Which template to use"),
     techStack: tool.schema.string().optional().describe("Tech stack description (for plan template)"),
     overwrite: tool.schema.boolean().optional().describe("Overwrite existing files if they exist"),
   },
@@ -73,6 +75,43 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       const template = await readTemplate(args.template)
+
+      if (args.template === "steering") {
+        const dir = steeringDirPath(projectRoot)
+        await fs.mkdir(dir, { recursive: true })
+        const files = ["product-steering", "tech-steering", "structure-steering"] as const
+        const labels: Record<string, string> = {
+          "product-steering": "Product",
+          "tech-steering": "Tech",
+          "structure-steering": "Structure",
+        }
+        const allExist = await Promise.all(
+          files.map(f => exists(path.join(dir, `${labels[f].toLowerCase()}.md`))),
+        )
+        const created: string[] = []
+        const skipped: string[] = []
+        for (let i = 0; i < files.length; i++) {
+          const fileName = `${labels[files[i]].toLowerCase()}.md`
+          const filePath = path.join(dir, fileName)
+          if (allExist[i] && !args.overwrite) {
+            skipped.push(fileName)
+            continue
+          }
+          const tmpl = await readTemplate(files[i])
+          let content = tmpl ?? `# ${labels[files[i]]} Steering\n\nSteering document for ${labels[files[i]]} context.\n`
+          content = content.replace(/\[PROJECT NAME\]/g, args.featureName)
+          await fs.writeFile(filePath, content, "utf-8")
+          created.push(fileName)
+        }
+        const parts: string[] = []
+        if (created.length > 0) parts.push(`created: ${created.join(", ")}`)
+        if (skipped.length > 0) parts.push(`skipped (exist): ${skipped.join(", ")}`)
+        return {
+          title: `Steering: ${created.length} created, ${skipped.length} skipped`,
+          output: parts.join(" | ") + "  Next: /spec <description>",
+          metadata: { created, skipped, path: dir },
+        }
+      }
 
       if (args.template === "constitution") {
         const dir = path.join(projectRoot, ".opencode", "spec-memory")

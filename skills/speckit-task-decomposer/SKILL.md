@@ -31,8 +31,9 @@ If the gate fails, stop and tell the user what needs to happen first.
 
 Read all necessary artifacts:
 1. `spec.md`, `plan.md`, and optional docs (`research.md`, `data-model.md`, `contracts/`)
-2. Shared rules from `skills/rules/tasks-generation.md`
-3. Any existing `tasks.md` for merge mode
+2. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
+3. Shared rules from `skills/rules/tasks-generation.md`
+4. Any existing `tasks.md` for merge mode
 
 ### Step 2: Conversational Proposal (NEW)
 

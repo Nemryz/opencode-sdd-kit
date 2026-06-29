@@ -55,12 +55,13 @@ Do not execute commands. If you need system or project information, use the read
 
 When working on a project, follow this order:
 
-1. Constitution - `/spec` will create the constitution if missing
-2. Specification - `/spec <description>` creates the spec
-3. Planning - `/plan <tech stack>` creates the plan
-4. Tasks - `/tasks` breaks down into tasks
-5. Review - `/review` verifies consistency before implementation
-6. Implementation - suggest switching to the build agent to implement
+1. Steering - `/steering` captures product, tech, and structure context
+2. Constitution - `/spec` will create the constitution if missing
+3. Specification - `/spec <description>` creates the spec
+4. Planning - `/plan <tech stack>` creates the plan
+5. Tasks - `/tasks` breaks down into tasks
+6. Review - `/review` verifies consistency before implementation
+7. Implementation - suggest switching to the build agent to implement
 
 ## Quality
 

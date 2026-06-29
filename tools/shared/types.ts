@@ -7,9 +7,13 @@ import { z } from "zod"
 export const PATHS = {
   OPENCODE_DIR: ".opencode",
   SPEC_MEMORY_DIR: "spec-memory",
+  STEERING_DIR: "steering",
   SESSION_FILE: "session.json",
   CONFIG_FILE: "config.json",
   CONSTITUTION_FILE: "constitution.md",
+  PRODUCT_STEERING_FILE: "product.md",
+  TECH_STEERING_FILE: "tech.md",
+  STRUCTURE_STEERING_FILE: "structure.md",
   SPECS_DIR: "specs",
 } as const
 
@@ -31,6 +35,22 @@ export function specJsonPath(featureDir: string): string {
 
 export function specsDirPath(root: string): string {
   return path.join(root, PATHS.SPECS_DIR)
+}
+
+export function steeringDirPath(root: string): string {
+  return path.join(root, PATHS.OPENCODE_DIR, PATHS.STEERING_DIR)
+}
+
+export function productSteeringPath(root: string): string {
+  return path.join(steeringDirPath(root), PATHS.PRODUCT_STEERING_FILE)
+}
+
+export function techSteeringPath(root: string): string {
+  return path.join(steeringDirPath(root), PATHS.TECH_STEERING_FILE)
+}
+
+export function structureSteeringPath(root: string): string {
+  return path.join(steeringDirPath(root), PATHS.STRUCTURE_STEERING_FILE)
 }
 
 // ─────────────────────────── Zod schemas ───────────────────────────

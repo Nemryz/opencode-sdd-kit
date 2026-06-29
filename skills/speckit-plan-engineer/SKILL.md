@@ -33,7 +33,7 @@ Read all necessary context:
 1. Spec from `specs/NNN-feature-name/spec.md`
 2. Constitution from `.opencode/spec-memory/constitution.md`
 3. Domain map from `.opencode/domain-map.md` (if exists)
-4. Steering documents: `tech.md`, `structure.md` in `.opencode/` (if exists)
+4. Steering documents: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
 5. Shared rules from `skills/rules/design-principles.md`
 6. Existing plans in `specs/` for reference
 

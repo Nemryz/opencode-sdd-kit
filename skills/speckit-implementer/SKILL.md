@@ -23,7 +23,8 @@ Use when spec, plan, and tasks are all complete and approved. I implement the fe
 Read all task documentation:
 1. `tasks.md`, `plan.md`, `spec.md` from `specs/NNN-feature-name/`
 2. Constitution from `.opencode/spec-memory/constitution.md`
-3. Domain map from `.opencode/domain-map.md` (if exists)
+3. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
+4. Domain map from `.opencode/domain-map.md` (if exists)
 
 ### Step 2: Preflight Checks
 

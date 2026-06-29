@@ -28,7 +28,7 @@ Use at any point in the workflow to validate work done so far:
 1. Read all available artifacts (spec, plan, tasks, constitution)
 2. Read `specs/NNN-feature-name/spec.json` — check `phase` and `approvals` to understand what has been completed
 3. Read domain map from `.opencode/domain-map.md` (if exists)
-4. Read steering context from `.opencode/` (if exists)
+4. Read steering context from `.opencode/steering/` (if exists)
 
 ### Step 2: Review Dimensions (expanded)
 

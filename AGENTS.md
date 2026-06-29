@@ -42,10 +42,15 @@ Test against real dependencies (database, API, filesystem). Use testcontainers o
 
 ## Commands
 
+### `/steering [description]`
+Create or update steering context documents. Loads `speckit-scaffold` tool with `template: "steering"`.
+Creates `product.md`, `tech.md`, `structure.md` in `.opencode/steering/`.
+All SDD skills load steering context automatically if it exists.
+
 ### `/spec <description>`
 Create a feature specification. Loads `speckit-spec-writer` skill.
 Scaffolds `specs/NNN-slug/spec.md` via `speckit-scaffold` tool.
-If no constitution exists, suggest creating one.
+If no constitution exists, suggest creating one. If no steering context exists, suggest `/steering`.
 Focus on WHAT and WHY. Write Gherkin scenarios. Prioritize P1 (MVP) / P2 (important) / P3 (nice to have).
 Mark ambiguous areas with `[NEEDS CLARIFICATION]`.
 
@@ -133,6 +138,10 @@ Example opencode.json config:
 Constitution:    .opencode/spec-memory/constitution.md
 Feature state:   .opencode/spec-memory/session.json
 Domain map:      .opencode/domain-map.md           — Glossary of domain terms (optional)
+Steering:
+  product.md     .opencode/steering/product.md     — Product context (optional)
+  tech.md        .opencode/steering/tech.md        — Tech stack & ADRs (optional)
+  structure.md   .opencode/steering/structure.md   — Code conventions (optional)
 Shared types:    .opencode/artifacts.schema.json   — JSON Schema for all artifacts (optional)
 
 specs/
@@ -170,7 +179,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 
 | Tool | Purpose | Key Arguments |
 |------|---------|---------------|
-| `speckit-scaffold` | Create `specs/NNN-name/` or constitution with template | `featureName`, `template` (spec/plan/tasks/constitution), `overwrite` (bool) |
+| `speckit-scaffold` | Create `specs/NNN-name/`, constitution, or steering with template | `featureName`, `template` (spec/plan/tasks/constitution/steering), `overwrite` (bool) |
 | `speckit-validate` | Check artifact existence and phase | `featureDir` (optional), `command` (optional) |
 | `speckit-clean` | Scan all features and report inconsistencies | `fix` (bool, optional) |
 | `speckit-config` | Read or update SDD configuration | `key`, `value`, `defaultTechStack` (all optional) |
@@ -193,6 +202,7 @@ Agent: "No features yet. Run `/spec <description>` to create the first feature."
 
 User: /spec create an invoicing system with users, clients, products, and invoices
 Agent: Loads speckit-spec-writer skill. Determines next number (001).
+       Checks steering context — if missing, suggests /steering first.
        Creates specs/001-invoicing-system/spec.md via speckit-scaffold.
        "Spec created. Next: /plan <tech stack>"
 

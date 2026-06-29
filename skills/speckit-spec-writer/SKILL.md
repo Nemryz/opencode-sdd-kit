@@ -24,7 +24,7 @@ Use after the constitution is created. Use whenever you need to define a new fea
 Read all available project context:
 1. Constitution from `.opencode/spec-memory/constitution.md`
 2. Domain map from `.opencode/domain-map.md` (if exists)
-3. Steering documents: `product.md`, `tech.md`, `structure.md` in `.opencode/` (if exists)
+3. Steering documents: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
 4. Shared rules from `skills/rules/spec-writing.md`
 5. Existing specs in `specs/` for context
 
