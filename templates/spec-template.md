@@ -17,6 +17,8 @@ As a [role],
 I want [capability],
 So that [benefit].
 
+**Boundary:** This story owns [what], does NOT own [what].
+
 Acceptance (Gherkin):
 - GIVEN [precondition]
 - WHEN [action]
@@ -28,6 +30,8 @@ As a [role],
 I want [capability],
 So that [benefit].
 
+**Boundary:** This story owns [what], does NOT own [what].
+
 Acceptance (Gherkin):
 - GIVEN [precondition]
 - WHEN [action]
@@ -38,6 +42,13 @@ Acceptance (Gherkin):
 As a [role],
 I want [capability],
 So that [benefit].
+
+**Boundary:** This story owns [what], does NOT own [what].
+
+Acceptance (Gherkin):
+- GIVEN [precondition]
+- WHEN [action]
+- THEN [expected result]
 
 ---
 
