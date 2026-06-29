@@ -29,17 +29,20 @@ Spec-Driven Development workflow for opencode (opencode.ai). A structured method
 ## Installation
 
 1. Install opencode (see opencode.ai/docs/installation).
-2. Copy these files into your `~/.config/opencode/` directory:
+2. Clone or copy the kit into your config directory.
 
-```
-git clone https://github.com/Nemryz/opencode-sdd-kit.git
-cp -r opencode-sdd-kit/AGENTS.md ~/.config/opencode/
-cp -r opencode-sdd-kit/commands ~/.config/opencode/
-cp -r opencode-sdd-kit/skills ~/.config/opencode/
-cp -r opencode-sdd-kit/tools ~/.config/opencode/
-cp -r opencode-sdd-kit/templates ~/.config/opencode/
-cp -r opencode-sdd-kit/agents ~/.config/opencode/
-```
+   Quick install (recommended):
+   ```
+   git clone https://github.com/Nemryz/opencode-sdd-kit.git ~/.config/opencode
+   cd ~/.config/opencode && npm install
+   ```
+
+   Or copy individual files:
+   ```
+   git clone https://github.com/Nemryz/opencode-sdd-kit.git
+   cp -r opencode-sdd-kit/* ~/.config/opencode/
+   cd ~/.config/opencode && npm install
+   ```
 
 3. Restart opencode.
 4. Run /status to verify installation.

@@ -25,8 +25,9 @@ jobs:
       - name: Create release archive
         run: |
           tar czf speckit-sdd-${{ github.ref_name }}.tar.gz \
-            AGENTS.md install.sh install.ps1 \
-            templates/ skills/ tools/ .github/
+            AGENTS.md install.sh install.ps1 opencode.jsonc package.json \
+            README.md LICENSE .github/ \
+            agents/ commands/ templates/ skills/ tools/ docs/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

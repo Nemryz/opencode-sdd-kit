@@ -1,40 +1,38 @@
 # speckit-sdd Installer — Windows PowerShell 5.1+
-# Usage: irm https://raw.githubusercontent.com/<user>/speckit-sdd/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.ps1 | iex
 # Or:    .\install.ps1
 
-$Repo     = "<user>/speckit-sdd"
+$Repo     = "Nemryz/opencode-sdd-kit"
 $Branch   = "main"
 $ConfigDir = "$env:USERPROFILE\.config\opencode"
-$TmpDir   = "$env:TEMP\speckit-sdd-install"
+$TmpDir   = "$env:TEMP\opencode-sdd-kit-install"
 
 if (Test-Path $TmpDir) { Remove-Item -Recurse -Force $TmpDir }
 New-Item -ItemType Directory -Path $TmpDir -Force | Out-Null
 
-Write-Host "==> Cloning speckit-sdd ($Branch)..."
-git clone --depth 1 --branch $Branch "https://github.com/$Repo.git" "$TmpDir\speckit-sdd"
+Write-Host "==> Cloning opencode-sdd-kit ($Branch)..."
+git clone --depth 1 --branch $Branch "https://github.com/$Repo.git" "$TmpDir\opencode-sdd-kit"
 
-Write-Host "==> Installing templates..."
-New-Item -ItemType Directory -Path "$ConfigDir\templates" -Force | Out-Null
-Copy-Item -Recurse -Force "$TmpDir\speckit-sdd\templates\*" "$ConfigDir\templates\"
+Write-Host "==> Installing files..."
+New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
+Copy-Item -Force "$TmpDir\opencode-sdd-kit\AGENTS.md" "$ConfigDir\AGENTS.md"
+Copy-Item -Force "$TmpDir\opencode-sdd-kit\opencode.jsonc" "$ConfigDir\opencode.jsonc" -ErrorAction SilentlyContinue
+Copy-Item -Force "$TmpDir\opencode-sdd-kit\package.json" "$ConfigDir\package.json"
 
-Write-Host "==> Installing skills..."
-Get-ChildItem "$TmpDir\speckit-sdd\skills\*" -Directory | ForEach-Object {
-    $skillName = $_.Name
-    $target = "$ConfigDir\skills\$skillName"
-    New-Item -ItemType Directory -Path $target -Force | Out-Null
-    Copy-Item -Recurse -Force "$_\*" "$target"
-}
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\agents" "$ConfigDir"
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\commands" "$ConfigDir"
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\templates" "$ConfigDir"
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\skills" "$ConfigDir"
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\tools" "$ConfigDir"
+Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\docs" "$ConfigDir"
 
-Write-Host "==> Installing tools..."
-New-Item -ItemType Directory -Path "$ConfigDir\tools" -Force | Out-Null
-Copy-Item -Recurse -Force "$TmpDir\speckit-sdd\tools\*" "$ConfigDir\tools\"
-
-Write-Host "==> Installing AGENTS.md..."
-Copy-Item -Force "$TmpDir\speckit-sdd\AGENTS.md" "$ConfigDir\AGENTS.md"
+Write-Host "==> Installing dependencies..."
+Push-Location $ConfigDir
+npm install --ignore-scripts 2>$null
+Pop-Location
 
 Remove-Item -Recurse -Force $TmpDir
 
 Write-Host ""
-Write-Host "==> Done! speckit-sdd installed to $ConfigDir"
-Write-Host "    Restart opencode to load new tools and skills."
-Write-Host "    Run /status to verify."
+Write-Host "==> Done! opencode-sdd-kit installed to $ConfigDir"
+Write-Host "    Restart opencode and run /status to verify."

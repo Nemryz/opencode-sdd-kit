@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # speckit-sdd Installer — Linux / macOS / Git Bash
-# Usage: curl -fsSL https://raw.githubusercontent.com/<user>/speckit-sdd/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.sh | bash
 # Or:   ./install.sh
 
-REPO="<user>/speckit-sdd"
+REPO="Nemryz/opencode-sdd-kit"
 BRANCH="main"
 CONFIG_DIR="${HOME}/.config/opencode"
 TMP_DIR=$(mktemp -d)
@@ -13,30 +13,26 @@ TMP_DIR=$(mktemp -d)
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-echo "==> Cloning speckit-sdd (${BRANCH})..."
-git clone --depth 1 --branch "${BRANCH}" "https://github.com/${REPO}.git" "${TMP_DIR}/speckit-sdd"
+echo "==> Cloning opencode-sdd-kit (${BRANCH})..."
+git clone --depth 1 --branch "${BRANCH}" "https://github.com/${REPO}.git" "${TMP_DIR}/opencode-sdd-kit"
 
-echo "==> Installing templates..."
-mkdir -p "${CONFIG_DIR}/templates"
-cp -r "${TMP_DIR}/speckit-sdd/templates/"* "${CONFIG_DIR}/templates/"
+echo "==> Installing files..."
+mkdir -p "${CONFIG_DIR}"
+cp "${TMP_DIR}/opencode-sdd-kit/AGENTS.md" "${CONFIG_DIR}/AGENTS.md"
+cp "${TMP_DIR}/opencode-sdd-kit/opencode.jsonc" "${CONFIG_DIR}/opencode.jsonc" 2>/dev/null || true
+cp "${TMP_DIR}/opencode-sdd-kit/package.json" "${CONFIG_DIR}/package.json"
 
-echo "==> Installing skills..."
-mkdir -p "${CONFIG_DIR}/skills"
-for d in "${TMP_DIR}/speckit-sdd/skills/"*/; do
-  skill_name=$(basename "$d")
-  target="${CONFIG_DIR}/skills/${skill_name}"
-  mkdir -p "$target"
-  cp -r "${d}"* "$target"
-done
+cp -r "${TMP_DIR}/opencode-sdd-kit/agents" "${CONFIG_DIR}/"
+cp -r "${TMP_DIR}/opencode-sdd-kit/commands" "${CONFIG_DIR}/"
+cp -r "${TMP_DIR}/opencode-sdd-kit/templates" "${CONFIG_DIR}/"
+cp -r "${TMP_DIR}/opencode-sdd-kit/skills" "${CONFIG_DIR}/"
+cp -r "${TMP_DIR}/opencode-sdd-kit/tools" "${CONFIG_DIR}/"
+cp -r "${TMP_DIR}/opencode-sdd-kit/docs" "${CONFIG_DIR}/"
 
-echo "==> Installing tools..."
-mkdir -p "${CONFIG_DIR}/tools"
-cp -r "${TMP_DIR}/speckit-sdd/tools/"* "${CONFIG_DIR}/tools/"
-
-echo "==> Installing AGENTS.md..."
-cp "${TMP_DIR}/speckit-sdd/AGENTS.md" "${CONFIG_DIR}/AGENTS.md"
+echo "==> Installing dependencies..."
+cd "${CONFIG_DIR}"
+npm install --ignore-scripts 2>/dev/null || echo "    (npm install skipped, manual install may be needed)"
 
 echo ""
-echo "==> Done! speckit-sdd installed to ${CONFIG_DIR}"
-echo "    Restart opencode to load new tools and skills."
-echo "    Run /status to verify."
+echo "==> Done! opencode-sdd-kit installed to ${CONFIG_DIR}"
+echo "    Restart opencode and run /status to verify."
