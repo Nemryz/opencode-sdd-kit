@@ -66,7 +66,7 @@ export default tool({
   description: "Create a new feature scaffold: create specs/NNN-name/ or constitution with the appropriate template",
   args: {
     featureName: tool.schema.string().describe("Feature name or description to scaffold"),
-    template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering", "data-model", "domain-map", "glossary"]).describe("Which template to use"),
+    template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering", "data-model", "domain-map", "glossary", "research", "contracts"]).describe("Which template to use"),
     techStack: tool.schema.string().optional().describe("Tech stack description (for plan template)"),
     overwrite: tool.schema.boolean().optional().describe("Overwrite existing files if they exist"),
   },
@@ -216,6 +216,75 @@ export default tool({
           title: "data-model.md created",
           output: `data-model.md created in specs/${targetDir}/  Next: continue with your workflow`,
           metadata: { path: filePath, featureDir: targetDir },
+        }
+      }
+
+      // --- Per-feature optional artifacts: research, contracts ---
+
+      if (args.template === "research" || args.template === "contracts") {
+        const specsDir = specsDirPath(projectRoot)
+        let targetDir: string | null = null
+        try {
+          const entries = await fs.readdir(specsDir, { withFileTypes: true })
+          const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
+          if (dirs.length === 0) {
+            return {
+              title: "Error",
+              output: "No feature directories found in specs/. Create a spec first with /spec <description>",
+              metadata: { error: "no features exist" },
+            }
+          }
+          const exact = dirs.find(d => d === args.featureName || d.endsWith(`-${args.featureName}`))
+          targetDir = exact ?? dirs[dirs.length - 1]
+        } catch {
+          return {
+            title: "Error",
+            output: "Cannot access specs/ directory. Create a feature first with /spec <description>",
+            metadata: { error: "specs dir not found or empty" },
+          }
+        }
+
+        if (args.template === "research") {
+          const featurePath = path.join(projectRoot, "specs", targetDir!)
+          const filePath = path.join(featurePath, "research.md")
+          if (!args.overwrite) {
+            try {
+              await fs.access(filePath)
+              return {
+                title: "research.md exists",
+                output: `research.md already exists in specs/${targetDir}/  Use overwrite: true to overwrite`,
+                metadata: { exists: true, path: filePath },
+              }
+            } catch (err: unknown) {
+              if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+            }
+          }
+          let content = template ?? "# Research\n\nTechnology research notes.\n"
+          content = content.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
+          await fs.writeFile(filePath, content, "utf-8")
+          return {
+            title: "research.md created",
+            output: `research.md created in specs/${targetDir}/  Next: continue with your workflow`,
+            metadata: { path: filePath, featureDir: targetDir },
+          }
+        }
+
+        if (args.template === "contracts") {
+          const featurePath = path.join(projectRoot, "specs", targetDir!)
+          const dirPath = path.join(featurePath, "contracts")
+          await fs.mkdir(dirPath, { recursive: true })
+          if (template) {
+            const indexPath = path.join(dirPath, "_template.md")
+            if (args.overwrite || !(await exists(indexPath).catch(() => false))) {
+              let content = template.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
+              await fs.writeFile(indexPath, content, "utf-8")
+            }
+          }
+          return {
+            title: "contracts/ created",
+            output: `contracts/ directory created in specs/${targetDir}/  Next: continue with your workflow`,
+            metadata: { path: dirPath, featureDir: targetDir },
+          }
         }
       }
 
