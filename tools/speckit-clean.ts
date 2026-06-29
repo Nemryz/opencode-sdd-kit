@@ -1,105 +1,19 @@
 import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
-
-interface ApprovalState {
-  generated: boolean
-  approved: boolean
-}
-
-interface SpecJson {
-  feature_name: string
-  feature_number: number
-  created_at: string
-  updated_at: string
-  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
-  approvals: {
-    spec: ApprovalState
-    plan: ApprovalState
-    tasks: ApprovalState
-  }
-  ready_for_implementation: boolean
-}
-
-function specJsonPath(featureDir: string): string {
-  return path.join(featureDir, "spec.json")
-}
-
-async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
-  try {
-    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
-    return JSON.parse(data) as SpecJson
-  } catch {
-    return null
-  }
-}
-
-async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
-  sj.updated_at = new Date().toISOString()
-  await fs.writeFile(specJsonPath(featureDir), JSON.stringify(sj, null, 2), "utf-8")
-}
-
-function detectPhaseFromFiles(specOk: boolean, planOk: boolean, tasksOk: boolean): string {
-  if (!specOk) return "spec"
-  if (!planOk) return "plan"
-  if (!tasksOk) return "tasks"
-  return "ready"
-}
-
-interface SessionState {
-  command: string | null
-  phase: string
-  featureDir: string | null
-  featureNumber: number | null
-  featureName: string | null
-  nextStep: string | null
-  lastResult: string | null
-  history: string[]
-}
-
-const DEFAULT_SESSION: SessionState = {
-  command: null,
-  phase: "init",
-  featureDir: null,
-  featureNumber: null,
-  featureName: null,
-  nextStep: "/spec <description>",
-  lastResult: null,
-  history: [],
-}
-
-function sessionPath(root: string): string {
-  return path.join(root, ".opencode", "spec-memory", "session.json")
-}
-
-async function readSession(root: string): Promise<SessionState> {
-  try {
-    const data = await fs.readFile(sessionPath(root), "utf-8")
-    return { ...DEFAULT_SESSION, ...JSON.parse(data) }
-  } catch {
-    return { ...DEFAULT_SESSION }
-  }
-}
-
-async function writeSession(root: string, s: SessionState): Promise<void> {
-  const dir = path.join(root, ".opencode", "spec-memory")
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(sessionPath(root), JSON.stringify(s, null, 2), "utf-8")
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function parseNNN(dirName: string): number {
-  const match = dirName.match(/^(\d+)-/)
-  return match ? parseInt(match[1], 10) : 0
-}
+import {
+  readSession,
+  writeSession,
+  readSpecJson,
+  writeSpecJson,
+  exists,
+  parseNNN,
+  detectPhaseFromFiles,
+  getFeatureDirs,
+  PHASE_NEXT_STEP,
+  specsDirPath,
+  SpecJson,
+} from "./shared/types"
 
 export default tool({
   description: "Scan all feature directories and report inconsistencies in artifact states",
@@ -110,14 +24,14 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      const specsDir = path.join(projectRoot, "specs")
+      const specsDir = specsDirPath(projectRoot)
       let entries: string[] = []
       try {
         entries = (await fs.readdir(specsDir, { withFileTypes: true }))
           .filter(e => e.isDirectory())
           .map(e => e.name)
           .filter(n => parseNNN(n) > 0)
-          .sort()
+          .sort((a, b) => parseNNN(a) - parseNNN(b))
       } catch {
         return {
           title: "No features",
@@ -202,7 +116,7 @@ export default tool({
             const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
             if (sj.phase !== filesPhase) {
               sj.phase = filesPhase as SpecJson["phase"]
-              sj.ready_for_implementation = filesPhase === "ready"
+              sj.ready_for_implementation = filesPhase === "ready" && sj.approvals.tasks.approved
               await writeSpecJson(sj, base)
               fixedFields.push(`${dir}: phase → ${filesPhase}`)
             }
@@ -223,7 +137,7 @@ export default tool({
           fixedFields.push("featureDir (asignado)")
         }
 
-        if (session.featureNumber && session.featureDir) {
+        if (session.featureNumber != null && session.featureDir) {
           const expected = parseNNN(session.featureDir)
           if (session.featureNumber !== expected) {
             session.featureNumber = expected
@@ -235,11 +149,7 @@ export default tool({
           const report = reports.find(r => r.dir === session.featureDir)
           if (report) {
             const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
-            let expectedNext: string
-            if (filesPhase === "spec") expectedNext = "/spec <description>"
-            else if (filesPhase === "plan") expectedNext = "/plan <tech stack>"
-            else if (filesPhase === "tasks") expectedNext = "/tasks"
-            else expectedNext = "/impl or /review"
+            const expectedNext = PHASE_NEXT_STEP[filesPhase] ?? "/spec <description>"
             if (session.phase !== filesPhase) {
               session.phase = filesPhase
               session.nextStep = expectedNext

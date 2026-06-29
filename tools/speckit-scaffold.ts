@@ -2,103 +2,17 @@ import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
 import os from "node:os"
+import {
+  readSession,
+  writeSession,
+  readSpecJson,
+  writeSpecJson,
+  makeSpecJson,
+  SpecJson,
+  specsDirPath,
+} from "./shared/types"
 
 const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
-
-interface ApprovalState {
-  generated: boolean
-  approved: boolean
-}
-
-interface SpecJson {
-  feature_name: string
-  feature_number: number
-  created_at: string
-  updated_at: string
-  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
-  approvals: {
-    spec: ApprovalState
-    plan: ApprovalState
-    tasks: ApprovalState
-  }
-  ready_for_implementation: boolean
-}
-
-function makeSpecJson(featureName: string, featureNumber: number): SpecJson {
-  const now = new Date().toISOString()
-  return {
-    feature_name: featureName,
-    feature_number: featureNumber,
-    created_at: now,
-    updated_at: now,
-    phase: "spec",
-    approvals: {
-      spec: { generated: false, approved: false },
-      plan: { generated: false, approved: false },
-      tasks: { generated: false, approved: false },
-    },
-    ready_for_implementation: false,
-  }
-}
-
-function specJsonPath(featureDir: string): string {
-  return path.join(featureDir, "spec.json")
-}
-
-async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
-  try {
-    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
-    return JSON.parse(data) as SpecJson
-  } catch {
-    return null
-  }
-}
-
-async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
-  sj.updated_at = new Date().toISOString()
-  await fs.writeFile(specJsonPath(featureDir), JSON.stringify(sj, null, 2), "utf-8")
-}
-
-interface SessionState {
-  command: string | null
-  phase: string
-  featureDir: string | null
-  featureNumber: number | null
-  featureName: string | null
-  nextStep: string | null
-  lastResult: string | null
-  history: string[]
-}
-
-const DEFAULT_SESSION: SessionState = {
-  command: null,
-  phase: "init",
-  featureDir: null,
-  featureNumber: null,
-  featureName: null,
-  nextStep: "/spec <description>",
-  lastResult: null,
-  history: [],
-}
-
-function sessionPath(root: string): string {
-  return path.join(root, ".opencode", "spec-memory", "session.json")
-}
-
-async function readSession(root: string): Promise<SessionState> {
-  try {
-    const data = await fs.readFile(sessionPath(root), "utf-8")
-    return { ...DEFAULT_SESSION, ...JSON.parse(data) }
-  } catch {
-    return { ...DEFAULT_SESSION }
-  }
-}
-
-async function writeSession(root: string, s: SessionState): Promise<void> {
-  const dir = path.join(root, ".opencode", "spec-memory")
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(sessionPath(root), JSON.stringify(s, null, 2), "utf-8")
-}
 
 function slugify(text: string, maxLen: number = 80): { slug: string; truncated: boolean } {
   const raw = text
@@ -118,7 +32,7 @@ function makeFeatureDirName(featureName: string, number: number): { dir: string;
 }
 
 async function getNextFeatureNumber(projectRoot: string): Promise<number> {
-  const specsDir = path.join(projectRoot, "specs")
+  const specsDir = specsDirPath(projectRoot)
   try {
     const entries = await fs.readdir(specsDir, { withFileTypes: true })
     let max = 0
@@ -224,7 +138,7 @@ export default tool({
 
       await fs.writeFile(filePath, content, "utf-8")
 
-      const sjPath = specJsonPath(featurePath)
+      const sjPath = path.join(featurePath, "spec.json")
       let sj = await readSpecJson(featurePath)
       if (!sj) {
         sj = makeSpecJson(args.featureName, featureNumber)

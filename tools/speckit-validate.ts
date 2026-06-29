@@ -1,129 +1,17 @@
 import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
-import fs from "node:fs/promises"
-
-interface ApprovalState {
-  generated: boolean
-  approved: boolean
-}
-
-interface SpecJson {
-  feature_name: string
-  feature_number: number
-  created_at: string
-  updated_at: string
-  phase: "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
-  approvals: {
-    spec: ApprovalState
-    plan: ApprovalState
-    tasks: ApprovalState
-  }
-  ready_for_implementation: boolean
-}
-
-function specJsonPath(featureDir: string): string {
-  return path.join(featureDir, "spec.json")
-}
-
-async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
-  try {
-    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
-    return JSON.parse(data) as SpecJson
-  } catch {
-    return null
-  }
-}
-
-interface SessionState {
-  command: string | null
-  phase: string
-  featureDir: string | null
-  featureNumber: number | null
-  featureName: string | null
-  nextStep: string | null
-  lastResult: string | null
-  history: string[]
-}
-
-const DEFAULT_SESSION: SessionState = {
-  command: null,
-  phase: "init",
-  featureDir: null,
-  featureNumber: null,
-  featureName: null,
-  nextStep: "/spec <description>",
-  lastResult: null,
-  history: [],
-}
-
-function sessionPath(root: string): string {
-  return path.join(root, ".opencode", "spec-memory", "session.json")
-}
-
-async function readSession(root: string): Promise<SessionState> {
-  try {
-    const data = await fs.readFile(sessionPath(root), "utf-8")
-    return { ...DEFAULT_SESSION, ...JSON.parse(data) }
-  } catch {
-    return { ...DEFAULT_SESSION }
-  }
-}
-
-async function writeSession(root: string, s: SessionState): Promise<void> {
-  const dir = path.join(root, ".opencode", "spec-memory")
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(sessionPath(root), JSON.stringify(s, null, 2), "utf-8")
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function parseNNN(dirName: string): number {
-  const match = dirName.match(/^(\d+)-/)
-  return match ? parseInt(match[1], 10) : 0
-}
-
-function detectPhase(specOk: boolean, planOk: boolean, tasksOk: boolean, constitutionExists: boolean): { phase: string; nextStep: string } {
-  if (!constitutionExists) {
-    return { phase: "init", nextStep: "/spec <description>" }
-  }
-  if (!specOk) {
-    return { phase: "spec", nextStep: "/spec <description>" }
-  }
-  if (!planOk) {
-    return { phase: "plan", nextStep: "/plan <tech stack>" }
-  }
-  if (!tasksOk) {
-    return { phase: "tasks", nextStep: "/tasks" }
-  }
-  return { phase: "ready", nextStep: "/impl or /review" }
-}
-
-async function getLatestFeatureDir(projectRoot: string): Promise<string | null> {
-  const specsDir = path.join(projectRoot, "specs")
-  try {
-    const entries = await fs.readdir(specsDir, { withFileTypes: true })
-    const dirs: { name: string; nnn: number }[] = []
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const nnn = parseNNN(entry.name)
-        if (nnn > 0) {
-          dirs.push({ name: entry.name, nnn })
-        }
-      }
-    }
-    dirs.sort((a, b) => b.nnn - a.nnn)
-    return dirs.length > 0 ? dirs[0].name : null
-  } catch {
-    return null
-  }
-}
+import {
+  readSession,
+  writeSession,
+  readSpecJson,
+  exists,
+  detectPhase,
+  getLatestFeatureDir,
+  SpecJson,
+  PHASE_NEXT_STEP,
+  constitutionPath,
+  specsDirPath,
+} from "./shared/types"
 
 export default tool({
   description: "Validate that required SDD artifacts exist and determine current workflow phase",
@@ -137,7 +25,7 @@ export default tool({
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       const session = await readSession(projectRoot)
       const featureDir = args.featureDir || session.featureDir || (await getLatestFeatureDir(projectRoot))
-      const constitutionExists = await exists(path.join(projectRoot, ".opencode", "spec-memory", "constitution.md"))
+      const constitutionExists = await exists(constitutionPath(projectRoot))
 
       let specOk = false
       let planOk = false
@@ -147,7 +35,7 @@ export default tool({
       let mismatch = false
 
       if (featureDir) {
-        const base = path.join(projectRoot, "specs", featureDir)
+        const base = path.join(specsDirPath(projectRoot), featureDir)
         specOk = await exists(path.join(base, "spec.md"))
         planOk = await exists(path.join(base, "plan.md"))
         tasksOk = await exists(path.join(base, "tasks.md"))
@@ -189,12 +77,7 @@ export default tool({
         nextStep = constitutionExists ? "/spec <description>" : "create constitution.md first"
       } else if (specJsonPhase && !mismatch) {
         phase = specJsonPhase
-        if (phase === "spec") nextStep = "/plan <tech stack>"
-        else if (phase === "plan") nextStep = "/tasks"
-        else if (phase === "tasks") nextStep = "/tasks (approve) or /impl"
-        else if (phase === "ready") nextStep = "/impl or /review"
-        else if (phase === "impl") nextStep = "/impl (continue)"
-        else nextStep = "/review"
+        nextStep = PHASE_NEXT_STEP[phase] ?? "/review"
       } else {
         ;({ phase, nextStep } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
       }

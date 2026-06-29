@@ -1,22 +1,13 @@
 import { tool } from "@opencode-ai/plugin"
-import path from "node:path"
+import {
+  configPath,
+  readSession,
+  writeSession,
+  SDDConfig,
+  DEFAULT_CONFIG,
+} from "./shared/types"
 import fs from "node:fs/promises"
-
-interface SDDConfig {
-  defaultTechStack: string | null
-  lastUsedLanguage: string | null
-  preferences: Record<string, string>
-}
-
-const DEFAULT_CONFIG: SDDConfig = {
-  defaultTechStack: null,
-  lastUsedLanguage: null,
-  preferences: {},
-}
-
-function configPath(root: string): string {
-  return path.join(root, ".opencode", "spec-memory", "config.json")
-}
+import path from "node:path"
 
 async function readConfig(root: string): Promise<SDDConfig> {
   try {
@@ -28,7 +19,7 @@ async function readConfig(root: string): Promise<SDDConfig> {
 }
 
 async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
-  const dir = path.join(root, ".opencode", "spec-memory")
+  const dir = path.dirname(configPath(root))
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(configPath(root), JSON.stringify(cfg, null, 2), "utf-8")
 }
@@ -68,7 +59,7 @@ export default tool({
       }
 
       if (args.key) {
-        const raw = cfg.preferences[args.key] ?? (cfg as Record<string, unknown>)[args.key] ?? null
+        const raw = cfg.preferences[args.key] ?? (cfg as unknown as Record<string, unknown>)[args.key] ?? null
         const val = typeof raw === "object" ? JSON.stringify(raw) : raw
         return {
           title: "Configuration read",
