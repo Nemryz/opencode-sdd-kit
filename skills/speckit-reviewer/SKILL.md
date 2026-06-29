@@ -137,3 +137,14 @@ Ownership: LOCAL | UPSTREAM | UNCLEAR
 ### Error: Verify protocol cannot run tests
 - **Fallback**: If no test command can be found, return MANUAL_VERIFY_REQUIRED
 - **Recovery**: Document exactly which verification step could not be automated
+
+## Reference
+
+- Skills: `speckit-spec-writer`, `speckit-plan-engineer`, `speckit-task-decomposer`, `speckit-implementer`
+- Tools: `speckit-validate`, `speckit-scaffold`
+- Steering context: `.opencode/steering/` (product.md, tech.md, structure.md)
+- Constitution: `.opencode/spec-memory/constitution.md`
+
+## Output location
+
+The review report is returned inline to the calling agent (not written to disk). The agent may choose to persist it as `review-report.md` in the feature directory.

@@ -19,6 +19,10 @@ Use after the constitution is created. Use whenever you need to define a new fea
 
 ## How to use me
 
+### Step 0: Phase Gate
+
+Before starting, read `spec.json` (if it exists). If `phase` indicates this feature already has a spec, propose overwriting or creating a new feature instead of proceeding silently.
+
 ### Step 1: Load Context
 
 Read all available project context:
@@ -71,10 +75,6 @@ After writing the spec, update the feature's `spec.json`:
 - Keep `phase` as `"spec"` (scaffold already sets this)
 
 The spec.json is at `specs/NNN-feature-name/spec.json`. Read it first, modify fields, then write back.
-
-## Phase Gate
-
-Before generating, read `spec.json` (if it exists). If `phase` indicates this feature already has a spec, propose overwriting or creating a new feature instead of proceeding silently.
 
 ## Safety & Fallback
 

@@ -50,8 +50,8 @@ Propose the task structure before writing:
 5. Polish — <remaining work>
 
 ### Boundary Map
-- Component A: T-001, T-002
-- Component B: T-003, T-004
+- `_Boundary: Component A_` → T-001, T-002
+- `_Boundary: Component B_` → T-003, T-004
 
 ### Confirmation
 Does this breakdown look right? I'll generate the full task list after confirmation.
@@ -71,16 +71,9 @@ Wait for user confirmation before writing.
 8. Include test tasks (tests are written BEFORE implementation)
 9. Verify each task has a clear file path or deliverable with observable done state
 
-### Step 4: Update spec.json
+### Step 4: Task-Graph Sanity Review
 
-After writing tasks.md, update `specs/NNN-feature-name/spec.json`:
-- Set `approvals.tasks.generated = true`
-- Set `phase = "tasks"`
-- Set `updated_at` to current UTC ISO-8601
-
-### Step 5: Task-Graph Sanity Review (NEW)
-
-Before finalizing, run a lightweight review:
+Before writing spec.json, run a lightweight review:
 
 1. Every user story has at least one task
 2. Every task has a verifiable deliverable
@@ -90,6 +83,13 @@ Before finalizing, run a lightweight review:
 6. Boundary annotations don't overlap
 
 If issues found, repair once and re-check. If still failing, report the gap.
+
+### Step 5: Update spec.json
+
+Only after the sanity review passes, update `specs/NNN-feature-name/spec.json`:
+- Set `approvals.tasks.generated = true`
+- Set `phase = "tasks"`
+- Set `updated_at` to current UTC ISO-8601
 
 ## Task format
 
@@ -104,8 +104,8 @@ If issues found, repair once and re-check. If still failing, report the gap.
 
 - `[P]` = can run in parallel with siblings
 - `T-NNN` = task ID (stable, never renumbered)
-- `_Boundary:_` = which component this task belongs to
-- `_Depends:_` = explicit cross-task dependency
+- `_Boundary: ComponentName_` = inline annotation on `[P]` tasks (also appears as `- **Boundary**: <name>` in task detail)
+- `_Depends: T-NNN_` = explicit cross-task dependency
 
 ## Phase structure
 

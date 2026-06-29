@@ -18,6 +18,16 @@ Use when spec, plan, and tasks are all complete and approved. I implement the fe
 
 ## How to use me
 
+### Step 0: Phase Gate
+
+Before starting, read `specs/NNN-feature-name/spec.json` and verify:
+- `approvals.tasks.approved === true` — tasks must be approved before implementation
+- `phase` is `"tasks"` or `"ready"` — otherwise implementation has already started
+- Run `git status --porcelain` to note pre-existing uncommitted changes
+- Discover validation commands: check `package.json`, `Makefile`, `README*`, CI configs
+
+If the gate fails, stop and tell the user what needs to happen first.
+
 ### Step 1: Load Context
 
 Read all task documentation:
@@ -26,15 +36,7 @@ Read all task documentation:
 3. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
 4. Domain map from `.opencode/domain-map.md` (if exists)
 
-### Step 2: Preflight Checks
-
-- Read `specs/NNN-feature-name/spec.json` and verify:
-  - `approvals.tasks.approved === true` — tasks must be approved before implementation
-  - `phase` is `"tasks"` or `"ready"` — otherwise implementation has already started
-- Run `git status --porcelain` to note pre-existing uncommitted changes
-- Discover validation commands: check `package.json`, `Makefile`, `README*`, CI configs
-
-### Step 3: Execute Tasks
+### Step 2: Execute Tasks
 
 Execute tasks in dependency order. For each task:
 
@@ -56,7 +58,7 @@ Max 2 debug rounds per task. If still blocked after 2 rounds, mark `_Blocked:_` 
 - Stage only files changed for this task (never `git add -A` or `git add .`)
 - Commit format: `feat(<feature>): <task description>`
 
-### Step 4: Run Tests After Each Phase
+### Step 3: Run Tests After Each Phase
 
 After all tasks in a phase complete, run:
 1. Build check
@@ -65,13 +67,13 @@ After all tasks in a phase complete, run:
 
 If tests fail, fix before proceeding to the next phase.
 
-### Step 5: Update spec.json
+### Step 4: Update spec.json
 
 After all phases complete, update `specs/NNN-feature-name/spec.json`:
 - Set `phase = "complete"`
 - Set `updated_at` to current UTC ISO-8601
 
-### Step 6: Final Verification
+### Step 5: Final Verification
 
 After all phases complete:
 1. Run full test suite (final)

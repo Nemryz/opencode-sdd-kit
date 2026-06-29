@@ -34,3 +34,36 @@ Use `speckit-scaffold` with `template: "constitution"` to scaffold a new constit
 ## Output format
 
 Write the constitution to `.opencode/spec-memory/constitution.md` with all articles, including project-specific notes under each one. Use checkboxes for items that need project-specific decisions.
+
+## Safety & Fallback
+
+### Error: No project context available
+- **Stop**: Cannot write meaningful constitution without project context
+- **Recovery**: Ask the user for project name, domain, and team composition
+
+### Error: Template file missing
+- **Stop**: If `speckit-scaffold` fails to load constitution template
+- **Recovery**: Use inline article structure as fallback, report the missing template path
+
+### Error: Conflicting steering context
+- **Warning**: Steering documents contradict each other (e.g., tech.md says React, structure.md says Vue)
+- **Recovery**: Flag contradictions to user, ask for resolution before proceeding
+
+## Quality checklist
+
+- [ ] All 6 articles are present (I-VI)
+- [ ] Each article has a clear principle statement
+- [ ] Each article has "Why" rationale
+- [ ] Project-specific notes are filled (not placeholder text)
+- [ ] Steering context was loaded (or gracefully skipped)
+- [ ] Constitution is consistent with existing spec.json states
+
+## Reference
+
+Template: `~/.config/opencode/templates/constitution-template.md`
+Tool: `speckit-scaffold` (call with `template: "constitution"`)
+Steering context: `.opencode/steering/` (product.md, tech.md, structure.md)
+
+## Output location
+
+`.opencode/spec-memory/constitution.md`
