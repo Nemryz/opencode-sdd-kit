@@ -39,13 +39,15 @@ Read all necessary context:
 5. Shared rules from `skills/rules/design-principles.md`
 6. Existing plans in `specs/` for reference
 
-### Step 2: Sub-Agent Research (NEW for complex decisions)
+### Step 2: Sub-Agent Research (for complex decisions)
 
 For uncertain technology choices (unfamiliar framework, library evaluation, architecture pattern), dispatch sub-agents in parallel:
 
-**Sub-agent 1 — Dependencies**: Research compatibility, latest versions, known issues
-**Sub-agent 2 — Alternatives**: Compare 2-3 alternatives with pros/cons
-**Sub-agent 3 — Codebase patterns**: Analyze existing codebase for conventions
+1. **`@explore` sub-agent for dependencies**: Research compatibility, latest versions, known issues
+2. **`@explore` sub-agent for alternatives**: Compare 2-3 alternatives with pros/cons
+3. **`@explore` sub-agent for codebase patterns**: Analyze existing codebase for conventions
+
+Use the `_Boundary: ComponentName_` annotation format to assign research scope to each sub-agent.
 
 Each sub-agent returns a structured findings summary (under 100 lines). Synthesize in main context after all return.
 
@@ -63,6 +65,10 @@ Propose the architecture approach before writing:
 
 ### Key Decisions
 1. <Decision 1> — <alternative considered, why chosen>
+
+### Boundary Map
+- `_Boundary: Component A_` — scope and responsibilities
+- `_Boundary: Component B_` — integration points with A
 
 ### Risks
 - <Risk 1> — <mitigation>
@@ -85,7 +91,8 @@ Wait for user confirmation before proceeding.
 5. Create `research.md` for uncertain technology choices
 6. Create `data-model.md` if entities are involved
 7. Create `contracts/` for API definitions if applicable
-8. Mark the plan as IMMUTABLE once written (do not modify after approval)
+8. Add `_Boundary: ComponentName_` annotations to each component description to document ownership and integration points
+9. Mark the plan as IMMUTABLE once written (do not modify after approval)
 
 ### Step 5: Update spec.json
 
@@ -132,11 +139,13 @@ After writing all plan artifacts, update `specs/NNN-feature-name/spec.json`:
 
 - [ ] Every technology choice has documented rationale with alternatives
 - [ ] Constitution gates have been checked and passed
-- [ ] Architecture descriptions are clear (components, flows, boundaries)
+- [ ] Architecture descriptions use `_Boundary: ComponentName_` annotation format
+- [ ] Boundary annotations document ownership and integration points
 - [ ] Data model is defined (if applicable)
 - [ ] API contracts are defined (if applicable)
 - [ ] Risks are identified with mitigations
 - [ ] Sub-agent research was used for uncertain choices (or skipped with reason)
+- [ ] `@mention` syntax used for sub-agent dispatch when applicable
 - [ ] Conversational proposal was made (or skipped in auto mode)
 - [ ] Plan is marked as immutable after approval
 
@@ -147,6 +156,8 @@ Shared rules: `skills/rules/design-principles.md`
 Spec: `specs/NNN-feature-name/spec.md`
 Constitution: `.opencode/spec-memory/constitution.md`
 Domain map: `.opencode/domain-map.md`
+Sub-agents: `@explore`
+Boundary annotations: `_Boundary: ComponentName_` in each component description
 
 ## Output location
 

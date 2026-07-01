@@ -9,11 +9,9 @@ tools/, seis habilidades Markdown en skills/, diez comandos en commands/, reglas
 compartidas en skills/rules/, plantillas en templates/, y una suite de pruebas en
 tools/test/. Actualmente la suite tiene 277 tests pasando y CI verde en Node 20 y 22.
 
-Estados actuales: C completado (7 tareas, 80+ tests), D completado (withLock reentrant,
-14 tests), B completado (4 comandos con compuertas de fase), A parcial: A-5 (implementer)
-y A-1 (constitution) completos. Quedan pendientes: A-4 task-decomposer, A-2 spec-writer,
-A-3 plan-engineer, A-6 reviewer, y la funcionalidad mayor 3.2 (Discovery and Complexity
-Routing con Express Mode).
+Estados actuales: C completo, D completo, B completo, Fase A: 5 completas, 1 pendiente
+(A-3 plan-engineer). Suite: 339 tests en 17 archivos. Solo falta A-3 y luego Fase 3.2
+(Discovery and Complexity Routing con Express Mode).
 
 ## Sistema de implementacion incremental
 
@@ -89,10 +87,10 @@ conversacional, subagentes, boundary, shared rules, @mention. Se extendio el
 test de 4 a 22 aserciones en implementer-content.test.ts. Se confirma que el
 SKILL.md ya tenia todas las dimensiones.
 
-### A-6: speckit-reviewer (PENDIENTE)
+### A-6: speckit-reviewer (COMPLETO)
 
-Vacio: propuesta conversacional ausente antes del dispatch.
-Pendiente de implementar.
+Vacio: propuesta conversacional. Agregado: Step 2 con Scope y Dispatch Plan,
+renumbering de steps, test expandido de 3 a 21 aserciones.
 
 ## Fase B: Compuertas de fase en comandos (COMPLETO)
 
@@ -189,18 +187,18 @@ El orden de ejecucion actualizado es:
 
 1. Fase C (completo)
 2. Fase A, comenzando con A-5 (completo), luego A-1 (completo).
-    Pendiente: A-3, A-6.
+    Pendiente: A-3.
 3. Fase B (completo)
 4. Fase D (completo)
 5. Fase 3.2 (pendiente, requiere Fase A completa)
 
 ## Resumen de metricas
 
-Fase A: 6 tareas, 5 completas (A-5, A-1, A-4, A-2). Pendientes A-3, A-6.
+Fase A: 6 tareas, 5 completas (A-5, A-1, A-4, A-2, A-6). Pendiente A-3.
 Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase 3.2: 5 tareas (pendiente).
 
-Total: 23 tareas, 19 completas, 4 pendientes.
-Suite actual: 321 tests en 17 archivos.
+Total: 23 tareas, 20 completas, 3 pendientes (A-3 + 2 de Fase 3.2).
+Suite actual: 339 tests en 17 archivos.
