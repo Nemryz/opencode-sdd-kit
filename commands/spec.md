@@ -16,6 +16,8 @@ Call `speckit-validate` with `command`: `"spec"`
 
 If `metadata.artifacts.spec` is `true` for the latest feature, warn the user and ask if they want to create a new feature or overwrite. Use `metadata.featureDir` to determine the latest feature.
 
+Read `spec.json` for the current feature if it exists. Check `phase` and `approvals.spec.generated` to determine if a spec was already generated. If a spec already exists, warn the user before overwriting.
+
 ## Task
 
 1. Load the `speckit-spec-writer` skill to guide your spec creation

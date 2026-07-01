@@ -8,6 +8,9 @@ Call `speckit-validate` with:
 - `command`: `"audit"`
 - `featureDir`: `$ARGUMENTS` (optional specific feature)
 
+If `metadata.phase` is `"empty"` or no features are found, tell the user no features exist and stop.
+Use `metadata.featureDir` as the feature directory for the audit.
+
 ## Task
 
 1. Call the `speckit-audit` tool to run the full audit

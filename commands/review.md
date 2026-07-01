@@ -16,6 +16,8 @@ Call `speckit-validate` with:
 
 Use `metadata.featureDir` as the feature directory.
 
+Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.spec.approved` is not `true`, tell the user the spec needs approval before review can proceed and stop. If `approvals.plan.approved` is not `true`, warn the user that the plan is not yet approved.
+
 ## Task
 
 1. Load the `speckit-reviewer` skill to guide your review
