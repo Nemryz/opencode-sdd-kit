@@ -1,12 +1,27 @@
+import path from "node:path"
+import os from "node:os"
 import { describe, it, expect } from "vitest"
 import {
   parseNNN,
   detectPhase,
   detectPhaseFromFiles,
   isENOENT,
+  isEEXIST,
+  isValidProjectRoot,
   parsePhase,
   makeSpecJson,
   PHASE_NEXT_STEP,
+  DEFAULT_SESSION,
+  DEFAULT_CONFIG,
+  sessionPath,
+  configPath,
+  constitutionPath,
+  specJsonPath,
+  specsDirPath,
+  steeringDirPath,
+  productSteeringPath,
+  techSteeringPath,
+  structureSteeringPath,
 } from "../../shared/types"
 
 // ── parseNNN ────────────────────────────────────────────────
@@ -109,6 +124,141 @@ describe("isENOENT", () => {
 
   it("returns false for an Error without a code property", () => {
     expect(isENOENT(new Error("generic"))).toBe(false)
+  })
+})
+
+// ── isEEXIST ───────────────────────────────────────────────
+
+describe("isEEXIST", () => {
+  it("returns true for an error with code EEXIST", () => {
+    const err = new Error("already exists")
+    ;(err as NodeJS.ErrnoException).code = "EEXIST"
+    expect(isEEXIST(err)).toBe(true)
+  })
+
+  it("returns false for an error with a different code", () => {
+    const err = new Error("not found")
+    ;(err as NodeJS.ErrnoException).code = "ENOENT"
+    expect(isEEXIST(err)).toBe(false)
+  })
+
+  it("returns false for a non-Error value", () => {
+    expect(isEEXIST("some string")).toBe(false)
+  })
+
+  it("returns false for null", () => {
+    expect(isEEXIST(null)).toBe(false)
+  })
+
+  it("returns false for an Error without a code property", () => {
+    expect(isEEXIST(new Error("generic"))).toBe(false)
+  })
+})
+
+// ── isValidProjectRoot ─────────────────────────────────────
+
+describe("isValidProjectRoot", () => {
+  it("rejects the config directory", () => {
+    const configDir = path.join(os.homedir(), ".config", "opencode")
+    expect(isValidProjectRoot(configDir)).toBe(false)
+  })
+
+  it("accepts any other directory", () => {
+    expect(isValidProjectRoot("/some/project")).toBe(true)
+  })
+
+  it("accepts the homedir itself", () => {
+    expect(isValidProjectRoot(os.homedir())).toBe(true)
+  })
+})
+
+// ── Path helpers ───────────────────────────────────────────
+
+describe("sessionPath", () => {
+  it("joins root with .opencode/spec-memory/session.json", () => {
+    const r = path.resolve("/root")
+    expect(sessionPath(r)).toBe(path.join(r, ".opencode", "spec-memory", "session.json"))
+  })
+})
+
+describe("configPath", () => {
+  it("joins root with .opencode/spec-memory/config.json", () => {
+    const r = path.resolve("/root")
+    expect(configPath(r)).toBe(path.join(r, ".opencode", "spec-memory", "config.json"))
+  })
+})
+
+describe("constitutionPath", () => {
+  it("joins root with .opencode/spec-memory/constitution.md", () => {
+    const r = path.resolve("/root")
+    expect(constitutionPath(r)).toBe(path.join(r, ".opencode", "spec-memory", "constitution.md"))
+  })
+})
+
+describe("specJsonPath", () => {
+  it("joins featureDir with spec.json", () => {
+    const fd = path.resolve("/proj/specs/001-foo")
+    expect(specJsonPath(fd)).toBe(path.join(fd, "spec.json"))
+  })
+})
+
+describe("specsDirPath", () => {
+  it("joins root with specs", () => {
+    const r = path.resolve("/root")
+    expect(specsDirPath(r)).toBe(path.join(r, "specs"))
+  })
+})
+
+describe("steeringDirPath", () => {
+  it("joins root with .opencode/steering", () => {
+    const r = path.resolve("/root")
+    expect(steeringDirPath(r)).toBe(path.join(r, ".opencode", "steering"))
+  })
+})
+
+describe("productSteeringPath", () => {
+  it("joins root with .opencode/steering/product.md", () => {
+    const r = path.resolve("/root")
+    expect(productSteeringPath(r)).toBe(path.join(r, ".opencode", "steering", "product.md"))
+  })
+})
+
+describe("techSteeringPath", () => {
+  it("joins root with .opencode/steering/tech.md", () => {
+    const r = path.resolve("/root")
+    expect(techSteeringPath(r)).toBe(path.join(r, ".opencode", "steering", "tech.md"))
+  })
+})
+
+describe("structureSteeringPath", () => {
+  it("joins root with .opencode/steering/structure.md", () => {
+    const r = path.resolve("/root")
+    expect(structureSteeringPath(r)).toBe(path.join(r, ".opencode", "steering", "structure.md"))
+  })
+})
+
+// ── DEFAULT_SESSION ────────────────────────────────────────
+
+describe("DEFAULT_SESSION", () => {
+  it("has the expected shape with null defaults and init phase", () => {
+    expect(DEFAULT_SESSION.command).toBeNull()
+    expect(DEFAULT_SESSION.phase).toBe("init")
+    expect(DEFAULT_SESSION.featureDir).toBeNull()
+    expect(DEFAULT_SESSION.featureNumber).toBeNull()
+    expect(DEFAULT_SESSION.featureName).toBeNull()
+    expect(DEFAULT_SESSION.nextStep).toBe("/spec <description>")
+    expect(DEFAULT_SESSION.lastResult).toBeNull()
+    expect(DEFAULT_SESSION.history).toEqual([])
+  })
+})
+
+// ── DEFAULT_CONFIG ─────────────────────────────────────────
+
+describe("DEFAULT_CONFIG", () => {
+  it("has the expected shape with null defaults and empty preferences", () => {
+    expect(DEFAULT_CONFIG.defaultTechStack).toBeNull()
+    expect(DEFAULT_CONFIG.lastUsedLanguage).toBeNull()
+    expect(DEFAULT_CONFIG.preferences).toEqual({})
   })
 })
 
