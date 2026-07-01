@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
-import os from "node:os"
+import { fileURLToPath } from "node:url"
 import {
   readSession,
   writeSession,
@@ -16,7 +16,8 @@ import {
   PATHS,
 } from "./shared/types"
 
-const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const TEMPLATES_DIR = path.resolve(__dirname, "..", "templates")
 
 function slugify(text: string, maxLen: number = 80): { slug: string; truncated: boolean } {
   const raw = text
