@@ -47,6 +47,8 @@ export default tool({
         } else if (args.key && args.value !== undefined) {
           if (args.key === "expressMode") {
             innerCfg.expressMode = args.value === "true"
+          } else if (args.key === "defaultTechStack") {
+            innerCfg.defaultTechStack = args.value || null
           } else {
             innerCfg.preferences[args.key] = args.value
           }
@@ -82,6 +84,13 @@ export default tool({
           return {
             title: "Configuration read",
             output: `expressMode: ${cfg.expressMode}`,
+            metadata: cfg,
+          }
+        }
+        if (args.key === "defaultTechStack") {
+          return {
+            title: "Configuration read",
+            output: `defaultTechStack: ${cfg.defaultTechStack ?? "(not set)"}`,
             metadata: cfg,
           }
         }
