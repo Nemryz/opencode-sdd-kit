@@ -67,6 +67,47 @@ describe("audit project-level findings", () => {
     expect(fullSteering).toHaveLength(1)
   })
 
+  it("reports info when only product.md exists", async () => {
+    await createConstitution(worktree)
+    const steeringDir = steeringDirPath(worktree)
+    await fs.mkdir(steeringDir, { recursive: true })
+    await fs.writeFile(path.join(steeringDir, PATHS.PRODUCT_STEERING_FILE), "product")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    expect(steeringFindings).toHaveLength(2)
+    expect(steeringFindings.every((f: any) => f.severity === "info")).toBe(true)
+    expect(steeringFindings.some((f: any) => f.message.includes("missing tech.md"))).toBe(true)
+    expect(steeringFindings.some((f: any) => f.message.includes("missing structure.md"))).toBe(true)
+  })
+
+  it("reports info when only tech.md exists", async () => {
+    await createConstitution(worktree)
+    const steeringDir = steeringDirPath(worktree)
+    await fs.mkdir(steeringDir, { recursive: true })
+    await fs.writeFile(path.join(steeringDir, PATHS.TECH_STEERING_FILE), "tech")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    expect(steeringFindings).toHaveLength(2)
+    expect(steeringFindings.some((f: any) => f.message.includes("missing product.md"))).toBe(true)
+    expect(steeringFindings.some((f: any) => f.message.includes("missing structure.md"))).toBe(true)
+  })
+
+  it("reports info when two of three steering files exist", async () => {
+    await createConstitution(worktree)
+    const steeringDir = steeringDirPath(worktree)
+    await fs.mkdir(steeringDir, { recursive: true })
+    await fs.writeFile(path.join(steeringDir, PATHS.PRODUCT_STEERING_FILE), "product")
+    await fs.writeFile(path.join(steeringDir, PATHS.TECH_STEERING_FILE), "tech")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    expect(steeringFindings).toHaveLength(1)
+    expect(steeringFindings[0].severity).toBe("info")
+    expect(steeringFindings[0].message).toContain("missing structure.md")
+  })
+
   it("reports info when no features exist", async () => {
     await createConstitution(worktree)
     const result = await auditTool.execute({}, ctx)
