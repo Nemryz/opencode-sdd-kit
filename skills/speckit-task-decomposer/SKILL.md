@@ -34,8 +34,9 @@ If the gate fails, stop and tell the user what needs to happen first.
 Read all necessary artifacts:
 1. `spec.md`, `plan.md`, and optional docs (`research.md`, `data-model.md`, `contracts/`)
 2. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
-3. Shared rules from `skills/rules/tasks-generation.md`
-4. Any existing `tasks.md` for merge mode
+3. Domain map from `.opencode/domain-map.md` (if exists) for domain-specific terminology and constraints
+4. Shared rules from `skills/rules/tasks-generation.md`
+5. Any existing `tasks.md` for merge mode
 
 ### Step 2: Conversational Proposal (NEW)
 
@@ -83,6 +84,13 @@ Before writing spec.json, run a lightweight review:
 4. Dependency graph is acyclic
 5. `[P]` tasks have no hidden inter-dependencies
 6. Boundary annotations don't overlap
+
+**Sub-agent dispatch (optional, for complex dependency graphs):**
+If the dependency graph has more than 10 tasks or contains cycles, dispatch sub-agents:
+1. **`@speckit-reviewer` sub-agent**: Validates the full task graph for acyclicity and completeness
+2. **`@explore` sub-agent**: Researches dependencies between components in the codebase
+
+Use `_Boundary: ComponentName_` annotations to assign scope to each sub-agent.
 
 If issues found, repair once and re-check. If still failing, report the gap.
 
@@ -160,6 +168,9 @@ T-001
 
 ## Quality checklist
 
+- [ ] Conversational proposal made (or skipped in auto mode)
+- [ ] Domain map loaded from `.opencode/domain-map.md`
+- [ ] Shared rules loaded from `skills/rules/`
 - [ ] Every user story has at least one implementation task
 - [ ] Tests are in separate tasks, ordered before implementation
 - [ ] Dependencies between tasks are clearly mapped
@@ -169,6 +180,7 @@ T-001
 - [ ] Each task has a file path or clear deliverable
 - [ ] No task is too large (split if > 1 day of work)
 - [ ] Setup phase exists for infrastructure
+- [ ] `@mention` syntax used for sub-agent dispatch when applicable
 - [ ] Task-graph sanity review passed
 
 ## Reference
@@ -177,6 +189,8 @@ Tool: `speckit-scaffold` (call with `template: "tasks"`)
 Shared rules: `skills/rules/tasks-generation.md`
 Plan: `specs/NNN-feature-name/plan.md`
 Spec: `specs/NNN-feature-name/spec.md`
+Domain map: `.opencode/domain-map.md`
+Sub-agents: `@speckit-reviewer`, `@explore`
 
 ## Output location
 
