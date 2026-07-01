@@ -170,4 +170,81 @@ describe("clean auto-fix", () => {
     const session2 = await readSession(worktree)
     expect(session2.featureDir).toBeNull()
   })
+
+  it("fixes featureNumber when it does not match the directory number", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    let session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    session.featureNumber = 99
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.featureNumber).toBe(1)
+  })
+
+  it("assigns featureDir to latest feature when featureDir is null", async () => {
+    await scaffoldTool.execute({ featureName: "A", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "B", template: "spec" }, ctx)
+    let session = await readSession(worktree)
+    session.featureDir = null
+    session.featureNumber = null
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.featureDir).toBe("002-b")
+    expect(session2.featureNumber).toBe(2)
+  })
+
+  it("fixes session phase to match files phase when set wrong", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    let session = await readSession(worktree)
+    session.phase = "init"
+    session.featureDir = "001-auth"
+    session.featureNumber = 1
+    session.nextStep = null
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.phase).toBe("plan")
+    expect(session2.nextStep).toBe("/plan <tech stack>")
+  })
+
+  it("sets ready_for_implementation correctly when tasks approved and all files exist", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    let sj = await readSpecJson(base)
+    sj.phase = "spec"
+    sj.ready_for_implementation = false
+    sj.approvals = { spec: { generated: true, approved: true }, plan: { generated: true, approved: true }, tasks: { generated: true, approved: true } }
+    await writeSpecJson(sj, base)
+    await cleanTool.execute({ fix: true }, ctx)
+    const fixed = await readSpecJson(base)
+    expect(fixed.phase).toBe("ready")
+    expect(fixed.ready_for_implementation).toBe(true)
+  })
+
+  it("fixes multiple session issues in one run", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    let session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    session.featureNumber = 77
+    session.phase = "init"
+    session.nextStep = null
+    await writeSession(worktree, session)
+    const base = path.join(worktree, "specs", "001-auth")
+    let sj = await readSpecJson(base)
+    sj.phase = "spec"
+    await writeSpecJson(sj, base)
+    await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.featureNumber).toBe(1)
+    expect(session2.phase).toBe("ready")
+    expect(session2.nextStep).toBe("/impl or /review")
+    const fixedSj = await readSpecJson(base)
+    expect(fixedSj.phase).toBe("ready")
+  })
 })

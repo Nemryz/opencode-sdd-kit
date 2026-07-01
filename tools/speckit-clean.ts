@@ -9,9 +9,9 @@ import {
   exists,
   parseNNN,
   detectPhaseFromFiles,
+  detectPhase,
   getFeatureDirs,
   isValidProjectRoot,
-  PHASE_NEXT_STEP,
   specsDirPath,
   parsePhase,
 } from "./shared/types"
@@ -157,8 +157,9 @@ export default tool({
         if (session.featureDir) {
           const report = reports.find(r => r.dir === session.featureDir)
           if (report) {
-            const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
-            const expectedNext = PHASE_NEXT_STEP[filesPhase] ?? "/spec <description>"
+            const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
+              report.spec, report.plan, report.tasks, true,
+            )
             if (session.phase !== filesPhase) {
               session.phase = filesPhase
               session.nextStep = expectedNext
