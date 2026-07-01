@@ -85,6 +85,11 @@ Scan all features for inconsistencies. Uses `speckit-clean` tool.
 Auto-fixes session.json when features are renamed or deleted.
 Use `--dry-run` for report only, without fixes.
 
+### `/audit [--fix]`
+Run a comprehensive project audit for phase consistency and artifact health. Uses `speckit-audit` tool.
+Reports error, warning, and info findings with severity ratings.
+Use `--fix` to auto-repair phase mismatches in spec.json.
+
 ### `/config [key=key value=val|defaultTechStack=stack]`
 Read or update SDD configuration. Uses `speckit-config` tool.
 Examples: `/config defaultTechStack=Node.js+PostgreSQL` or `/config key=language value=python`
@@ -181,9 +186,11 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 |------|---------|---------------|
 | `speckit-scaffold` | Create `specs/NNN-name/`, constitution, or steering with template | `featureName`, `template` (spec/plan/tasks/constitution/steering), `overwrite` (bool) |
 | `speckit-validate` | Check artifact existence and phase | `featureDir` (optional), `command` (optional) |
+| `speckit-audit` | Run comprehensive project audit | `fix` (bool, optional) |
 | `speckit-clean` | Scan all features and report inconsistencies | `fix` (bool, optional) |
 | `speckit-config` | Read or update SDD configuration | `key`, `value`, `defaultTechStack` (all optional) |
 | `speckit-status` | Report full workflow state | none |
+| `speckit-complexity` | Assess task complexity for routing | `taskDescription`, `filesAffected`, `hasNewDependencies`, `hasBoundaryAnnotations`, `hasNeedsClarification`, `useProjectContext` |
 
 ---
 
@@ -267,7 +274,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-clean`, `speckit-config`, `speckit-status`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 
