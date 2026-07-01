@@ -65,58 +65,16 @@ compuertas de fase implementadas. Verificado con commands-gates.test.ts
 
 Todas las 7 tareas de C estan implementadas y pasando.
 
-## Fase 3.2: Discovery, Complexity Routing, y Express Mode
+## Fase 3.2: Discovery, Complexity Routing, Express Mode — subfases
 
-Esta es la funcionalidad mayor pendiente del plan original. No se ha iniciado
-ninguna implementacion ni prueba para esta fase. El nombre 3.2 hace referencia
-a la tercera fase del plan original, segunda iteracion.
+Subfases implementadas incrementalmente, 1 componente por commit.
 
-### Descripcion
+### 3.2.1: Discovery (COMPLETO)
 
-Discovery es la capacidad de las herramientas para descubrir automaticamente
-el contexto del proyecto: detectar el framework, el gestor de paquetes, las
-dependencias instaladas, la estructura de directorios, y las convenciones
-existentes. Esto permite que las herramientas tomen decisiones informadas sin
-preguntar al usuario cada vez.
-
-Complexity Routing es la capacidad de evaluar la complejidad de una tarea y
-seleccionar la ruta de implementacion adecuada: ruta simple para cambios
-menores sin necesidad de subagentes, ruta estandar para cambios tipicos con
-un ciclo TDD completo, y ruta compleja para cambios grandes que requieren
-investigacion, multiples subagentes, y revision extendida.
-
-Express Mode es un modo de operacion que omite las propuestas conversacionales
-y las confirmaciones del usuario, ejecutando directamente la implementacion
-con valores predeterminados. Es util para usuarios experimentados que confian
-en el sistema.
-
-### Componentes
-
-El sistema requiere los siguientes cambios en las herramientas existentes.
-
-Uno, una nueva funcion en shared/types.ts que detecte el contexto del proyecto:
-framework principal, gestor de paquetes, archivos de configuracion existentes,
-y estructura de directorios. Esta funcion debe ser llamada por las habilidades
-durante la carga de contexto.
-
-Dos, una nueva herramienta speckit-complexity.ts que reciba una descripcion de
-tarea y devuelva un nivel de complejidad: simple, estandar, o complejo. La
-evaluacion puede basarse en la cantidad de archivos afectados, la presencia de
-dependencias externas, o la ambiguedad de la especificacion.
-
-Tres, una actualizacion a speckit-implementer para que lea el nivel de
-complejidad antes de ejecutar cada tarea y seleccione la ruta adecuada. En
-modo simple, ejecuta sin subagentes. En modo estandar, ejecuta el ciclo TDD
-completo. En modo complejo, despacha subagentes de investigacion.
-
-Cuatro, una actualizacion a speckit-spec-writer y speckit-plan-engineer para
-que soporten Express Mode. Cuando el modo express esta activo, las propuestas
-conversacionales se omiten y los valores predeterminados se usan
-automaticamente.
-
-Cinco, pruebas de integracion para cada nivel de complejidad y para el modo
-express. Las pruebas deben verificar que la ruta seleccionada corresponde al
-nivel de complejidad declarado.
+ProjectContext interface, discoverProject, detectPackageManager, detectFramework,
+detectConfigFiles, detectScripts en shared/types.ts. En memoria (siempre fresco).
+Constitucion enmendada para permitir auto-discovery explicito y visible.
+Tests unitarios para cada detector en discovery.test.ts.
 
 ## Fase D: Bug de concurrencia (COMPLETO)
 
@@ -169,7 +127,7 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
-Fase 3.2: 5 tareas (pendiente).
+Fase 3.2: 5 subfases, 1 completa (3.2.1 Discovery). Pendientes 3.2.2 a 3.2.5.
 
-Total: 24 tareas, 22 completas, 2 pendientes (Fase 3.2).
-Suite actual: 374 tests en 18 archivos.
+Total: 24 tareas, 22 completas, 1 en progreso (3.2.1 parcial), 4 pendientes (3.2.2-3.2.5).
+Suite actual: 389+ tests en 19 archivos.

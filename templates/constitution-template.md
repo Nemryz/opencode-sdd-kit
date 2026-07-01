@@ -16,9 +16,9 @@ Why: Writing tests after code lets the agent optimize for false positives. Tests
 
 ## Article III: Explicit Over Implicit
 
-All configuration is explicit. No magic auto-discovery. No global state. Dependencies are injected, not imported.
+Configuration is explicit. Auto-discovery is permitted when visible and confirmed by the user before use. No hidden global state. Dependencies are injected, not imported.
 
-Why: AI agents default to implicit patterns (auto-loading, ambient singletons) because training data favors brevity. Explicit configuration makes decisions visible, auditable, and reversible.
+Why: AI agents default to implicit patterns (auto-loading, ambient singletons) because training data favors brevity. Explicit configuration makes decisions visible, auditable, and reversible. When auto-discovery is used, detected context must be shown to the user for confirmation, ensuring no silent decisions are made.
 
 ## Article IV: Integration-First Testing
 
