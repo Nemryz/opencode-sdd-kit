@@ -205,6 +205,79 @@ export function isENOENT(err: unknown): boolean {
   return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "ENOENT"
 }
 
+export function isEEXIST(err: unknown): boolean {
+  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "EEXIST"
+}
+
+// ─────────────────────────── File Locking ───────────────────────────
+
+export interface LockOptions {
+  timeout?: number
+  staleThreshold?: number
+}
+
+export interface LockHandle {
+  lockDir: string
+  filePath: string
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function readLockJson(lockDir: string): Promise<{ pid: number; createdAt: string } | null> {
+  try {
+    const data = await fs.readFile(path.join(lockDir, "lock.json"), "utf-8")
+    return JSON.parse(data)
+  } catch {
+    return null
+  }
+}
+
+export async function acquireLock(filePath: string, options?: LockOptions): Promise<LockHandle> {
+  const lockDir = filePath + ".lock"
+  const timeout = options?.timeout ?? 5000
+  const staleThreshold = options?.staleThreshold ?? 10000
+  const start = Date.now()
+
+  while (true) {
+    try {
+      await fs.mkdir(lockDir, { recursive: false })
+      await fs.writeFile(
+        path.join(lockDir, "lock.json"),
+        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }),
+        "utf-8",
+      )
+      return { lockDir, filePath }
+    } catch (err) {
+      if (isEEXIST(err)) {
+        const info = await readLockJson(lockDir)
+        if (info) {
+          const age = Date.now() - new Date(info.createdAt).getTime()
+          if (age > staleThreshold) {
+            await fs.rm(lockDir, { recursive: true, force: true })
+            continue
+          }
+        }
+        if (Date.now() - start >= timeout) {
+          throw new Error(`Lock timeout: could not acquire lock for ${filePath}`)
+        }
+        await sleep(50)
+        continue
+      }
+      throw err
+    }
+  }
+}
+
+export async function releaseLock(handle: LockHandle): Promise<void> {
+  try {
+    await fs.rm(handle.lockDir, { recursive: true, force: true })
+  } catch {
+    // idempotent
+  }
+}
+
 const VALID_PHASES: readonly string[] = ["spec", "plan", "tasks", "ready", "impl", "complete"]
 
 function isPhase(s: string): s is Phase {
@@ -227,9 +300,15 @@ export async function readSession(root: string): Promise<SessionState> {
 }
 
 export async function writeSession(root: string, s: SessionState): Promise<void> {
-  const dir = path.dirname(sessionPath(root))
+  const fp = sessionPath(root)
+  const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(sessionPath(root), JSON.stringify(s, null, 2), "utf-8")
+  const handle = await acquireLock(fp)
+  try {
+    await fs.writeFile(fp, JSON.stringify(s, null, 2), "utf-8")
+  } finally {
+    await releaseLock(handle)
+  }
 }
 
 // ─────────────────────────── SpecJson I/O ───────────────────────────
@@ -251,7 +330,13 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
 
 export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
   sj.updated_at = new Date().toISOString()
-  await fs.writeFile(specJsonPath(featureDir), JSON.stringify(sj, null, 2), "utf-8")
+  const fp = specJsonPath(featureDir)
+  const handle = await acquireLock(fp)
+  try {
+    await fs.writeFile(fp, JSON.stringify(sj, null, 2), "utf-8")
+  } finally {
+    await releaseLock(handle)
+  }
 }
 
 // ─────────────────────────── Feature directory utilities ───────────────────────────

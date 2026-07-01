@@ -4,6 +4,8 @@ import {
   isValidProjectRoot,
   SDDConfig,
   DEFAULT_CONFIG,
+  acquireLock,
+  releaseLock,
 } from "./shared/types"
 import fs from "node:fs/promises"
 import path from "node:path"
@@ -18,9 +20,15 @@ async function readConfig(root: string): Promise<SDDConfig> {
 }
 
 async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
-  const dir = path.dirname(configPath(root))
+  const fp = configPath(root)
+  const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(configPath(root), JSON.stringify(cfg, null, 2), "utf-8")
+  const handle = await acquireLock(fp)
+  try {
+    await fs.writeFile(fp, JSON.stringify(cfg, null, 2), "utf-8")
+  } finally {
+    await releaseLock(handle)
+  }
 }
 
 export default tool({
