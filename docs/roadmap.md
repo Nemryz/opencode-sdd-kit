@@ -74,11 +74,12 @@ Vacios: anotaciones _Boundary: ComponentName_ incompletas, @mention para
 subagentes (actualmente usa "Sub-agent 1" generico).
 Pendiente de implementar.
 
-### A-4: speckit-task-decomposer (PENDIENTE)
+### A-4: speckit-task-decomposer (COMPLETO)
 
-Vacios: carga de domain-map.md ausente en Step 1, subagentes para validacion
-de grafos de dependencia, @mention.
-Pendiente de implementar.
+Vacios: carga de domain-map.md, subagentes para validacion de grafos de
+dependencia, @mention. Agregado: domain-map.md en Step 1, @speckit-reviewer
+y @explore para dispatch en Step 4, @mention en Reference, 22 tests en
+task-decomposer-content.test.ts.
 
 ### A-5: speckit-implementer (COMPLETO)
 
@@ -187,18 +188,18 @@ El orden de ejecucion actualizado es:
 
 1. Fase C (completo)
 2. Fase A, comenzando con A-5 (completo), luego A-1 (completo).
-   Pendiente: A-4, A-2, A-3, A-6.
+    Pendiente: A-2, A-3, A-6.
 3. Fase B (completo)
 4. Fase D (completo)
 5. Fase 3.2 (pendiente, requiere Fase A completa)
 
 ## Resumen de metricas
 
-Fase A: 6 tareas, 4 completas (A-5, A-1). Pendientes A-4, A-2, A-3, A-6.
+Fase A: 6 tareas, 4 completas (A-5, A-1, A-4). Pendientes A-2, A-3, A-6.
 Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase 3.2: 5 tareas (pendiente).
 
-Total: 23 tareas, 17 completas, 6 pendientes.
-Suite actual: 277 tests en 15 archivos.
+Total: 23 tareas, 18 completas, 5 pendientes.
+Suite actual: 299 tests en 16 archivos.

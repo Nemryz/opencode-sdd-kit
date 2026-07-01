@@ -69,6 +69,11 @@ Wait for user confirmation before proceeding to Step 3.
 8. Define measurable success criteria
 9. Identify edge cases in a dedicated section
 
+**Sub-agent dispatch (optional, for ambiguous or complex features):**
+If the feature description is ambiguous or the domain is unfamiliar, dispatch sub-agents:
+1. **`@explore` sub-agent**: Researches existing codebase patterns, similar features in specs/, or external references to resolve ambiguities
+2. **`@spec-writing` sub-agent** (future): Generates story candidates from research findings for review
+
 ### Step 4: Update spec.json
 
 After writing the spec, update the feature's `spec.json`:
@@ -104,6 +109,7 @@ The spec.json is at `specs/NNN-feature-name/spec.json`. Read it first, modify fi
 - [ ] Boundaries are explicitly documented
 - [ ] Steering context was loaded (or gracefully skipped)
 - [ ] Conversational proposal was made (or skipped if in auto mode)
+- [ ] `@mention` syntax used for sub-agent dispatch when applicable
 
 ## Reference
 
@@ -111,6 +117,7 @@ Tool: `speckit-scaffold` (call with `template: "spec"`)
 Shared rules: `skills/rules/spec-writing.md`
 Constitution: `.opencode/spec-memory/constitution.md`
 Domain map: `.opencode/domain-map.md`
+Sub-agents: `@explore`
 
 ## Output location
 
