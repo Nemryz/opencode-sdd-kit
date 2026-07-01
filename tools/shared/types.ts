@@ -219,7 +219,10 @@ export interface LockOptions {
 export interface LockHandle {
   lockDir: string
   filePath: string
+  reentrant?: boolean
 }
+
+const heldLocks = new Set<string>()
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -236,19 +239,24 @@ async function readLockJson(lockDir: string): Promise<{ pid: number; createdAt: 
 
 export async function acquireLock(filePath: string, options?: LockOptions): Promise<LockHandle> {
   const lockDir = filePath + ".lock"
+  if (heldLocks.has(lockDir)) {
+    return { lockDir, filePath, reentrant: true }
+  }
   const timeout = options?.timeout ?? 5000
   const staleThreshold = options?.staleThreshold ?? 10000
   const start = Date.now()
 
   while (true) {
     try {
+      await fs.mkdir(path.dirname(lockDir), { recursive: true })
       await fs.mkdir(lockDir, { recursive: false })
       await fs.writeFile(
         path.join(lockDir, "lock.json"),
         JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }),
         "utf-8",
       )
-      return { lockDir, filePath }
+      heldLocks.add(lockDir)
+      return { lockDir, filePath, reentrant: false }
     } catch (err) {
       if (isEEXIST(err)) {
         const info = await readLockJson(lockDir)
@@ -271,10 +279,21 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
 }
 
 export async function releaseLock(handle: LockHandle): Promise<void> {
+  if (handle.reentrant) return
+  heldLocks.delete(handle.lockDir)
   try {
     await fs.rm(handle.lockDir, { recursive: true, force: true })
   } catch {
     // idempotent
+  }
+}
+
+export async function withLock<T>(filePath: string, fn: () => Promise<T>, options?: LockOptions): Promise<T> {
+  const handle = await acquireLock(filePath, options)
+  try {
+    return await fn()
+  } finally {
+    await releaseLock(handle)
   }
 }
 

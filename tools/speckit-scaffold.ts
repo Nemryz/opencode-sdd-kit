@@ -10,9 +10,12 @@ import {
   makeSpecJson,
   specsDirPath,
   steeringDirPath,
+  specJsonPath,
+  sessionPath,
   exists,
   isENOENT,
   isValidProjectRoot,
+  withLock,
   PATHS,
 } from "./shared/types"
 
@@ -347,28 +350,29 @@ export default tool({
 
       await fs.writeFile(filePath, content, "utf-8")
 
-      const sjPath = path.join(featurePath, "spec.json")
-      let sj = await readSpecJson(featurePath)
-      if (!sj) {
-        sj = makeSpecJson(args.featureName, featureNumber)
-      }
-      if (args.template === "spec") {
-        sj.phase = "spec"
-        sj.approvals.spec.generated = true
-      } else if (args.template === "plan") {
-        sj.approvals.spec.approved = true
-        sj.approvals.plan.generated = true
-        sj.phase = "plan"
-      } else if (args.template === "tasks") {
-        sj.approvals.plan.approved = true
-        sj.approvals.tasks.generated = true
-        sj.phase = "tasks"
-        if (sj.approvals.tasks.approved) {
-          sj.phase = "ready"
-          sj.ready_for_implementation = true
+      await withLock(specJsonPath(featurePath), async () => {
+        let sj = await readSpecJson(featurePath)
+        if (!sj) {
+          sj = makeSpecJson(args.featureName, featureNumber)
         }
-      }
-      await writeSpecJson(sj, featurePath)
+        if (args.template === "spec") {
+          sj.phase = "spec"
+          sj.approvals.spec.generated = true
+        } else if (args.template === "plan") {
+          sj.approvals.spec.approved = true
+          sj.approvals.plan.generated = true
+          sj.phase = "plan"
+        } else if (args.template === "tasks") {
+          sj.approvals.plan.approved = true
+          sj.approvals.tasks.generated = true
+          sj.phase = "tasks"
+          if (sj.approvals.tasks.approved) {
+            sj.phase = "ready"
+            sj.ready_for_implementation = true
+          }
+        }
+        await writeSpecJson(sj, featurePath)
+      })
 
       const nextHint = args.template === "spec"
         ? "/plan <tech stack>"
@@ -378,17 +382,19 @@ export default tool({
 
       const phase = args.template === "spec" ? "spec" : args.template === "plan" ? "plan" : "tasks"
 
-      const session = await readSession(projectRoot)
-      session.command = "/" + args.template
-      session.phase = phase
-      session.featureDir = featureDirName
-      session.featureNumber = featureNumber
-      session.featureName = args.featureName
-      session.nextStep = nextHint
-      session.lastResult = `${fileName} created in specs/${featureDirName}/`
-      session.history.push("/" + args.template)
-      if (session.history.length > 20) session.history = session.history.slice(-20)
-      await writeSession(projectRoot, session)
+      await withLock(sessionPath(projectRoot), async () => {
+        const session = await readSession(projectRoot)
+        session.command = "/" + args.template
+        session.phase = phase
+        session.featureDir = featureDirName
+        session.featureNumber = featureNumber
+        session.featureName = args.featureName
+        session.nextStep = nextHint
+        session.lastResult = `${fileName} created in specs/${featureDirName}/`
+        session.history.push("/" + args.template)
+        if (session.history.length > 20) session.history = session.history.slice(-20)
+        await writeSession(projectRoot, session)
+      })
 
       let output = `${fileName} created in specs/${featureDirName}/`
       if (slugTruncated) {

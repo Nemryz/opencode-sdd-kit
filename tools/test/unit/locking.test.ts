@@ -1,67 +1,82 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import {
   acquireLock,
   releaseLock,
+  withLock,
   sleep,
   writeSession,
   readSession,
+  writeSpecJson,
+  readSpecJson,
+  makeSpecJson,
   DEFAULT_SESSION,
 } from "../../shared/types"
 
+let tmp: string
+
 async function worktree(): Promise<string> {
-  return await fs.mkdtemp(path.join(os.tmpdir(), "lock-test-"))
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), "lock-test-"))
+  return tmp
 }
+
+afterEach(async () => {
+  if (tmp) {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => {})
+  }
+})
 
 // ── acquireLock ───────────────────────────────────────────
 
 describe("acquireLock", () => {
   it("creates a lock directory", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const handle = await acquireLock(target)
     await expect(fs.stat(handle.lockDir)).resolves.toBeDefined()
     await releaseLock(handle)
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 
   it("returns a handle with lockDir and filePath", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const handle = await acquireLock(target)
     expect(handle.filePath).toBe(target)
     expect(handle.lockDir).toBe(target + ".lock")
+    expect(handle.reentrant).toBe(false)
     await releaseLock(handle)
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 
-  it("throws LockTimeout when lock cannot be acquired within timeout", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
-    const handle1 = await acquireLock(target)
+  it("throws LockTimeout when lock held by another process", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const lockDir = target + ".lock"
+    // manually create lock dir so heldLocks does not know about it
+    await fs.mkdir(lockDir, { recursive: true })
+    await fs.writeFile(
+      path.join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999999, createdAt: new Date().toISOString() }),
+      "utf-8",
+    )
     await expect(acquireLock(target, { timeout: 100 })).rejects.toThrow("Lock timeout")
-    await releaseLock(handle1)
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 
   it("acquires lock after previous lock is released", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const handle1 = await acquireLock(target)
     await releaseLock(handle1)
     const handle2 = await acquireLock(target)
     await releaseLock(handle2)
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 
   it("steals a stale lock directory", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const lockDir = target + ".lock"
     await fs.mkdir(lockDir, { recursive: true })
-    // stale threshold 1s, lock json says 60s ago
     await fs.writeFile(
       path.join(lockDir, "lock.json"),
       JSON.stringify({ pid: 999999, createdAt: new Date(Date.now() - 60000).toISOString() }),
@@ -70,7 +85,6 @@ describe("acquireLock", () => {
     const handle = await acquireLock(target, { staleThreshold: 1000 })
     expect(handle.filePath).toBe(target)
     await releaseLock(handle)
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 })
 
@@ -78,21 +92,99 @@ describe("acquireLock", () => {
 
 describe("releaseLock", () => {
   it("removes the lock directory", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const handle = await acquireLock(target)
     await releaseLock(handle)
     await expect(fs.stat(handle.lockDir)).rejects.toThrow()
-    await fs.rm(tmp, { recursive: true, force: true })
   })
 
   it("is idempotent when called twice", async () => {
-    const tmp = await worktree()
-    const target = path.join(tmp, "test.json")
+    const t = await worktree()
+    const target = path.join(t, "test.json")
     const handle = await acquireLock(target)
     await releaseLock(handle)
     await expect(releaseLock(handle)).resolves.toBeUndefined()
-    await fs.rm(tmp, { recursive: true, force: true })
+  })
+})
+
+// ── Reentrancy ────────────────────────────────────────────
+
+describe("reentrant lock", () => {
+  it("returns immediately when same file is already locked by this process", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const outer = await acquireLock(target)
+    const inner = await acquireLock(target)
+    expect(inner.reentrant).toBe(true)
+    await releaseLock(inner)
+    await releaseLock(outer)
+  })
+
+  it("keeps lock dir alive after reentrant release", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const outer = await acquireLock(target)
+    const inner = await acquireLock(target)
+    await releaseLock(inner)
+    await expect(fs.stat(inner.lockDir)).resolves.toBeDefined()
+    await releaseLock(outer)
+  })
+
+  it("writeSession inside withLock does not deadlock", async () => {
+    const t = await worktree()
+    const fp = path.join(t, ".opencode", "spec-memory", "session.json")
+    const custom = { ...DEFAULT_SESSION, phase: "spec" }
+    await withLock(fp, async () => {
+      await writeSession(t, custom)
+    })
+    const result = await readSession(t)
+    expect(result.phase).toBe("spec")
+  })
+
+  it("writeSpecJson inside withLock does not deadlock", async () => {
+    const t = await worktree()
+    const sj = makeSpecJson("test", 1)
+    const fp = path.join(t, "spec.json")
+    await withLock(fp, async () => {
+      await writeSpecJson(sj, t)
+    })
+    const result = await readSpecJson(t)
+    expect(result?.feature_name).toBe("test")
+  })
+})
+
+// ── withLock ──────────────────────────────────────────────
+
+describe("withLock", () => {
+  it("acquires and releases lock around a callback", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    let ran = false
+    await withLock(target, async () => {
+      ran = true
+    })
+    expect(ran).toBe(true)
+    // lock dir should be gone
+    await expect(fs.stat(target + ".lock")).rejects.toThrow()
+  })
+
+  it("protects read-modify-write from concurrent overwrite", async () => {
+    const t = await worktree()
+    const fp = path.join(t, "data.json")
+    await fs.writeFile(fp, JSON.stringify({ counter: 0 }), "utf-8")
+    const ops = 5
+    const tasks = Array.from({ length: ops }, () =>
+      withLock(fp, async () => {
+        const raw = await fs.readFile(fp, "utf-8")
+        const data = JSON.parse(raw)
+        data.counter++
+        await fs.writeFile(fp, JSON.stringify(data), "utf-8")
+      }),
+    )
+    await Promise.all(tasks)
+    const final = JSON.parse(await fs.readFile(fp, "utf-8"))
+    expect(final.counter).toBe(ops)
   })
 })
 

@@ -4,8 +4,7 @@ import {
   isValidProjectRoot,
   SDDConfig,
   DEFAULT_CONFIG,
-  acquireLock,
-  releaseLock,
+  withLock,
 } from "./shared/types"
 import fs from "node:fs/promises"
 import path from "node:path"
@@ -23,12 +22,9 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const fp = configPath(root)
   const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
-  const handle = await acquireLock(fp)
-  try {
+  await withLock(fp, async () => {
     await fs.writeFile(fp, JSON.stringify(cfg, null, 2), "utf-8")
-  } finally {
-    await releaseLock(handle)
-  }
+  })
 }
 
 export default tool({
@@ -43,11 +39,20 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
-      const cfg = await readConfig(projectRoot)
+      const cfg = await withLock(configPath(projectRoot), async () => {
+        const innerCfg = await readConfig(projectRoot)
+        if (args.defaultTechStack !== undefined) {
+          innerCfg.defaultTechStack = args.defaultTechStack ?? null
+          await writeConfig(projectRoot, innerCfg)
+        } else if (args.key && args.value !== undefined) {
+          innerCfg.preferences[args.key] = args.value
+          innerCfg.lastUsedLanguage = args.key === "language" ? args.value : innerCfg.lastUsedLanguage
+          await writeConfig(projectRoot, innerCfg)
+        }
+        return innerCfg
+      })
 
       if (args.defaultTechStack !== undefined) {
-        cfg.defaultTechStack = args.defaultTechStack ?? null
-        await writeConfig(projectRoot, cfg)
         return {
           title: "Configuration updated",
           output: `defaultTechStack: ${cfg.defaultTechStack ?? "(not set)"}`,
@@ -56,9 +61,6 @@ export default tool({
       }
 
       if (args.key && args.value !== undefined) {
-        cfg.preferences[args.key] = args.value
-        cfg.lastUsedLanguage = args.key === "language" ? args.value : cfg.lastUsedLanguage
-        await writeConfig(projectRoot, cfg)
         return {
           title: "Configuration updated",
           output: `${args.key}: ${args.value}`,

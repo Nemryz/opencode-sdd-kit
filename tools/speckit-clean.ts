@@ -13,7 +13,10 @@ import {
   getFeatureDirs,
   isValidProjectRoot,
   specsDirPath,
+  specJsonPath,
+  sessionPath,
   parsePhase,
+  withLock,
 } from "./shared/types"
 
 export default tool({
@@ -104,76 +107,91 @@ export default tool({
       }
 
       if (args.fix) {
-        const session = await readSession(projectRoot)
-        const fixedFields: string[] = []
-
         for (const dir of entries) {
           const report = reports.find(r => r.dir === dir)
           if (!report) continue
           const base = path.join(specsDir, dir)
-          const sj = await readSpecJson(base)
-
-          if (sj) {
-            const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
-            let changed = false
-            if (sj.phase !== filesPhase) {
-              sj.phase = parsePhase(filesPhase)
-              changed = true
+          await withLock(specJsonPath(base), async () => {
+            const sj = await readSpecJson(base)
+            if (sj) {
+              const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+              let changed = false
+              if (sj.phase !== filesPhase) {
+                sj.phase = parsePhase(filesPhase)
+                changed = true
+              }
+              const correctRfi = filesPhase === "ready" && sj.approvals.tasks.approved
+              if (sj.ready_for_implementation !== correctRfi) {
+                sj.ready_for_implementation = correctRfi
+                changed = true
+              }
+              if (changed) {
+                await writeSpecJson(sj, base)
+              }
             }
-            const correctRfi = filesPhase === "ready" && sj.approvals.tasks.approved
-            if (sj.ready_for_implementation !== correctRfi) {
-              sj.ready_for_implementation = correctRfi
-              changed = true
-            }
-            if (changed) {
-              await writeSpecJson(sj, base)
-              fixedFields.push(`${dir}: phase → ${filesPhase}`)
-            }
-          }
+          })
         }
 
-        if (session.featureDir) {
-          const stillExists = reports.some(r => r.dir === session.featureDir)
-          if (!stillExists) {
-            session.featureDir = reports.length > 0 ? reports[reports.length - 1].dir : null
-            session.featureNumber = session.featureDir ? parseNNN(session.featureDir) : null
-            session.featureName = null
-            fixedFields.push("featureDir")
-          }
-        } else if (reports.length > 0) {
-          session.featureDir = reports[reports.length - 1].dir
-          session.featureNumber = parseNNN(session.featureDir)
-          fixedFields.push("featureDir (assigned)")
-        }
-
-        if (session.featureNumber != null && session.featureDir) {
-          const expected = parseNNN(session.featureDir)
-          if (session.featureNumber !== expected) {
-            session.featureNumber = expected
-            fixedFields.push("featureNumber")
-          }
-        }
-
-        if (session.featureDir) {
-          const report = reports.find(r => r.dir === session.featureDir)
-          if (report) {
-            const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
-              report.spec, report.plan, report.tasks, true,
-            )
-            if (session.phase !== filesPhase) {
-              session.phase = filesPhase
-              session.nextStep = expectedNext
-              fixedFields.push("session phase")
+        const session = await withLock(sessionPath(projectRoot), async () => {
+          const s = await readSession(projectRoot)
+          const fixedFields: string[] = []
+          for (const dir of entries) {
+            const report = reports.find(r => r.dir === dir)
+            if (!report) continue
+            const base = path.join(specsDir, dir)
+            const sj = await readSpecJson(base)
+            if (sj) {
+              const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+              if (sj.phase !== filesPhase) {
+                fixedFields.push(`${dir}: phase → ${filesPhase}`)
+              }
             }
           }
-        }
 
-        if (fixedFields.length > 0) {
-          session.lastResult = "repaired: " + fixedFields.join(", ")
-          session.history.push("/clean")
-          if (session.history.length > 20) session.history = session.history.slice(-20)
-          await writeSession(projectRoot, session)
-        }
+          if (s.featureDir) {
+            const stillExists = reports.some(r => r.dir === s.featureDir)
+            if (!stillExists) {
+              s.featureDir = reports.length > 0 ? reports[reports.length - 1].dir : null
+              s.featureNumber = s.featureDir ? parseNNN(s.featureDir) : null
+              s.featureName = null
+              fixedFields.push("featureDir")
+            }
+          } else if (reports.length > 0) {
+            s.featureDir = reports[reports.length - 1].dir
+            s.featureNumber = parseNNN(s.featureDir)
+            fixedFields.push("featureDir (assigned)")
+          }
+
+          if (s.featureNumber != null && s.featureDir) {
+            const expected = parseNNN(s.featureDir)
+            if (s.featureNumber !== expected) {
+              s.featureNumber = expected
+              fixedFields.push("featureNumber")
+            }
+          }
+
+          if (s.featureDir) {
+            const report = reports.find(r => r.dir === s.featureDir)
+            if (report) {
+              const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
+                report.spec, report.plan, report.tasks, true,
+              )
+              if (s.phase !== filesPhase) {
+                s.phase = filesPhase
+                s.nextStep = expectedNext
+                fixedFields.push("session phase")
+              }
+            }
+          }
+
+          if (fixedFields.length > 0) {
+            s.lastResult = "repaired: " + fixedFields.join(", ")
+            s.history.push("/clean")
+            if (s.history.length > 20) s.history = s.history.slice(-20)
+            await writeSession(projectRoot, s)
+          }
+          return s
+        })
       }
 
       const summary = issues.length === 0

@@ -10,9 +10,11 @@ import {
   constitutionPath,
   specsDirPath,
   steeringDirPath,
+  specJsonPath,
   PATHS,
   detectPhaseFromFiles,
   parsePhase,
+  withLock,
 } from "./shared/types"
 
 interface AuditFinding {
@@ -283,12 +285,14 @@ export default tool({
               const planOk = await exists(path.join(base, "plan.md"))
               const tasksOk = await exists(path.join(base, "tasks.md"))
               const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
-              const sjPrev = await readSpecJson(base)
-              if (sjPrev && sjPrev.phase !== newPhase) {
-                sjPrev.phase = parsePhase(newPhase)
-                await writeSpecJson(sjPrev, base)
-                finding.message += " (auto-fixed)"
-              }
+              await withLock(specJsonPath(base), async () => {
+                const sjPrev = await readSpecJson(base)
+                if (sjPrev && sjPrev.phase !== newPhase) {
+                  sjPrev.phase = parsePhase(newPhase)
+                  await writeSpecJson(sjPrev, base)
+                  finding.message += " (auto-fixed)"
+                }
+              })
             }
           }
         }
