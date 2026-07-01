@@ -70,6 +70,33 @@ describe("status", () => {
     expect(session.featureDir).toBeTruthy()
   })
 
+  it("falls back to other feature when session.featureDir deleted (T-4)", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Billing", template: "spec" }, ctx)
+    const session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    await writeSession(worktree, session)
+    const specsDir = path.join(worktree, "specs")
+    await fs.rm(path.join(specsDir, "001-auth"), { recursive: true, force: true })
+    const result = await statusTool.execute({}, ctx)
+    expect(result.metadata?.latestFeature).toBe("002-billing")
+    expect(result.metadata?.featureCount).toBe(1)
+  })
+
+  it("reports no features when session.featureDir deleted and no others exist (T-5)", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    await writeSession(worktree, session)
+    const specsDir = path.join(worktree, "specs")
+    await fs.rm(path.join(specsDir, "001-auth"), { recursive: true, force: true })
+    const result = await statusTool.execute({}, ctx)
+    expect(result.metadata?.featureCount).toBe(0)
+    expect(result.output).toContain("No features yet")
+  })
+
   it("prefers spec.json phase over detectPhase", async () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
@@ -135,5 +162,30 @@ describe("config", () => {
     const cfg = JSON.parse(raw)
     expect(cfg.lastUsedLanguage).toBe("es")
     expect(cfg.preferences.language).toBe("es")
+  })
+
+  it("does not allow __proto__ pollution in preferences (T-6)", async () => {
+    const r1 = await configTool.execute({ key: "__proto__", value: "polluted" }, ctx)
+    expect(r1.title).not.toBe("Error")
+    const proto = ({} as Record<string, string>).__proto__
+    expect(proto).not.toBe("polluted")
+  })
+
+  it("handles unicode preference keys correctly (T-6)", async () => {
+    await configTool.execute({ key: "theme", value: "dark" }, ctx)
+    const r2 = await configTool.execute({ key: "theme", value: "darker" }, ctx)
+    expect(r2.output).toContain("darker")
+    const cfgPath = configPath(worktree)
+    const raw = await fs.readFile(cfgPath, "utf-8")
+    const cfg = JSON.parse(raw)
+    expect(cfg.preferences.theme).toBe("darker")
+  })
+
+  it("stores dotted preference keys literally not nested (T-6)", async () => {
+    await configTool.execute({ key: "editor.path", value: "vim" }, ctx)
+    const cfgPath = configPath(worktree)
+    const raw = await fs.readFile(cfgPath, "utf-8")
+    const cfg = JSON.parse(raw)
+    expect(cfg.preferences["editor.path"]).toBe("vim")
   })
 })

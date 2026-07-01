@@ -48,49 +48,12 @@ Este ciclo se aplica a cada tarea individual, no a grupos de tareas. La
 granularidad busca que cada commit sea atomico: contiene exactamente un cambio
 logico, sus pruebas, y nada mas.
 
-## Fase A: Completitud de habilidades (Domain Layer)
+## Fase A: Completitud de habilidades (COMPLETO)
 
-Cada tarea incluye un test de contenido que verifica dimensiones esperadas
-(propuesta conversacional, subagentes, boundary annotations, shared rules,
-@mention, domain-map). Estado actualizado tras verificacion real de SKILL.md.
-
-### A-1: speckit-constitution (COMPLETO)
-
-Vacios originales: flujo de propuesta conversacional, subagentes, boundary,
-reglas compartidas, @mention. Agregado: Step 2 con propuesta, @explore como
-subagente, _Boundary:_ en Boundary Map, shared-rules: design-principles.md,
-20 tests de contenido en constitution-content.test.ts.
-
-### A-2: speckit-spec-writer (COMPLETO)
-
-Vacios: subagentes para investigacion y @mention. Agregado: @explore para
-investigar ambiguedades, @mention en Reference y quality checklist,
-22 tests en spec-writer-content.test.ts.
-
-### A-3: speckit-plan-engineer (PENDIENTE)
-
-Vacios: anotaciones _Boundary: ComponentName_ incompletas, @mention para
-subagentes (actualmente usa "Sub-agent 1" generico).
-Pendiente de implementar.
-
-### A-4: speckit-task-decomposer (COMPLETO)
-
-Vacios: carga de domain-map.md, subagentes para validacion de grafos de
-dependencia, @mention. Agregado: domain-map.md en Step 1, @speckit-reviewer
-y @explore para dispatch en Step 4, @mention en Reference, 22 tests en
-task-decomposer-content.test.ts.
-
-### A-5: speckit-implementer (COMPLETO)
-
-Vacios originales segun roadmap ya estaban implementados realmente: propuesta
-conversacional, subagentes, boundary, shared rules, @mention. Se extendio el
-test de 4 a 22 aserciones en implementer-content.test.ts. Se confirma que el
-SKILL.md ya tenia todas las dimensiones.
-
-### A-6: speckit-reviewer (COMPLETO)
-
-Vacio: propuesta conversacional. Agregado: Step 2 con Scope y Dispatch Plan,
-renumbering de steps, test expandido de 3 a 21 aserciones.
+Las 6 habilidades (constitution, spec-writer, plan-engineer, task-decomposer,
+implementer, reviewer) estan completas: todas tienen propuesta conversacional,
+subagentes con @mention, boundary annotations, shared rules, y tests de
+contenido. 132 tests distribuidos en 6 archivos de contenido.
 
 ## Fase B: Compuertas de fase en comandos (COMPLETO)
 
@@ -159,7 +122,15 @@ nivel de complejidad declarado.
 
 Implementado con acquireLock/releaseLock atomicos via fs.mkdir, withLock
 helper reentrante, timeout configurable, stale lock detection, y wrappers
-en las 6 herramientas. 14 tests en locking.test.ts.
+en las 6 herramientas. 14+ tests en locking.test.ts.
+
+## Fase E: Cobertura de edge cases (COMPLETO)
+
+Ocho escenarios de alto y medio riesgo identificados tras auditoria de la
+suite completa (362 tests). Incluye: withLock error propagation, stale lock
+detection con datos corruptos, status con directorios borrados, config con
+caracteres especiales, y clean con directorios faltantes. Suite final: 370+
+tests.
 
 ## Mapa de dependencias
 
@@ -187,18 +158,19 @@ El orden de ejecucion actualizado es:
 
 1. Fase C (completo)
 2. Fase A, comenzando con A-5 (completo), luego A-1 (completo).
-    Pendiente: A-3.
 3. Fase B (completo)
 4. Fase D (completo)
-5. Fase 3.2 (pendiente, requiere Fase A completa)
+5. Fase E (completo)
+6. Fase 3.2 (pendiente)
 
 ## Resumen de metricas
 
-Fase A: 6 tareas, 5 completas (A-5, A-1, A-4, A-2, A-6). Pendiente A-3.
+Fase A: 6 tareas (completo).
 Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
+Fase E: 1 tarea (completo).
 Fase 3.2: 5 tareas (pendiente).
 
-Total: 23 tareas, 20 completas, 3 pendientes (A-3 + 2 de Fase 3.2).
-Suite actual: 339 tests en 17 archivos.
+Total: 24 tareas, 22 completas, 2 pendientes (Fase 3.2).
+Suite actual: 370+ tests en 18 archivos.

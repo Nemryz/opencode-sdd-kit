@@ -225,6 +225,35 @@ describe("clean auto-fix", () => {
     expect(fixed.ready_for_implementation).toBe(true)
   })
 
+  it("fixes featureDir when deleted but other features remain (T-7)", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Billing", template: "spec" }, ctx)
+    let session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    session.featureNumber = 1
+    await writeSession(worktree, session)
+    const specsDir = specsDirPath(worktree)
+    await fs.rm(path.join(specsDir, "001-auth"), { recursive: true, force: true })
+    const result = await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.featureDir).toBe("002-billing")
+    expect(session2.featureNumber).toBe(2)
+  })
+
+  it("clears featureDir when specs empty after deleting last feature (T-8)", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    let session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    session.featureNumber = 1
+    await writeSession(worktree, session)
+    const specsDir = specsDirPath(worktree)
+    await fs.rm(path.join(specsDir, "001-auth"), { recursive: true, force: true })
+    const result = await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.featureDir).toBeNull()
+    expect(session2.featureNumber).toBeNull()
+  })
+
   it("fixes multiple session issues in one run", async () => {
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)

@@ -260,12 +260,10 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
     } catch (err) {
       if (isEEXIST(err)) {
         const info = await readLockJson(lockDir)
-        if (info) {
-          const age = Date.now() - new Date(info.createdAt).getTime()
-          if (age > staleThreshold) {
-            await fs.rm(lockDir, { recursive: true, force: true })
-            continue
-          }
+        const createdAt = info ? new Date(info.createdAt).getTime() : NaN
+        if (!info || isNaN(createdAt) || (Date.now() - createdAt > staleThreshold)) {
+          await fs.rm(lockDir, { recursive: true, force: true })
+          continue
         }
         if (Date.now() - start >= timeout) {
           throw new Error(`Lock timeout: could not acquire lock for ${filePath}`)

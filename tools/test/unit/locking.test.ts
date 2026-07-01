@@ -154,6 +154,36 @@ describe("reentrant lock", () => {
   })
 })
 
+// ── Stale detection edge cases ─────────────────────────
+
+describe("stale lock detection edge cases", () => {
+  it("steals a lock when lock.json has invalid date string (T-2)", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const lockDir = target + ".lock"
+    await fs.mkdir(lockDir, { recursive: true })
+    await fs.writeFile(
+      path.join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999999, createdAt: "not-a-date" }),
+      "utf-8",
+    )
+    const handle = await acquireLock(target, { staleThreshold: 100, timeout: 500 })
+    expect(handle.filePath).toBe(target)
+    await releaseLock(handle)
+  })
+
+  it("steals a lock when lock dir exists but lock.json is missing (T-3)", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const lockDir = target + ".lock"
+    await fs.mkdir(lockDir, { recursive: true })
+    // no lock.json written — simulate crash between mkdir and writeFile
+    const handle = await acquireLock(target, { staleThreshold: 100, timeout: 500 })
+    expect(handle.filePath).toBe(target)
+    await releaseLock(handle)
+  })
+})
+
 // ── withLock ──────────────────────────────────────────────
 
 describe("withLock", () => {
@@ -166,6 +196,15 @@ describe("withLock", () => {
     })
     expect(ran).toBe(true)
     // lock dir should be gone
+    await expect(fs.stat(target + ".lock")).rejects.toThrow()
+  })
+
+  it("releases lock when callback throws and propagates error (T-1)", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const err = new Error("inside callback error")
+    await expect(withLock(target, async () => { throw err })).rejects.toThrow("inside callback error")
+    // lock dir must be cleaned up even after error
     await expect(fs.stat(target + ".lock")).rejects.toThrow()
   })
 
