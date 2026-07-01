@@ -552,6 +552,17 @@ export interface ComplexityResult {
   reasoning: string[]
 }
 
+const COMPLEXITY_KEYWORDS: { pattern: RegExp; score: number; reason: string }[] = [
+  { pattern: /\bmigrat(e|ion)\b|\bupgrade\b/i, score: 2, reason: "migration task detected: high risk of breaking changes" },
+  { pattern: /\brefactor\b|\brestructure\b|\brewrite\b/i, score: 1, reason: "refactoring task: needs careful regression testing" },
+  { pattern: /\bsecurity\b|\bauth(entication|orization)?\b/i, score: 1, reason: "security-sensitive task: requires review" },
+  { pattern: /\bperform(ance)?\b|\boptimiz(e|ation)\b|\bperf\b/i, score: 1, reason: "performance optimization: needs benchmarking" },
+  { pattern: /\bdatabase\b|\bschema\b|\bddl\b|\bdml\b/i, score: 1, reason: "database changes: requires migration handling" },
+  { pattern: /\bapi\b|\bendpoint\b|\bgraphql\b|\brest\b/i, score: 1, reason: "API surface changes: needs versioning consideration" },
+  { pattern: /\bconcurrent\b|\bparallel\b|\basync\b|\brace condition\b/i, score: 1, reason: "concurrency work: needs careful synchronization" },
+  { pattern: /\bcach(e|ing)\b|\bqueue\b|\bpub\.sub\b|\bmessaging\b/i, score: 1, reason: "infrastructure changes: messaging, caching, or queues" },
+]
+
 export async function assessComplexity(
   taskDescription: string,
   filesAffected: number,
@@ -562,6 +573,16 @@ export async function assessComplexity(
 ): Promise<ComplexityResult> {
   const reasoning: string[] = []
   let score = 0
+
+  // task description keyword analysis
+  const usedReasons = new Set<string>()
+  for (const rule of COMPLEXITY_KEYWORDS) {
+    if (rule.pattern.test(taskDescription) && !usedReasons.has(rule.reason)) {
+      reasoning.push(rule.reason)
+      score += rule.score
+      usedReasons.add(rule.reason)
+    }
+  }
 
   // files affected
   if (filesAffected <= 1) {

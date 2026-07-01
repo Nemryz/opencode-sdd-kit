@@ -114,7 +114,7 @@ F-3: config defaultTechStack redirect (fix).
 F-4: audit fix recalculo de resumen (fix).
 F-5: clean constitutionExists real (fix).
 F-6: findTargetFeatureDir sort numerico (fix).
-Pendiente: taskDescription NLP scoring en assessComplexity.
+F-7: taskDescription NLP scoring con 8 categorias de riesgo (fix).
 
 ## Fase E: Cobertura de edge cases (COMPLETO)
 
@@ -161,8 +161,8 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
-Fase F: 6 tareas (completo).
+Fase F: 7 tareas (completo).
 Fase 3.2: 5 subfases (completo).
 
-Total: 30 tareas, 29 completas, 1 pendiente (taskDescription NLP).
-Suite actual: 420+ tests en 20 archivos.
+Total: 31 tareas (completo).
+Suite actual: 435+ tests en 20 archivos.

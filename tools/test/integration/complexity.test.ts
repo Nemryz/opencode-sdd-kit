@@ -56,6 +56,74 @@ describe("assessComplexity", () => {
     expect(r.reasoning.length).toBeGreaterThanOrEqual(5)
     expect(r.reasoning.some(line => line.includes("score"))).toBe(true)
   })
+
+  it("detects migration keyword and adds 2 points", async () => {
+    const r = await assessComplexity("migrate database from X to Y", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(2)
+    expect(r.reasoning.some(line => line.includes("migration"))).toBe(true)
+  })
+
+  it("detects refactor keyword and adds 1 point", async () => {
+    const r = await assessComplexity("refactor user service", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("refactoring"))).toBe(true)
+  })
+
+  it("detects auth keyword adds 1 point", async () => {
+    const r = await assessComplexity("add authentication system", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("security"))).toBe(true)
+  })
+
+  it("detects performance keyword adds 1 point", async () => {
+    const r = await assessComplexity("optimize page load performance", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("performance"))).toBe(true)
+  })
+
+  it("detects database keyword adds 1 point", async () => {
+    const r = await assessComplexity("update database schema", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("database"))).toBe(true)
+  })
+
+  it("detects api keyword adds 1 point", async () => {
+    const r = await assessComplexity("create API endpoint for users", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("API"))).toBe(true)
+  })
+
+  it("detects concurrency keyword adds 1 point", async () => {
+    const r = await assessComplexity("fix race condition in worker", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("concurrency"))).toBe(true)
+  })
+
+  it("detects cache keyword adds 1 point", async () => {
+    const r = await assessComplexity("implement cache layer for queries", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(1)
+    expect(r.reasoning.some(line => line.includes("infrastructure"))).toBe(true)
+  })
+
+  it("detects multiple distinct keywords without duplication", async () => {
+    const r = await assessComplexity("refactor and migrate the entire API", 1, false, false, false)
+    expect(r.score).toBeGreaterThanOrEqual(3)
+    const migrations = r.reasoning.filter(line => line.includes("migration")).length
+    expect(migrations).toBe(1)
+  })
+
+  it("does not add keyword score for simple unrelated description", async () => {
+    const r1 = await assessComplexity("update readme documentation", 1, false, false, false)
+    const r2 = await assessComplexity("fix typo in comment", 1, false, false, false)
+    const keywordScores = [r1.score, r2.score]
+    expect(keywordScores.every(s => s <= 0)).toBe(true)
+  })
+
+  it("does not duplicate reason when same keyword appears twice", async () => {
+    const r = await assessComplexity("migrate database and migrate schema", 1, false, false, false)
+    const migrationExact = r.reasoning.filter(line => line === "migration task detected: high risk of breaking changes").length
+    expect(migrationExact).toBe(1)
+  })
 })
 
 // ── complexityTool integration tests ─────────────────────
