@@ -113,7 +113,7 @@ The project includes 418 automated tests distributed across 20 test files, cover
 
 ## Contributing
 
-Issues and pull requests are welcome at the GitHub repository. Follow the incremental development cycle described in the roadmap document: write the failing test first, implement the minimum change, refactor if needed, run the full suite to confirm no regressions, commit with an English message using commas instead of dashes, push, then stop and evaluate the next step.
+Issues and pull requests are welcome at the GitHub repository. 
 
 ## License
 
