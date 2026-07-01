@@ -12,6 +12,7 @@ import {
   detectPhase,
   getFeatureDirs,
   isValidProjectRoot,
+  constitutionPath,
   specsDirPath,
   specJsonPath,
   sessionPath,
@@ -173,8 +174,9 @@ export default tool({
           if (s.featureDir) {
             const report = reports.find(r => r.dir === s.featureDir)
             if (report) {
+              const constitutionExists = await exists(constitutionPath(projectRoot))
               const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
-                report.spec, report.plan, report.tasks, true,
+                report.spec, report.plan, report.tasks, constitutionExists,
               )
               if (s.phase !== filesPhase) {
                 s.phase = filesPhase

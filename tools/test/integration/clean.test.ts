@@ -196,6 +196,7 @@ describe("clean auto-fix", () => {
   })
 
   it("fixes session phase to match files phase when set wrong", async () => {
+    await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     let session = await readSession(worktree)
     session.phase = "init"
@@ -254,7 +255,27 @@ describe("clean auto-fix", () => {
     expect(session2.featureNumber).toBeNull()
   })
 
+  it("detects init phase when constitution is missing (F-5)", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const constitutionPath = path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+    await fs.rm(constitutionPath, { force: true })
+    let session = await readSession(worktree)
+    session.featureDir = "001-auth"
+    session.featureNumber = 1
+    session.phase = "ready"
+    session.nextStep = "/impl or /review"
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const session2 = await readSession(worktree)
+    expect(session2.phase).toBe("init")
+    expect(session2.nextStep).toBe("/spec <description>")
+  })
+
   it("fixes multiple session issues in one run", async () => {
+    await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
