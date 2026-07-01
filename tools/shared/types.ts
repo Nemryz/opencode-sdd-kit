@@ -237,6 +237,15 @@ async function readLockJson(lockDir: string): Promise<{ pid: number; createdAt: 
   }
 }
 
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function acquireLock(filePath: string, options?: LockOptions): Promise<LockHandle> {
   const lockDir = filePath + ".lock"
   if (heldLocks.has(lockDir)) {
@@ -260,6 +269,10 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
     } catch (err) {
       if (isEEXIST(err)) {
         const info = await readLockJson(lockDir)
+        if (info && info.pid !== process.pid && !isPidAlive(info.pid)) {
+          await fs.rm(lockDir, { recursive: true, force: true })
+          continue
+        }
         const createdAt = info ? new Date(info.createdAt).getTime() : NaN
         if (!info || isNaN(createdAt) || (Date.now() - createdAt > staleThreshold)) {
           await fs.rm(lockDir, { recursive: true, force: true })

@@ -126,11 +126,10 @@ en las 6 herramientas. 14+ tests en locking.test.ts.
 
 ## Fase E: Cobertura de edge cases (COMPLETO)
 
-Ocho escenarios de alto y medio riesgo identificados tras auditoria de la
-suite completa (362 tests). Incluye: withLock error propagation, stale lock
-detection con datos corruptos, status con directorios borrados, config con
-caracteres especiales, y clean con directorios faltantes. Suite final: 370+
-tests.
+Incluye T-1 a T-9: withLock error propagation, stale lock detection con datos
+corruptos, PID-based dead process detection (fast path sin esperar threshold),
+status con directorios borrados, config con caracteres especiales, y clean con
+directorios faltantes. Suite final: 374 tests.
 
 ## Mapa de dependencias
 
@@ -173,4 +172,4 @@ Fase E: 1 tarea (completo).
 Fase 3.2: 5 tareas (pendiente).
 
 Total: 24 tareas, 22 completas, 2 pendientes (Fase 3.2).
-Suite actual: 370+ tests en 18 archivos.
+Suite actual: 374 tests en 18 archivos.

@@ -57,7 +57,7 @@ describe("acquireLock", () => {
     await fs.mkdir(lockDir, { recursive: true })
     await fs.writeFile(
       path.join(lockDir, "lock.json"),
-      JSON.stringify({ pid: 999999, createdAt: new Date().toISOString() }),
+      JSON.stringify({ pid: 0, createdAt: new Date().toISOString() }),
       "utf-8",
     )
     await expect(acquireLock(target, { timeout: 100 })).rejects.toThrow("Lock timeout")
@@ -84,6 +84,34 @@ describe("acquireLock", () => {
     )
     const handle = await acquireLock(target, { staleThreshold: 1000 })
     expect(handle.filePath).toBe(target)
+    await releaseLock(handle)
+  })
+
+  it("steals lock immediately when owning PID is dead (T-9a)", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const lockDir = target + ".lock"
+    await fs.mkdir(lockDir, { recursive: true })
+    await fs.writeFile(
+      path.join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999999999, createdAt: new Date().toISOString() }),
+      "utf-8",
+    )
+    const start = Date.now()
+    const handle = await acquireLock(target, { timeout: 5000, staleThreshold: 10000 })
+    const elapsed = Date.now() - start
+    expect(handle.filePath).toBe(target)
+    expect(elapsed).toBeLessThan(100)
+    await releaseLock(handle)
+  })
+
+  it("saves process.pid in lock.json (T-9b)", async () => {
+    const t = await worktree()
+    const target = path.join(t, "test.json")
+    const handle = await acquireLock(target)
+    const raw = await fs.readFile(path.join(handle.lockDir, "lock.json"), "utf-8")
+    const info = JSON.parse(raw)
+    expect(info.pid).toBe(process.pid)
     await releaseLock(handle)
   })
 })
