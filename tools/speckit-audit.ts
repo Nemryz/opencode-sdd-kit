@@ -276,6 +276,7 @@ export default tool({
       const report = await auditProject(projectRoot)
 
       if (args.fix && report.findings.length > 0) {
+        let fixedCount = 0
         for (const finding of report.findings) {
           if (finding.severity === "error" && finding.category === "phase-mismatch") {
             const sjPath = finding.file
@@ -291,10 +292,16 @@ export default tool({
                   sjPrev.phase = parsePhase(newPhase)
                   await writeSpecJson(sjPrev, base)
                   finding.message += " (auto-fixed)"
+                  fixedCount++
                 }
               })
             }
           }
+        }
+        if (fixedCount > 0) {
+          report.summary.error -= fixedCount
+          if (report.summary.error < 0) report.summary.error = 0
+          report.passed = report.summary.error === 0
         }
       }
 

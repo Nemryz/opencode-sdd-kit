@@ -315,6 +315,23 @@ describe("audit auto-fix", () => {
     expect(fixedSj?.phase).not.toBe("ready")
   })
 
+  it("recalculates summary after fix so error count drops (F-4)", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "ready"
+      await writeSpecJson(sj, base)
+    }
+    const before = await auditTool.execute({ fix: false }, ctx)
+    expect(before.metadata?.errorCount).toBeGreaterThanOrEqual(1)
+    expect(before.title).toContain("issue")
+    const after = await auditTool.execute({ fix: true }, ctx)
+    expect(after.metadata?.errorCount).toBe(0)
+    expect(after.metadata?.passed).toBe(true)
+  })
+
   it("does not create spec.json when missing (unfixable)", async () => {
     await createConstitution(worktree)
     await fs.mkdir(path.join(worktree, "specs", "001-auth"), { recursive: true })
