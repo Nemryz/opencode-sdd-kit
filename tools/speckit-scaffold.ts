@@ -8,6 +8,7 @@ import {
   readSpecJson,
   writeSpecJson,
   makeSpecJson,
+  parseNNN,
   specsDirPath,
   steeringDirPath,
   specJsonPath,
@@ -72,7 +73,7 @@ async function findTargetFeatureDir(projectRoot: string, featureName: string): P
   const specsDir = specsDirPath(projectRoot)
   try {
     const entries = await fs.readdir(specsDir, { withFileTypes: true })
-    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort()
+    const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => parseNNN(a) - parseNNN(b))
     if (dirs.length === 0) return null
     const { slug } = slugify(featureName)
     const exact = dirs.find(d => {

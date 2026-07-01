@@ -342,4 +342,15 @@ describe("scaffold edge cases", () => {
     expect(result.title).toBe("Scaffold: 001-test")
     expect(result.metadata?.featureDir).toBe("001-test")
   })
+
+  it("data-model falls back to latest feature dir with numeric sorting (F-6)", async () => {
+    await scaffoldTool.execute({ featureName: "Alpha", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Beta", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Gamma", template: "spec" }, ctx)
+    const result = await scaffoldTool.execute(
+      { featureName: "Gamma", template: "data-model" },
+      ctx,
+    )
+    expect(result.metadata?.featureDir).toBe("003-gamma")
+  })
 })
