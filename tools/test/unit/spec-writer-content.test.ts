@@ -24,6 +24,10 @@ describe("speckit-spec-writer SKILL.md content", () => {
     expect(content).toMatch(/Confirmation/)
   })
 
+  it("mentions express mode skip in proposal section", () => {
+    expect(content).toMatch(/Express Mode/i)
+  })
+
   it("waits for user confirmation before proceeding", () => {
     expect(content).toMatch(/wait.*user confirmation|confirmation.*proceed/i)
   })

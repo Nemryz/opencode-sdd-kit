@@ -33,10 +33,13 @@ Read all available project context:
 3. Steering documents: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
 4. Shared rules from `skills/rules/spec-writing.md`
 5. Existing specs in `specs/` for context
+6. SDD configuration from `.opencode/spec-memory/config.json` — read `expressMode` and `defaultTechStack`
 
 If no steering documents exist, skip gracefully — do not fail.
 
-### Step 2: Conversational Proposal (NEW)
+### Step 2: Conversational Proposal
+
+**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default story structure, then update spec.json.
 
 Before writing any files, propose the spec structure to the user:
 

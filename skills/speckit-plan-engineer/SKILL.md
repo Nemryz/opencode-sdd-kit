@@ -38,6 +38,7 @@ Read all necessary context:
 4. Steering documents: `product.md`, `tech.md`, `structure.md` in `.opencode/steering/` (if exists)
 5. Shared rules from `skills/rules/design-principles.md`
 6. Existing plans in `specs/` for reference
+7. SDD configuration from `.opencode/spec-memory/config.json` — read `expressMode` and `defaultTechStack`
 
 ### Step 2: Sub-Agent Research (for complex decisions)
 
@@ -53,7 +54,9 @@ Each sub-agent returns a structured findings summary (under 100 lines). Synthesi
 
 For simple or obvious decisions, skip sub-agent dispatch entirely.
 
-### Step 3: Conversational Proposal (NEW)
+### Step 3: Conversational Proposal
+
+**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default architecture approach, then update spec.json.
 
 Propose the architecture approach before writing:
 

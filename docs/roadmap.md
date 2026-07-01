@@ -93,6 +93,12 @@ speckit-implementer/SKILL.md: Step 1.5 Complexity Routing con 3 rutas
 (simple directa, standard TDD, complex con subagentes). Express Mode guard en
 Step 2. Tests de contenido en implementer-content.test.ts.
 
+### 3.2.5: Express Mode Skills (COMPLETO)
+
+spec-writer y plan-engineer SKILL.md: Express Mode guard en proposal steps.
+Cuando expressMode: true, salta propuesta conversacional y procede con
+valores predeterminados. Tests de contenido actualizados.
+
 ## Fase D: Bug de concurrencia (COMPLETO)
 
 Implementado con acquireLock/releaseLock atomicos via fs.mkdir, withLock
@@ -144,7 +150,7 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
-Fase 3.2: 5 subfases, 4 completas (3.2.1-3.2.4). Pendiente 3.2.5 (Express Mode skills).
+Fase 3.2: 5 subfases (completo).
 
-Total: 24 tareas, 23 completas, 1 pendiente (3.2.5).
-Suite actual: 430+ tests en 20 archivos.
+Total: 24 tareas (completo).
+Suite actual: 420+ tests en 20 archivos.
