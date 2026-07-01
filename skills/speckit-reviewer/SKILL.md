@@ -36,7 +36,30 @@ Before starting, call `speckit-audit` to detect existing project issues. If the 
 4. Read steering context from `.opencode/steering/` (if exists)
 5. Shared rules from `skills/rules/spec-writing.md`, `skills/rules/design-principles.md`, and `skills/rules/tasks-generation.md`
 
-### Step 2: Sub-Agent Dispatch for Parallel Review (NEW)
+### Step 2: Conversational Proposal
+
+Before dispatching sub-agents, propose the review plan to the user:
+
+```
+## Proposed Review: <feature-name> (phase: <current-phase>)
+
+### Scope
+- Artifacts: spec.md, plan.md, tasks.md, constitution.md
+- Dimensions: Spec Quality, Plan Quality, Tasks Quality, Boundary Audit, Cross-artifact Consistency
+
+### Dispatch Plan
+- Sub-agent for spec review: @speckit-reviewer (against spec-writing rules)
+- Sub-agent for plan review: @speckit-reviewer (against design-principles rules)
+- Sub-agent for tasks review: @speckit-reviewer (against tasks-generation rules)
+- Sub-agent for boundary audit: @explore (scans _Boundary:_ annotations)
+
+### Confirmation
+Does this review scope cover what you need? I will start the parallel review after confirmation.
+```
+
+Wait for user confirmation before proceeding to dispatch. For simple reviews (single artifact, few findings), skip this step and review inline.
+
+### Step 3: Sub-Agent Dispatch for Parallel Review
 
 For complex or multi-artifact reviews, dispatch sub-agents in parallel to review each artifact independently:
 
@@ -47,7 +70,7 @@ For complex or multi-artifact reviews, dispatch sub-agents in parallel to review
 
 Each sub-agent returns a structured findings list. Synthesize results in the main context after all sub-agents return. For simple reviews (single artifact, few findings), skip sub-agent dispatch and review inline.
 
-### Step 3: Review Dimensions (expanded)
+### Step 4: Review Dimensions
 
 ### Spec quality
 - [ ] User stories are prioritized (P1/P2/P3)
@@ -91,7 +114,7 @@ Each sub-agent returns a structured findings list. Synthesize results in the mai
 - [ ] spec.json phase matches actual file existence (all declared artifacts present)
 - [ ] spec.json approvals match review outcome
 
-### Step 4: Ownership Classification (NEW)
+### Step 5: Ownership Classification
 
 For each finding, classify the root cause:
 
@@ -101,7 +124,7 @@ For each finding, classify the root cause:
 
 If `UPSTREAM`, name the owning spec and explain which dependent specs need revalidation after fix.
 
-### Step 5: kiro-verify-completion Protocol (NEW)
+### Step 6: kiro-verify-completion Protocol
 
 After implementation review, validate completeness:
 1. All tasks marked `[x]` in tasks.md

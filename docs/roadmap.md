@@ -63,10 +63,11 @@ reglas compartidas, @mention. Agregado: Step 2 con propuesta, @explore como
 subagente, _Boundary:_ en Boundary Map, shared-rules: design-principles.md,
 20 tests de contenido en constitution-content.test.ts.
 
-### A-2: speckit-spec-writer (PENDIENTE)
+### A-2: speckit-spec-writer (COMPLETO)
 
-Vacios: despacho de subagentes para investigacion y @mention.
-Pendiente de implementar.
+Vacios: subagentes para investigacion y @mention. Agregado: @explore para
+investigar ambiguedades, @mention en Reference y quality checklist,
+22 tests en spec-writer-content.test.ts.
 
 ### A-3: speckit-plan-engineer (PENDIENTE)
 
@@ -188,18 +189,18 @@ El orden de ejecucion actualizado es:
 
 1. Fase C (completo)
 2. Fase A, comenzando con A-5 (completo), luego A-1 (completo).
-    Pendiente: A-2, A-3, A-6.
+    Pendiente: A-3, A-6.
 3. Fase B (completo)
 4. Fase D (completo)
 5. Fase 3.2 (pendiente, requiere Fase A completa)
 
 ## Resumen de metricas
 
-Fase A: 6 tareas, 4 completas (A-5, A-1, A-4). Pendientes A-2, A-3, A-6.
+Fase A: 6 tareas, 5 completas (A-5, A-1, A-4, A-2). Pendientes A-3, A-6.
 Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase 3.2: 5 tareas (pendiente).
 
-Total: 23 tareas, 18 completas, 5 pendientes.
-Suite actual: 299 tests en 16 archivos.
+Total: 23 tareas, 19 completas, 4 pendientes.
+Suite actual: 321 tests en 17 archivos.
