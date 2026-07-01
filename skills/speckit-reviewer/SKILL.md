@@ -6,6 +6,7 @@ compatibility: opencode
 metadata:
   phase: all
   workflow: sdd
+  shared-rules: spec-writing.md, design-principles.md, tasks-generation.md
 ---
 
 ## What I do
@@ -33,8 +34,20 @@ Before starting, call `speckit-audit` to detect existing project issues. If the 
 2. Read `specs/NNN-feature-name/spec.json` — check `phase` and `approvals` to understand what has been completed
 3. Read domain map from `.opencode/domain-map.md` (if exists)
 4. Read steering context from `.opencode/steering/` (if exists)
+5. Shared rules from `skills/rules/spec-writing.md`, `skills/rules/design-principles.md`, and `skills/rules/tasks-generation.md`
 
-### Step 2: Review Dimensions (expanded)
+### Step 2: Sub-Agent Dispatch for Parallel Review (NEW)
+
+For complex or multi-artifact reviews, dispatch sub-agents in parallel to review each artifact independently:
+
+1. **`@speckit-reviewer` sub-agent for spec**: Checks spec quality against `skills/rules/spec-writing.md`
+2. **`@speckit-reviewer` sub-agent for plan**: Checks plan quality against `skills/rules/design-principles.md`
+3. **`@speckit-reviewer` sub-agent for tasks**: Checks task structure against `skills/rules/tasks-generation.md`
+4. **`@explore` sub-agent for boundary audit**: Scans `_Boundary:_` annotations for overlap and consistency
+
+Each sub-agent returns a structured findings list. Synthesize results in the main context after all sub-agents return. For simple reviews (single artifact, few findings), skip sub-agent dispatch and review inline.
+
+### Step 3: Review Dimensions (expanded)
 
 ### Spec quality
 - [ ] User stories are prioritized (P1/P2/P3)
@@ -78,7 +91,7 @@ Before starting, call `speckit-audit` to detect existing project issues. If the 
 - [ ] spec.json phase matches actual file existence (all declared artifacts present)
 - [ ] spec.json approvals match review outcome
 
-### Step 3: Ownership Classification (NEW)
+### Step 4: Ownership Classification (NEW)
 
 For each finding, classify the root cause:
 
@@ -88,7 +101,7 @@ For each finding, classify the root cause:
 
 If `UPSTREAM`, name the owning spec and explain which dependent specs need revalidation after fix.
 
-### Step 4: kiro-verify-completion Protocol (NEW)
+### Step 5: kiro-verify-completion Protocol (NEW)
 
 After implementation review, validate completeness:
 1. All tasks marked `[x]` in tasks.md
@@ -126,6 +139,10 @@ Ownership: LOCAL | UPSTREAM | UNCLEAR
 
 ## Safety & Fallback
 
+### Error: Sub-agent dispatch fails for parallel review
+- **Fallback**: Perform all reviews sequentially in main context
+- **Recovery**: Report which sub-agent failed, continue with inline review for remaining artifacts
+
 ### Error: Artifact not found
 - **Warning**: Report which artifact is missing
 - **Recovery**: Continue review of available artifacts. Do not invent content.
@@ -148,6 +165,8 @@ Ownership: LOCAL | UPSTREAM | UNCLEAR
 - Tools: `speckit-validate`, `speckit-scaffold`
 - Steering context: `.opencode/steering/` (product.md, tech.md, structure.md)
 - Constitution: `.opencode/spec-memory/constitution.md`
+- Shared rules: `skills/rules/spec-writing.md`, `skills/rules/design-principles.md`, `skills/rules/tasks-generation.md`
+- Sub-agents: `@speckit-reviewer`, `@explore`
 
 ## Output location
 
