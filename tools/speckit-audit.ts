@@ -6,6 +6,7 @@ import {
   writeSpecJson,
   exists,
   getFeatureDirs,
+  isValidProjectRoot,
   constitutionPath,
   specsDirPath,
   steeringDirPath,
@@ -268,6 +269,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
 
       const report = await auditProject(projectRoot)
 
@@ -276,19 +278,16 @@ export default tool({
           if (finding.severity === "error" && finding.category === "phase-mismatch") {
             const sjPath = finding.file
             if (sjPath && sjPath.endsWith("spec.json")) {
-              const sj = await readSpecJson(path.dirname(sjPath))
-              if (sj) {
-                const base = path.dirname(sjPath)
-                const specOk = await exists(path.join(base, "spec.md"))
-                const planOk = await exists(path.join(base, "plan.md"))
-                const tasksOk = await exists(path.join(base, "tasks.md"))
-                const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
-                const sjPrev = await readSpecJson(base)
-                if (sjPrev && sjPrev.phase !== newPhase) {
-                  sjPrev.phase = parsePhase(newPhase)
-                  await writeSpecJson(sjPrev, base)
-                  finding.message += " (auto-fixed)"
-                }
+              const base = path.dirname(sjPath)
+              const specOk = await exists(path.join(base, "spec.md"))
+              const planOk = await exists(path.join(base, "plan.md"))
+              const tasksOk = await exists(path.join(base, "tasks.md"))
+              const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+              const sjPrev = await readSpecJson(base)
+              if (sjPrev && sjPrev.phase !== newPhase) {
+                sjPrev.phase = parsePhase(newPhase)
+                await writeSpecJson(sjPrev, base)
+                finding.message += " (auto-fixed)"
               }
             }
           }

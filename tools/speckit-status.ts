@@ -7,6 +7,7 @@ import {
   exists,
   detectPhase,
   getFeatureDirs,
+  isValidProjectRoot,
   PHASE_NEXT_STEP,
   constitutionPath,
   specsDirPath,
@@ -19,6 +20,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const session = await readSession(projectRoot)
       const constitutionExists = await exists(constitutionPath(projectRoot))
       const dirs = await getFeatureDirs(projectRoot)
@@ -59,7 +61,7 @@ export default tool({
 
       session.command = "/status"
       session.phase = latestPhase
-      session.featureDir = latest || session.featureDir
+      session.featureDir = latest
       session.nextStep = PHASE_NEXT_STEP[session.phase] ?? "/spec <description>"
       session.lastResult = summary
       session.history.push("/status")

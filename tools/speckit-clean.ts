@@ -10,6 +10,7 @@ import {
   parseNNN,
   detectPhaseFromFiles,
   getFeatureDirs,
+  isValidProjectRoot,
   PHASE_NEXT_STEP,
   specsDirPath,
   parsePhase,
@@ -24,6 +25,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const specsDir = specsDirPath(projectRoot)
       let entries: string[] = []
       try {
@@ -113,9 +115,17 @@ export default tool({
 
           if (sj) {
             const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+            let changed = false
             if (sj.phase !== filesPhase) {
               sj.phase = parsePhase(filesPhase)
-              sj.ready_for_implementation = filesPhase === "ready" && sj.approvals.tasks.approved
+              changed = true
+            }
+            const correctRfi = filesPhase === "ready" && sj.approvals.tasks.approved
+            if (sj.ready_for_implementation !== correctRfi) {
+              sj.ready_for_implementation = correctRfi
+              changed = true
+            }
+            if (changed) {
               await writeSpecJson(sj, base)
               fixedFields.push(`${dir}: phase → ${filesPhase}`)
             }

@@ -1,8 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import {
   configPath,
-  readSession,
-  writeSession,
+  isValidProjectRoot,
   SDDConfig,
   DEFAULT_CONFIG,
 } from "./shared/types"
@@ -35,6 +34,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const cfg = await readConfig(projectRoot)
 
       if (args.defaultTechStack !== undefined) {
@@ -63,11 +63,10 @@ export default tool({
           defaultTechStack: cfg.defaultTechStack,
           lastUsedLanguage: cfg.lastUsedLanguage,
         }
-        const raw = cfg.preferences[args.key] ?? knownKeys[args.key] ?? null
-        const val = typeof raw === "object" ? JSON.stringify(raw) : raw
+        const raw = cfg.preferences[args.key] ?? knownKeys[args.key]
         return {
           title: "Configuration read",
-          output: `${args.key}: ${val ?? "(not set)"}`,
+          output: `${args.key}: ${raw ?? "(not set)"}`,
           metadata: cfg,
         }
       }

@@ -103,9 +103,9 @@ describe("config", () => {
     expect(result.output).toContain("defaultTechStack")
   })
 
-  it("returns null for unknown key", async () => {
+  it("returns (not set) for unknown key", async () => {
     const result = await configTool.execute({ key: "nonexistent" }, ctx)
-    expect(result.output).toContain("null")
+    expect(result.output).toContain("(not set)")
   })
 
   it("sets defaultTechStack", async () => {

@@ -12,6 +12,8 @@ import {
   steeringDirPath,
   exists,
   isENOENT,
+  isValidProjectRoot,
+  PATHS,
 } from "./shared/types"
 
 const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
@@ -119,6 +121,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const template = await readTemplate(args.template)
 
       if (args.template === "steering") {
@@ -159,8 +162,8 @@ export default tool({
       }
 
       if (args.template === "constitution") {
-        const dir = path.join(projectRoot, ".opencode", "spec-memory")
-        const filePath = path.join(dir, "constitution.md")
+        const dir = path.join(projectRoot, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
+        const filePath = path.join(dir, PATHS.CONSTITUTION_FILE)
         const canWrite = await safeToWrite(filePath, args.overwrite)
         if (!canWrite) {
           return {
@@ -183,7 +186,7 @@ export default tool({
       // --- Project-level optional artifacts: domain-map, glossary ---
 
       if (args.template === "domain-map" || args.template === "glossary") {
-        const dir = path.join(projectRoot, ".opencode")
+        const dir = path.join(projectRoot, PATHS.OPENCODE_DIR)
         const filePath = path.join(dir, `${args.template}.md`)
         const canWrite = await safeToWrite(filePath, args.overwrite)
         if (!canWrite) {
@@ -248,7 +251,7 @@ export default tool({
         }
 
         if (args.template === "research") {
-          const featurePath = path.join(projectRoot, "specs", targetDir!)
+          const featurePath = path.join(specsDirPath(projectRoot), targetDir!)
           const filePath = path.join(featurePath, "research.md")
           const canWrite = await safeToWrite(filePath, args.overwrite)
           if (!canWrite) {
@@ -269,7 +272,7 @@ export default tool({
         }
 
         if (args.template === "contracts") {
-          const featurePath = path.join(projectRoot, "specs", targetDir!)
+          const featurePath = path.join(specsDirPath(projectRoot), targetDir!)
           const dirPath = path.join(featurePath, "contracts")
           await fs.mkdir(dirPath, { recursive: true })
           if (template) {
@@ -302,7 +305,7 @@ export default tool({
           featureNumber = await getNextFeatureNumber(projectRoot)
           const r = makeFeatureDirName(args.featureName, featureNumber)
           featureDirName = r.dir
-          featurePath = path.join(projectRoot, "specs", featureDirName)
+          featurePath = path.join(specsDirPath(projectRoot), featureDirName)
           slugTruncated = r.truncated
           await fs.mkdir(featurePath, { recursive: true })
         }
@@ -310,7 +313,7 @@ export default tool({
         featureNumber = await getNextFeatureNumber(projectRoot)
         const r = makeFeatureDirName(args.featureName, featureNumber)
         featureDirName = r.dir
-        featurePath = path.join(projectRoot, "specs", featureDirName)
+        featurePath = path.join(specsDirPath(projectRoot), featureDirName)
         slugTruncated = r.truncated
         await fs.mkdir(featurePath, { recursive: true })
       }

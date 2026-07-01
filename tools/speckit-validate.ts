@@ -7,6 +7,7 @@ import {
   exists,
   detectPhase,
   getLatestFeatureDir,
+  isValidProjectRoot,
   SpecJson,
   PHASE_NEXT_STEP,
   constitutionPath,
@@ -23,6 +24,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const session = await readSession(projectRoot)
       const featureDir = args.featureDir || session.featureDir || (await getLatestFeatureDir(projectRoot))
       const constitutionExists = await exists(constitutionPath(projectRoot))

@@ -1,5 +1,6 @@
 import path from "node:path"
 import fs from "node:fs/promises"
+import os from "node:os"
 import { z } from "zod"
 
 // ─────────────────────────── Paths ───────────────────────────
@@ -143,6 +144,13 @@ export const PHASE_NEXT_STEP: Record<string, string> = {
   complete: "/review or start a new feature",
 }
 
+// ─────────────────────────── Project root validation ───────────
+
+export function isValidProjectRoot(root: string): boolean {
+  const configDir = path.join(os.homedir(), ".config", "opencode")
+  return path.resolve(root) !== path.resolve(configDir)
+}
+
 // ─────────────────────────── Utilities ───────────────────────────
 
 export async function exists(filePath: string): Promise<boolean> {
@@ -194,12 +202,17 @@ export function detectPhaseFromFiles(
 // ─────────────────────────── Error / Cast helpers ───────────────────────────
 
 export function isENOENT(err: unknown): boolean {
-  return err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT"
+  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "ENOENT"
+}
+
+const VALID_PHASES: readonly string[] = ["spec", "plan", "tasks", "ready", "impl", "complete"]
+
+function isPhase(s: string): s is Phase {
+  return VALID_PHASES.includes(s)
 }
 
 export function parsePhase(s: string): Phase {
-  const valid: Phase[] = ["spec", "plan", "tasks", "ready", "impl", "complete"]
-  return valid.includes(s as Phase) ? (s as Phase) : "spec"
+  return isPhase(s) ? s : "spec"
 }
 
 // ─────────────────────────── Session I/O ───────────────────────────
