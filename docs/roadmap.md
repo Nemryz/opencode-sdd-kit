@@ -81,6 +81,12 @@ Tests unitarios para cada detector en discovery.test.ts (21 tests).
 expressMode: boolean en SDDConfig. speckit-config.ts permite leer/escribir
 expressMode via key=value. Tests de configuracion en status-config.test.ts.
 
+### 3.2.3: Complexity Tool (COMPLETO)
+
+Nuevo speckit-complexity.ts: evalua tareas por cantidad de archivos, dependencias
+externas, ambiguedad y boundaries. Usa ProjectContext de Discovery. Devuelve
+nivel simple/standard/complex con razonamiento. Tests en complexity.test.ts.
+
 ## Fase D: Bug de concurrencia (COMPLETO)
 
 Implementado con acquireLock/releaseLock atomicos via fs.mkdir, withLock
@@ -132,7 +138,7 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
-Fase 3.2: 5 subfases, 1 completa (3.2.1 Discovery). Pendientes 3.2.2 a 3.2.5.
+Fase 3.2: 5 subfases, 3 completas (3.2.1-3.2.3). Pendientes 3.2.4 y 3.2.5.
 
 Total: 24 tareas, 22 completas, 1 en progreso (3.2.1 parcial), 4 pendientes (3.2.2-3.2.5).
-Suite actual: 389+ tests en 19 archivos.
+Suite actual: 420+ tests en 20 archivos.

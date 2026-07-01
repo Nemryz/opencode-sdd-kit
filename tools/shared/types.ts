@@ -541,3 +541,81 @@ export function makeSpecJson(featureName: string, featureNumber: number): SpecJs
     ready_for_implementation: false,
   }
 }
+
+// ─────────────────────────── Complexity Assessment ───────────────────────────
+
+export type ComplexityLevel = "simple" | "standard" | "complex"
+
+export interface ComplexityResult {
+  level: ComplexityLevel
+  score: number
+  reasoning: string[]
+}
+
+export async function assessComplexity(
+  taskDescription: string,
+  filesAffected: number,
+  hasNewDependencies: boolean,
+  hasBoundaryAnnotations: boolean,
+  hasNeedsClarification: boolean,
+  context?: ProjectContext,
+): Promise<ComplexityResult> {
+  const reasoning: string[] = []
+  let score = 0
+
+  // files affected
+  if (filesAffected <= 1) {
+    reasoning.push("1 or fewer files affected")
+  } else if (filesAffected <= 3) {
+    reasoning.push("2-3 files affected")
+    score += 1
+  } else if (filesAffected <= 8) {
+    reasoning.push("4-8 files affected")
+    score += 3
+  } else {
+    reasoning.push("9+ files affected")
+    score += 5
+  }
+
+  // new dependencies
+  if (hasNewDependencies) {
+    reasoning.push("new external dependencies required")
+    score += 3
+  } else {
+    reasoning.push("no new external dependencies")
+  }
+
+  // boundary annotations
+  if (hasBoundaryAnnotations) {
+    reasoning.push("multiple boundaries involved, coordination needed")
+    score += 2
+  } else {
+    reasoning.push("single boundary or no boundary concerns")
+  }
+
+  // clarification needed
+  if (hasNeedsClarification) {
+    reasoning.push("spec has unresolved [NEEDS CLARIFICATION] markers")
+    score += 2
+  } else {
+    reasoning.push("spec is clear with no unresolved markers")
+  }
+
+  // framework knowledge from context
+  if (context?.framework === null && context?.packageManager !== "unknown") {
+    reasoning.push("project has no detected framework (may need research)")
+    score += 1
+  }
+
+  let level: ComplexityLevel
+  if (score <= 2) {
+    level = "simple"
+  } else if (score <= 6) {
+    level = "standard"
+  } else {
+    level = "complex"
+  }
+
+  reasoning.push(`total score: ${score}, routing to ${level}`)
+  return { level, score, reasoning }
+}
