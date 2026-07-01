@@ -50,7 +50,7 @@ export default tool({
             const filesOk = specOk && planOk && tasksOk
             if (specJson.phase === "ready" && !filesOk) {
               mismatch = true
-            } else if (specJson.phase === "spec" && (planOk || tasksOk)) {
+            } else if (specJson.phase === "spec" && (!specOk || planOk || tasksOk)) {
               mismatch = true
             } else if (specJson.phase === "plan" && !planOk) {
               mismatch = true

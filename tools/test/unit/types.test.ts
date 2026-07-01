@@ -22,6 +22,7 @@ import {
   productSteeringPath,
   techSteeringPath,
   structureSteeringPath,
+  SpecJsonSchema,
 } from "../../shared/types"
 
 // ── parseNNN ────────────────────────────────────────────────
@@ -323,5 +324,66 @@ describe("PHASE_NEXT_STEP", () => {
       expect(PHASE_NEXT_STEP[phase]).toBeDefined()
       expect(typeof PHASE_NEXT_STEP[phase]).toBe("string")
     }
+  })
+})
+
+describe("SpecJsonSchema rejection", () => {
+  const valid = { feature_name: "test", feature_number: 1, created_at: "2024-01-01", updated_at: "2024-01-01", phase: "spec", approvals: { spec: { generated: false, approved: false }, plan: { generated: false, approved: false }, tasks: { generated: false, approved: false } }, ready_for_implementation: false }
+
+  it("accepts a valid object", () => {
+    const r = SpecJsonSchema.safeParse(valid)
+    expect(r.success).toBe(true)
+  })
+
+  it("rejects when feature_name has wrong type", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, feature_name: 123 })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when feature_number has wrong type", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, feature_number: "abc" })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when phase is invalid", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, phase: "invalid-phase" })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when phase is empty string", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, phase: "" })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when ready_for_implementation has wrong type", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, ready_for_implementation: "yes" })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when created_at is missing", () => {
+    const { created_at, ...noCreated } = valid
+    const r = SpecJsonSchema.safeParse(noCreated)
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when approvals is missing", () => {
+    const { approvals, ...noApprovals } = valid
+    const r = SpecJsonSchema.safeParse(noApprovals)
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when approvals.spec has wrong type", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, approvals: { spec: "invalid", plan: { generated: false, approved: false }, tasks: { generated: false, approved: false } } })
+    expect(r.success).toBe(false)
+  })
+
+  it("rejects when approvals.spec.generated has wrong type", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, approvals: { spec: { generated: "yes", approved: false }, plan: { generated: false, approved: false }, tasks: { generated: false, approved: false } } })
+    expect(r.success).toBe(false)
+  })
+
+  it("accepts object with extra unknown fields (zod strips by default)", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, extra_field: "surprise" })
+    expect(r.success).toBe(true)
   })
 })

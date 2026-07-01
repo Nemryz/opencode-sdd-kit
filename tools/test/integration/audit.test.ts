@@ -149,6 +149,21 @@ describe("audit per-feature findings", () => {
     expect(findings.some((f: any) => f.category === "phase-mismatch" && f.severity === "error")).toBe(true)
   })
 
+  it("reports error on phase mismatch: spec.json says spec but spec.md missing", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    await fs.rm(path.join(base, "spec.md"))
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "spec"
+      await writeSpecJson(sj, base)
+    }
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: any) => f.category === "phase-mismatch")).toBe(true)
+  })
+
   it("reports error on phase mismatch: spec.json says plan but plan.md missing", async () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)

@@ -116,6 +116,20 @@ describe("validate spec.json phase mismatches", () => {
     expect(result.metadata?.mismatch).toBe(true)
   })
 
+  it("detects mismatch when spec.json says spec but spec.md missing", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    await fs.rm(path.join(base, "spec.md"))
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "spec"
+      await writeSpecJson(sj, base)
+    }
+    const result = await validateTool.execute({ featureDir: "001-auth" }, ctx)
+    expect(result.metadata?.mismatch).toBe(true)
+  })
+
   it("detects mismatch when spec.json says spec but plan already exists", async () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
