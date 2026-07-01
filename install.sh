@@ -6,7 +6,7 @@ set -euo pipefail
 # Or:   ./install.sh
 
 REPO="Nemryz/opencode-sdd-kit"
-BRANCH="main"
+BRANCH="master"
 CONFIG_DIR="${HOME}/.config/opencode"
 TMP_DIR=$(mktemp -d)
 

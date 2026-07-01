@@ -3,7 +3,7 @@
 # Or:    .\install.ps1
 
 $Repo     = "Nemryz/opencode-sdd-kit"
-$Branch   = "main"
+$Branch   = "master"
 $ConfigDir = "$env:USERPROFILE\.config\opencode"
 $TmpDir   = "$env:TEMP\opencode-sdd-kit-install"
 

@@ -105,6 +105,13 @@ Implementado con acquireLock/releaseLock atomicos via fs.mkdir, withLock
 helper reentrante, timeout configurable, stale lock detection, y wrappers
 en las 6 herramientas. 14+ tests en locking.test.ts.
 
+## Fase F: Auditoria de bugs externos (COMPLETO)
+
+Siete bugs identificados por auditoria externa. Fixes: install scripts rama
+master, scaffold race condition con withLock, config defaultTechStack redirect,
+audit fix recalculo de resumen, clean constitutionExists real,
+findTargetFeatureDir sort numerico. Pendiente: taskDescription NLP scoring.
+
 ## Fase E: Cobertura de edge cases (COMPLETO)
 
 Incluye T-1 a T-9: withLock error propagation, stale lock detection con datos
@@ -150,7 +157,8 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
+Fase F: 6 tareas (completo).
 Fase 3.2: 5 subfases (completo).
 
-Total: 24 tareas (completo).
+Total: 30 tareas, 29 completas, 1 pendiente (taskDescription NLP).
 Suite actual: 420+ tests en 20 archivos.
