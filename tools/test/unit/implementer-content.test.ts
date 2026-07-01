@@ -11,9 +11,22 @@ describe("speckit-implementer SKILL.md content", () => {
     content = await fs.readFile(SKILL_PATH, "utf-8")
   })
 
+  it("has a complexity routing section before proposal", () => {
+    const complexityMatch = content.match(/Complexity Routing|complexity/i)
+    const proposalIndex = content.indexOf("Conversational Proposal")
+    expect(complexityMatch).not.toBeNull()
+    expect(complexityMatch!.index).toBeLessThan(proposalIndex)
+  })
+
+  it("defines simple, standard, and complex routing routes", () => {
+    expect(content).toMatch(/simple/i)
+    expect(content).toMatch(/standard/i)
+    expect(content).toMatch(/complex/i)
+  })
+
   it("has a conversational proposal section before execution", () => {
     const proposalMatch = content.match(/proposal/i)
-    const executeIndex = content.indexOf("Step 3: Execute Tasks")
+    const executeIndex = content.indexOf("Step 4: Execute Tasks")
     expect(proposalMatch).not.toBeNull()
     expect(proposalMatch!.index).toBeLessThan(executeIndex)
   })
@@ -22,6 +35,10 @@ describe("speckit-implementer SKILL.md content", () => {
     expect(content).toMatch(/Phase Plan/)
     expect(content).toMatch(/Boundary Map/)
     expect(content).toMatch(/Confirmation/)
+  })
+
+  it("mentions express mode skip in conversational proposal section", () => {
+    expect(content).toMatch(/express.*mode.*skip|skip.*proposal|Express Mode/i)
   })
 
   it("waits for user confirmation before proceeding", () => {
@@ -80,8 +97,10 @@ describe("speckit-implementer SKILL.md content", () => {
     expect(content).toMatch(/- \[ \]/)
   })
 
-  it("quality checklist includes proposal, boundary, @mention, rules, TDD items", () => {
+  it("quality checklist includes proposal, complexity routing, express mode, boundary, @mention, rules, TDD items", () => {
     expect(content).toMatch(/proposal/i)
+    expect(content).toMatch(/Complexity|complexity/i)
+    expect(content).toMatch(/Express Mode|express/i)
     expect(content).toMatch(/Boundary/)
     expect(content).toMatch(/@mention/)
     expect(content).toMatch(/skills\/rules/)

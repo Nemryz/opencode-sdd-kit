@@ -39,10 +39,25 @@ Read all task documentation:
 3. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
 4. Domain map from `.opencode/domain-map.md` (if exists)
 5. Shared rules from `skills/rules/design-principles.md` and `skills/rules/tasks-generation.md`
+6. SDD configuration from `.opencode/spec-memory/config.json` — read `expressMode` and `defaultTechStack`
 
-### Step 2: Conversational Proposal (NEW)
+### Step 2: Complexity Routing (NEW)
 
-Before executing any task, propose the implementation order to the user:
+Before proposing the plan, call `speckit-complexity` to assess each phase's complexity level. Use the information gathered in Step 1 to determine routing per task:
+
+**simple**: Execute directly without sub-agents. Skip TDD if tests already exist. Single-file changes.
+**standard**: Run full TDD cycle (RED → GREEN → REFACTOR). Use sub-agents only if boundary annotations exist.
+**complex**: Dispatch `@explore` sub-agent first for research. Use `@speckit-implementer` and `@speckit-reviewer` sub-agents per boundary. Max 3 debug rounds instead of 2.
+
+Include the assessed complexity in the proposal to set user expectations.
+
+### Step 3: Conversational Proposal
+
+Before executing any task, propose the implementation order to the user.
+
+**Express Mode**: If the SDD configuration has `expressMode: true`, skip this step and proceed directly to execution with standard routing defaults.
+
+Standard proposal format:
 
 ```
 ## Proposed Execution: <feature-name>
@@ -62,11 +77,15 @@ Before executing any task, propose the implementation order to the user:
 Does this execution order look right? I will start implementation after confirmation.
 ```
 
-Wait for user confirmation before proceeding to Step 3.
+Wait for user confirmation before proceeding to Step 4.
 
-### Step 3: Execute Tasks
+### Step 4: Execute Tasks
 
-Execute tasks in dependency order. For each task:
+Execute tasks in dependency order. For each task, apply the complexity-appropriate route determined in Step 2:
+
+**Simple route**: Implement directly without TDD cycle. Skip sub-agents. Verify with existing tests.
+**Standard route**: Follow full TDD cycle. Use sub-agents if boundary annotations exist.
+**Complex route**: Dispatch `@explore` for research first. Use `@speckit-implementer` and `@speckit-reviewer` sub-agents per boundary. Max 3 debug rounds.
 
 **Per-task flow (TDD cycle):**
 1. **RED**: Read relevant spec sections. Write test for the next small piece. Test should fail.
@@ -89,7 +108,7 @@ Max 2 debug rounds per task. If still blocked after 2 rounds, mark `_Blocked:_` 
 - Stage only files changed for this task (never `git add -A` or `git add .`)
 - Commit format: `feat(<feature>): <task description>`
 
-### Step 4: Run Tests After Each Phase
+### Step 5: Run Tests After Each Phase
 
 After all tasks in a phase complete, run:
 1. Build check
@@ -98,13 +117,13 @@ After all tasks in a phase complete, run:
 
 If tests fail, fix before proceeding to the next phase.
 
-### Step 5: Update spec.json
+### Step 6: Update spec.json
 
 After all phases complete, update `specs/NNN-feature-name/spec.json`:
 - Set `phase = "complete"`
 - Set `updated_at` to current UTC ISO-8601
 
-### Step 6: Final Verification
+### Step 7: Final Verification
 
 After all phases complete:
 1. Run full test suite (final)
@@ -153,7 +172,10 @@ Within a phase, respect the dependency DAG. Run `[P]` tasks concurrently.
 ## Quality checklist
 
 - [ ] Pre-validated by command layer before skill invocation
-- [ ] Conversational proposal made (or skipped in auto mode)
+- [ ] Complexity routing assessed before execution
+- [ ] Correct route followed per task (simple/standard/complex)
+- [ ] Express Mode checked before conversational proposal
+- [ ] Conversational proposal made (or skipped in auto or express mode)
 - [ ] Shared rules loaded from `skills/rules/`
 - [ ] Tasks executed in correct dependency order
 - [ ] Boundary annotations (`_Boundary:_`) respected during dispatch

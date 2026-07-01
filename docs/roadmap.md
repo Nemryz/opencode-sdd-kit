@@ -85,7 +85,13 @@ expressMode via key=value. Tests de configuracion en status-config.test.ts.
 
 Nuevo speckit-complexity.ts: evalua tareas por cantidad de archivos, dependencias
 externas, ambiguedad y boundaries. Usa ProjectContext de Discovery. Devuelve
-nivel simple/standard/complex con razonamiento. Tests en complexity.test.ts.
+nivel simple/standard/complex con razonamiento. Tests en complexity.test.ts (14 tests).
+
+### 3.2.4: Implementer Routing (COMPLETO)
+
+speckit-implementer/SKILL.md: Step 1.5 Complexity Routing con 3 rutas
+(simple directa, standard TDD, complex con subagentes). Express Mode guard en
+Step 2. Tests de contenido en implementer-content.test.ts.
 
 ## Fase D: Bug de concurrencia (COMPLETO)
 
@@ -138,7 +144,7 @@ Fase B: 4 tareas (completo).
 Fase C: 7 tareas (completo).
 Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
-Fase 3.2: 5 subfases, 3 completas (3.2.1-3.2.3). Pendientes 3.2.4 y 3.2.5.
+Fase 3.2: 5 subfases, 4 completas (3.2.1-3.2.4). Pendiente 3.2.5 (Express Mode skills).
 
-Total: 24 tareas, 22 completas, 1 en progreso (3.2.1 parcial), 4 pendientes (3.2.2-3.2.5).
-Suite actual: 420+ tests en 20 archivos.
+Total: 24 tareas, 23 completas, 1 pendiente (3.2.5).
+Suite actual: 430+ tests en 20 archivos.
