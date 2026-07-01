@@ -105,12 +105,16 @@ Implementado con acquireLock/releaseLock atomicos via fs.mkdir, withLock
 helper reentrante, timeout configurable, stale lock detection, y wrappers
 en las 6 herramientas. 14+ tests en locking.test.ts.
 
-## Fase F: Auditoria de bugs externos (COMPLETO)
+## Fase F: Auditoria de bugs externos
 
-Siete bugs identificados por auditoria externa. Fixes: install scripts rama
-master, scaffold race condition con withLock, config defaultTechStack redirect,
-audit fix recalculo de resumen, clean constitutionExists real,
-findTargetFeatureDir sort numerico. Pendiente: taskDescription NLP scoring.
+Seis bugs identificados por auditoria externa y corregidos:
+F-1: install scripts rama master (fix).
+F-2: scaffold race condition con withLock (fix).
+F-3: config defaultTechStack redirect (fix).
+F-4: audit fix recalculo de resumen (fix).
+F-5: clean constitutionExists real (fix).
+F-6: findTargetFeatureDir sort numerico (fix).
+Pendiente: taskDescription NLP scoring en assessComplexity.
 
 ## Fase E: Cobertura de edge cases (COMPLETO)
 

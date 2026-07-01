@@ -294,32 +294,37 @@ export default tool({
         }
       }
 
-      let featureDirName: string
-      let featureNumber: number
-      let featurePath: string
+      let featureDirName = ""
+      let featureNumber = 0
+      let featurePath = ""
       let slugTruncated = false
 
+      const specsPath = specsDirPath(projectRoot)
       if (args.template === "plan" || args.template === "tasks") {
         const existing = await findExactFeatureBySlug(projectRoot, args.featureName)
         if (existing) {
           featureDirName = existing
-          featurePath = path.join(specsDirPath(projectRoot), existing)
+          featurePath = path.join(specsPath, existing)
           featureNumber = parseInt(existing.match(/^(\d+)/)?.[1] ?? "0", 10)
         } else {
+          await withLock(specsPath, async () => {
+            featureNumber = await getNextFeatureNumber(projectRoot)
+            const r = makeFeatureDirName(args.featureName, featureNumber)
+            featureDirName = r.dir
+            featurePath = path.join(specsPath, featureDirName)
+            slugTruncated = r.truncated
+            await fs.mkdir(featurePath, { recursive: true })
+          })
+        }
+      } else {
+        await withLock(specsPath, async () => {
           featureNumber = await getNextFeatureNumber(projectRoot)
           const r = makeFeatureDirName(args.featureName, featureNumber)
           featureDirName = r.dir
-          featurePath = path.join(specsDirPath(projectRoot), featureDirName)
+          featurePath = path.join(specsPath, featureDirName)
           slugTruncated = r.truncated
           await fs.mkdir(featurePath, { recursive: true })
-        }
-      } else {
-        featureNumber = await getNextFeatureNumber(projectRoot)
-        const r = makeFeatureDirName(args.featureName, featureNumber)
-        featureDirName = r.dir
-        featurePath = path.join(specsDirPath(projectRoot), featureDirName)
-        slugTruncated = r.truncated
-        await fs.mkdir(featurePath, { recursive: true })
+        })
       }
 
       const fileName = `${args.template}.md`

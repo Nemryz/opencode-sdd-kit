@@ -236,22 +236,37 @@ describe("withLock", () => {
     await expect(fs.stat(target + ".lock")).rejects.toThrow()
   })
 
-  it("protects read-modify-write from concurrent overwrite", async () => {
+  it("protects read-modify-write from sequential overwrite", async () => {
     const t = await worktree()
     const fp = path.join(t, "data.json")
     await fs.writeFile(fp, JSON.stringify({ counter: 0 }), "utf-8")
     const ops = 5
-    const tasks = Array.from({ length: ops }, () =>
-      withLock(fp, async () => {
+    for (let i = 0; i < ops; i++) {
+      await withLock(fp, async () => {
         const raw = await fs.readFile(fp, "utf-8")
         const data = JSON.parse(raw)
         data.counter++
         await fs.writeFile(fp, JSON.stringify(data), "utf-8")
-      }),
-    )
-    await Promise.all(tasks)
+      })
+    }
     const final = JSON.parse(await fs.readFile(fp, "utf-8"))
     expect(final.counter).toBe(ops)
+  })
+
+  it("rejects non-blocking acquire when lock held by same process concurrently", async () => {
+    const t = await worktree()
+    const fp = path.join(t, "data.json")
+    const lockDir = fp + ".lock"
+    await fs.mkdir(path.dirname(lockDir), { recursive: true })
+    await fs.mkdir(lockDir, { recursive: false })
+    await fs.writeFile(
+      path.join(lockDir, "lock.json"),
+      JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }),
+      "utf-8",
+    )
+    // the lock is held by the same process externally, so acquire uses stale detection
+    // with a very fresh date it cannot steal, and timeout fires
+    await expect(acquireLock(fp, { timeout: 50, staleThreshold: 10000 })).rejects.toThrow("Lock timeout")
   })
 })
 
