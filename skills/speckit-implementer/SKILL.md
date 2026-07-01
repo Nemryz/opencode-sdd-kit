@@ -6,6 +6,7 @@ compatibility: opencode
 metadata:
   phase: 4
   workflow: sdd
+  shared-rules: design-principles.md, tasks-generation.md
 ---
 
 ## What I do
@@ -37,8 +38,33 @@ Read all task documentation:
 2. Constitution from `.opencode/spec-memory/constitution.md`
 3. Steering context from `.opencode/steering/` (if exists) — `product.md`, `tech.md`, `structure.md`
 4. Domain map from `.opencode/domain-map.md` (if exists)
+5. Shared rules from `skills/rules/design-principles.md` and `skills/rules/tasks-generation.md`
 
-### Step 2: Execute Tasks
+### Step 2: Conversational Proposal (NEW)
+
+Before executing any task, propose the implementation order to the user:
+
+```
+## Proposed Execution: <feature-name>
+
+### Phase Plan
+1. Setup — <infrastructure and dependencies>
+2. Foundational — <core models and data layer>
+3. P1: <Story 1> — <N tasks, TDD>
+4. P2: <Story 2> — <M tasks, TDD>
+5. Polish — <edge cases and cleanup>
+
+### Boundary Map
+- `_Boundary: Component A_` → T-001, T-002
+- `_Boundary: Component B_` → T-003
+
+### Confirmation
+Does this execution order look right? I will start implementation after confirmation.
+```
+
+Wait for user confirmation before proceeding to Step 3.
+
+### Step 3: Execute Tasks
 
 Execute tasks in dependency order. For each task:
 
@@ -50,9 +76,12 @@ Execute tasks in dependency order. For each task:
 
 **Sub-agent dispatch (optional, for complex tasks):**
 If a task is complex, dispatch sub-agents:
-1. **Implementer sub-agent**: Writes code following TDD
-2. **Reviewer sub-agent**: Reviews code against spec, returns APPROVED/REJECTED
-3. **Debugger sub-agent** (on rejection): Investigates root cause in fresh context
+1. **`@speckit-implementer` sub-agent**: Writes code following TDD, respecting `_Boundary: ComponentName_` annotations
+2. **`@speckit-reviewer` sub-agent**: Reviews code against spec, returns APPROVED/REJECTED
+3. **`@explore` sub-agent** (for unknowns): Researches codebase patterns and returns findings
+4. **Debugger sub-agent** (on rejection): Investigates root cause in fresh context
+
+Use `_Boundary: ComponentName_` annotations from `tasks.md` to assign scope to each sub-agent. Clear ownership prevents overlap and merge conflicts.
 
 Max 2 debug rounds per task. If still blocked after 2 rounds, mark `_Blocked:_` with reason.
 
@@ -60,7 +89,7 @@ Max 2 debug rounds per task. If still blocked after 2 rounds, mark `_Blocked:_` 
 - Stage only files changed for this task (never `git add -A` or `git add .`)
 - Commit format: `feat(<feature>): <task description>`
 
-### Step 3: Run Tests After Each Phase
+### Step 4: Run Tests After Each Phase
 
 After all tasks in a phase complete, run:
 1. Build check
@@ -69,13 +98,13 @@ After all tasks in a phase complete, run:
 
 If tests fail, fix before proceeding to the next phase.
 
-### Step 4: Update spec.json
+### Step 5: Update spec.json
 
 After all phases complete, update `specs/NNN-feature-name/spec.json`:
 - Set `phase = "complete"`
 - Set `updated_at` to current UTC ISO-8601
 
-### Step 5: Final Verification
+### Step 6: Final Verification
 
 After all phases complete:
 1. Run full test suite (final)
@@ -109,6 +138,10 @@ Within a phase, respect the dependency DAG. Run `[P]` tasks concurrently.
 - **Stop**: Do not proceed to next task
 - **Recovery**: Fix test or implementation. Re-run until green.
 
+### Error: Boundary overlap between sub-agents
+- **Stop**: Two sub-agents claim the same `_Boundary:_` annotation
+- **Recovery**: Reassign boundaries in main context, dispatch sequentially for overlapping areas
+
 ### Error: Sub-agent dispatch unavailable
 - **Fallback**: Execute TDD sequentially in main context
 - **Recovery**: Report that sub-agent dispatch is unavailable, proceed with inline implementation
@@ -120,7 +153,11 @@ Within a phase, respect the dependency DAG. Run `[P]` tasks concurrently.
 ## Quality checklist
 
 - [ ] Pre-validated by command layer before skill invocation
+- [ ] Conversational proposal made (or skipped in auto mode)
+- [ ] Shared rules loaded from `skills/rules/`
 - [ ] Tasks executed in correct dependency order
+- [ ] Boundary annotations (`_Boundary:_`) respected during dispatch
+- [ ] `@mention` syntax used for sub-agent dispatch
 - [ ] Tests pass after each phase
 - [ ] Parallel tasks executed together
 - [ ] Blocked tasks reported with alternatives
@@ -136,6 +173,9 @@ Tasks: `specs/NNN-feature-name/tasks.md`
 Plan: `specs/NNN-feature-name/plan.md`
 Spec: `specs/NNN-feature-name/spec.md`
 Constitution: `.opencode/spec-memory/constitution.md`
+Shared rules: `skills/rules/design-principles.md`, `skills/rules/tasks-generation.md`
+Boundary map: `specs/NNN-feature-name/tasks.md` — look for `_Boundary: ComponentName_` annotations
+Sub-agents: `@speckit-implementer`, `@speckit-reviewer`, `@explore`
 
 ## Verification
 
