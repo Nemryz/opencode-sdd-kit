@@ -112,6 +112,7 @@ export interface SessionState {
 export interface SDDConfig {
   defaultTechStack: string | null
   lastUsedLanguage: string | null
+  expressMode: boolean
   preferences: Record<string, string>
 }
 
@@ -131,6 +132,7 @@ export const DEFAULT_SESSION: SessionState = {
 export const DEFAULT_CONFIG: SDDConfig = {
   defaultTechStack: null,
   lastUsedLanguage: null,
+  expressMode: false,
   preferences: {},
 }
 

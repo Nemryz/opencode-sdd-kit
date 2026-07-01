@@ -74,7 +74,12 @@ Subfases implementadas incrementalmente, 1 componente por commit.
 ProjectContext interface, discoverProject, detectPackageManager, detectFramework,
 detectConfigFiles, detectScripts en shared/types.ts. En memoria (siempre fresco).
 Constitucion enmendada para permitir auto-discovery explicito y visible.
-Tests unitarios para cada detector en discovery.test.ts.
+Tests unitarios para cada detector en discovery.test.ts (21 tests).
+
+### 3.2.2: Express Mode config (COMPLETO)
+
+expressMode: boolean en SDDConfig. speckit-config.ts permite leer/escribir
+expressMode via key=value. Tests de configuracion en status-config.test.ts.
 
 ## Fase D: Bug de concurrencia (COMPLETO)
 

@@ -45,7 +45,11 @@ export default tool({
           innerCfg.defaultTechStack = args.defaultTechStack ?? null
           await writeConfig(projectRoot, innerCfg)
         } else if (args.key && args.value !== undefined) {
-          innerCfg.preferences[args.key] = args.value
+          if (args.key === "expressMode") {
+            innerCfg.expressMode = args.value === "true"
+          } else {
+            innerCfg.preferences[args.key] = args.value
+          }
           innerCfg.lastUsedLanguage = args.key === "language" ? args.value : innerCfg.lastUsedLanguage
           await writeConfig(projectRoot, innerCfg)
         }
@@ -72,6 +76,14 @@ export default tool({
         const knownKeys: Record<string, string | null> = {
           defaultTechStack: cfg.defaultTechStack,
           lastUsedLanguage: cfg.lastUsedLanguage,
+          expressMode: String(cfg.expressMode),
+        }
+        if (args.key === "expressMode") {
+          return {
+            title: "Configuration read",
+            output: `expressMode: ${cfg.expressMode}`,
+            metadata: cfg,
+          }
         }
         const raw = cfg.preferences[args.key] ?? knownKeys[args.key]
         return {
@@ -84,6 +96,7 @@ export default tool({
       const lines = [
         `defaultTechStack: ${cfg.defaultTechStack ?? "(not set)"}`,
         `lastUsedLanguage: ${cfg.lastUsedLanguage ?? "(not set)"}`,
+        `expressMode: ${cfg.expressMode}`,
         `preferences: ${Object.keys(cfg.preferences).length} key(s)`,
       ]
 

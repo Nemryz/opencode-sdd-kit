@@ -188,4 +188,32 @@ describe("config", () => {
     const cfg = JSON.parse(raw)
     expect(cfg.preferences["editor.path"]).toBe("vim")
   })
+
+  it("sets expressMode to true", async () => {
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    const cfgPath = configPath(worktree)
+    const raw = await fs.readFile(cfgPath, "utf-8")
+    const cfg = JSON.parse(raw)
+    expect(cfg.expressMode).toBe(true)
+  })
+
+  it("sets expressMode to false", async () => {
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    await configTool.execute({ key: "expressMode", value: "false" }, ctx)
+    const cfgPath = configPath(worktree)
+    const raw = await fs.readFile(cfgPath, "utf-8")
+    const cfg = JSON.parse(raw)
+    expect(cfg.expressMode).toBe(false)
+  })
+
+  it("reads expressMode via key lookup", async () => {
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    const result = await configTool.execute({ key: "expressMode" }, ctx)
+    expect(result.output).toContain("true")
+  })
+
+  it("defaults expressMode to false when config file missing", async () => {
+    const result = await configTool.execute({}, ctx)
+    expect(result.metadata?.expressMode).toBe(false)
+  })
 })
