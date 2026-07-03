@@ -157,7 +157,8 @@ describe("scaffold plan", () => {
     expect(result.metadata?.featureDir).toBe("001-auth")
     const filePath = path.join(worktree, "specs", "001-auth", "plan.md")
     const content = await fs.readFile(filePath, "utf-8")
-    expect(content).toContain("Node.js")
+    expect(content).toContain("plan: Auth")
+    expect(content).toContain("Content pending skill generation")
   })
 
   it("sets spec.json phase to plan with approvals", async () => {
@@ -186,7 +187,8 @@ describe("scaffold tasks", () => {
     expect(result.metadata?.featureDir).toBe("001-auth")
     const filePath = path.join(worktree, "specs", "001-auth", "tasks.md")
     const content = await fs.readFile(filePath, "utf-8")
-    expect(content).toContain("001-auth")
+    expect(content).toContain("tasks: Auth")
+    expect(content).toContain("Content pending skill generation")
   })
 
   it("sets spec.json phase to tasks with approvals", async () => {

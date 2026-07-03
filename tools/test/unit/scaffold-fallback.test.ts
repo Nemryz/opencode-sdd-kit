@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 describe("scaffold fallback content (no template files)", () => {
-  it("creates spec.md with fallback content when template is missing", async () => {
+  it("creates spec.md with marker placeholder when template is missing", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Fallback Spec", template: "spec" },
       ctx,
@@ -26,12 +26,11 @@ describe("scaffold fallback content (no template files)", () => {
     expect(result.metadata?.featureDir).toBe("001-fallback-spec")
     const filePath = path.join(worktree, "specs", "001-fallback-spec", "spec.md")
     const content = await fs.readFile(filePath, "utf-8")
-    expect(content).toContain("Fallback Spec")
-    expect(content).toContain("P1 - MVP")
-    expect(content).toContain("Gherkin")
+    expect(content).toContain("spec: Fallback Spec")
+    expect(content).toContain("Content pending skill generation")
   })
 
-  it("creates plan.md with fallback content when template is missing", async () => {
+  it("creates plan.md with marker placeholder when template is missing", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Fallback Plan", template: "plan" },
       ctx,
@@ -39,11 +38,11 @@ describe("scaffold fallback content (no template files)", () => {
     expect(result.metadata?.featureDir).toBe("001-fallback-plan")
     const filePath = path.join(worktree, "specs", "001-fallback-plan", "plan.md")
     const content = await fs.readFile(filePath, "utf-8")
-    expect(content).toContain("Fallback Plan")
-    expect(content).toContain("Key Decisions")
+    expect(content).toContain("plan: Fallback Plan")
+    expect(content).toContain("Content pending skill generation")
   })
 
-  it("creates tasks.md with fallback content when template is missing", async () => {
+  it("creates tasks.md with marker placeholder when template is missing", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Fallback Tasks", template: "tasks" },
       ctx,
@@ -51,9 +50,8 @@ describe("scaffold fallback content (no template files)", () => {
     expect(result.metadata?.featureDir).toBe("001-fallback-tasks")
     const filePath = path.join(worktree, "specs", "001-fallback-tasks", "tasks.md")
     const content = await fs.readFile(filePath, "utf-8")
-    expect(content).toContain("Fallback Tasks")
-    expect(content).toContain("T-001")
-    expect(content).toContain("Setup")
+    expect(content).toContain("tasks: Fallback Tasks")
+    expect(content).toContain("Content pending skill generation")
   })
 
   it("creates steering docs with fallback content", async () => {

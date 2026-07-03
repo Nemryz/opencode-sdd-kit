@@ -63,7 +63,7 @@ Wait for user confirmation before proceeding to Step 3.
 ### Step 3: Generate Spec
 
 1. Derive feature name from description (kebab-case, 2-4 words)
-2. Call `speckit-scaffold` with `template: "spec"` to scaffold, then write content
+2. Call `speckit-scaffold` with `template: "spec"` to scaffold (creates a placeholder marker), then **overwrite** the entire file with full spec content
 3. Follow rules from `skills/rules/spec-writing.md`
 4. Mark ambiguous areas with `[NEEDS CLARIFICATION]` per AGENTS.md Critical Rules
 5. Prioritize user stories: P1 (MVP), P2 (important), P3 (nice to have)

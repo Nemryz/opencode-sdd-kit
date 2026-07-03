@@ -16,11 +16,12 @@ describe("mockContext", () => {
 })
 
 describe("createTempWorktree", () => {
-  it("creates an empty temp directory", async () => {
+  it("creates a temp directory with .opencode/spec-memory/", async () => {
     const dir = await createTempWorktree()
     try {
-      const entries = await fs.readdir(dir)
-      expect(entries).toEqual([])
+      const specMemory = path.join(dir, ".opencode", "spec-memory")
+      const stat = await fs.stat(specMemory)
+      expect(stat.isDirectory()).toBe(true)
     } finally {
       await destroyTempWorktree(dir)
     }

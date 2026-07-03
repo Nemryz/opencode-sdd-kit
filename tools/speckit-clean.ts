@@ -29,7 +29,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const specsDir = specsDirPath(projectRoot)
       let entries: string[] = []
       try {

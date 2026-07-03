@@ -64,7 +64,7 @@ Wait for user confirmation before writing.
 
 ### Step 3: Generate Tasks
 
-1. Call `speckit-scaffold` with `template: "tasks"`
+1. Call `speckit-scaffold` with `template: "tasks"` (creates a placeholder marker), then **overwrite** the entire file with full tasks content
 2. Decompose each user story into concrete implementation tasks
 3. Apply atomicity rules from `skills/rules/tasks-generation.md`
 4. Mark parallelizable tasks with `[P]`

@@ -18,6 +18,7 @@ export function mockContext(worktree: string): ToolContext {
 
 export async function createTempWorktree(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sdd-test-"))
+  await fs.mkdir(path.join(dir, ".opencode", "spec-memory"), { recursive: true })
   return dir
 }
 

@@ -26,7 +26,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (!isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const toolResult = await withLock(sessionPath(projectRoot), async () => {
         const s = await readSession(projectRoot)
         const featureDir = args.featureDir || s.featureDir || (await getLatestFeatureDir(projectRoot))

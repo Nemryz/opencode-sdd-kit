@@ -15,6 +15,7 @@ let ctx: ReturnType<typeof mockContext>
 
 beforeAll(async () => {
   worktree = await fs.mkdtemp(path.join(os.tmpdir(), "sdd-manual-"))
+  await fs.mkdir(path.join(worktree, ".opencode", "spec-memory"), { recursive: true })
   ctx = mockContext(worktree)
 })
 

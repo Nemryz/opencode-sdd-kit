@@ -148,9 +148,14 @@ export const PHASE_NEXT_STEP: Record<string, string> = {
 
 // ─────────────────────────── Project root validation ───────────
 
-export function isValidProjectRoot(root: string): boolean {
-  const configDir = path.join(os.homedir(), ".config", "opencode")
-  return path.resolve(root) !== path.resolve(configDir)
+export async function isValidProjectRoot(root: string): Promise<boolean> {
+  try {
+    const specMemoryDir = path.join(root, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
+    await fs.access(specMemoryDir)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ─────────────────────────── Project Discovery ───────────────────────────

@@ -1,6 +1,7 @@
 import path from "node:path"
 import os from "node:os"
-import { describe, it, expect } from "vitest"
+import fs from "node:fs/promises"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import {
   parseNNN,
   detectPhase,
@@ -159,17 +160,33 @@ describe("isEEXIST", () => {
 // ── isValidProjectRoot ─────────────────────────────────────
 
 describe("isValidProjectRoot", () => {
-  it("rejects the config directory", () => {
-    const configDir = path.join(os.homedir(), ".config", "opencode")
-    expect(isValidProjectRoot(configDir)).toBe(false)
+  let tmpDir: string
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "root-test-"))
   })
 
-  it("accepts any other directory", () => {
-    expect(isValidProjectRoot("/some/project")).toBe(true)
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   })
 
-  it("accepts the homedir itself", () => {
-    expect(isValidProjectRoot(os.homedir())).toBe(true)
+  it("rejects a directory without .opencode/spec-memory/", async () => {
+    expect(await isValidProjectRoot(tmpDir)).toBe(false)
+  })
+
+  it("rejects a non-existent directory", async () => {
+    const nonExistent = path.join(tmpDir, "nope")
+    expect(await isValidProjectRoot(nonExistent)).toBe(false)
+  })
+
+  it("accepts a directory with .opencode/spec-memory/", async () => {
+    await fs.mkdir(path.join(tmpDir, ".opencode", "spec-memory"), { recursive: true })
+    expect(await isValidProjectRoot(tmpDir)).toBe(true)
+  })
+
+  it("rejects a directory with only .opencode/ but no spec-memory/", async () => {
+    await fs.mkdir(path.join(tmpDir, ".opencode"), { recursive: true })
+    expect(await isValidProjectRoot(tmpDir)).toBe(false)
   })
 })
 

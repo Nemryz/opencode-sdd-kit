@@ -84,7 +84,7 @@ Wait for user confirmation before proceeding.
 
 ### Step 4: Generate Plan
 
-1. Call `speckit-scaffold` with `template: "plan"`
+1. Call `speckit-scaffold` with `template: "plan"` (creates a placeholder marker), then **overwrite** the entire file with full plan content
 2. Apply Constitution Gates BEFORE any planning:
    - **Simplicity Gate**: Is this the simplest solution? No future-proofing.
    - **Anti-Abstraction Gate**: Use frameworks directly, don't wrap them.
