@@ -8,6 +8,8 @@ import {
   detectPhaseFromFiles,
   isENOENT,
   isEEXIST,
+  isESRCH,
+  getFeatureDirs,
   isValidProjectRoot,
   parsePhase,
   makeSpecJson,
@@ -159,6 +161,34 @@ describe("isEEXIST", () => {
   })
 })
 
+// ── isESRCH ───────────────────────────────────────────────
+
+describe("isESRCH", () => {
+  it("returns true for an error with code ESRCH", () => {
+    const err = new Error("no such process")
+    ;(err as NodeJS.ErrnoException).code = "ESRCH"
+    expect(isESRCH(err)).toBe(true)
+  })
+
+  it("returns false for an error with a different code", () => {
+    const err = new Error("not found")
+    ;(err as NodeJS.ErrnoException).code = "ENOENT"
+    expect(isESRCH(err)).toBe(false)
+  })
+
+  it("returns false for a non-Error value", () => {
+    expect(isESRCH("some string")).toBe(false)
+  })
+
+  it("returns false for null", () => {
+    expect(isESRCH(null)).toBe(false)
+  })
+
+  it("returns false for an Error without a code property", () => {
+    expect(isESRCH(new Error("generic"))).toBe(false)
+  })
+})
+
 // ── isValidProjectRoot ─────────────────────────────────────
 
 describe("isValidProjectRoot", () => {
@@ -226,6 +256,51 @@ describe("specsDirPath", () => {
   it("joins root with specs", () => {
     const r = path.resolve("/root")
     expect(specsDirPath(r)).toBe(path.join(r, "specs"))
+  })
+})
+
+describe("getFeatureDirs", () => {
+  let tmpDir: string
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "featdirs-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  it("returns empty array when specs dir missing", async () => {
+    const dirs = await getFeatureDirs(tmpDir)
+    expect(dirs).toEqual([])
+  })
+
+  it("returns directories sorted by number then alphabetically", async () => {
+    const specsDir = specsDirPath(tmpDir)
+    await fs.mkdir(specsDir, { recursive: true })
+    await fs.mkdir(path.join(specsDir, "001-billing"), { recursive: true })
+    await fs.mkdir(path.join(specsDir, "002-alpha"), { recursive: true })
+    const dirs = await getFeatureDirs(tmpDir)
+    expect(dirs).toEqual(["001-billing", "002-alpha"])
+  })
+
+  it("sorts by name when NNN ties", async () => {
+    const specsDir = specsDirPath(tmpDir)
+    await fs.mkdir(specsDir, { recursive: true })
+    await fs.mkdir(path.join(specsDir, "002-beta"), { recursive: true })
+    await fs.mkdir(path.join(specsDir, "002-alpha"), { recursive: true })
+    await fs.mkdir(path.join(specsDir, "001-gamma"), { recursive: true })
+    const dirs = await getFeatureDirs(tmpDir)
+    expect(dirs).toEqual(["001-gamma", "002-alpha", "002-beta"])
+  })
+
+  it("ignores directories without NNN prefix", async () => {
+    const specsDir = specsDirPath(tmpDir)
+    await fs.mkdir(specsDir, { recursive: true })
+    await fs.mkdir(path.join(specsDir, "001-auth"), { recursive: true })
+    await fs.mkdir(path.join(specsDir, "random"), { recursive: true })
+    const dirs = await getFeatureDirs(tmpDir)
+    expect(dirs).toEqual(["001-auth"])
   })
 })
 

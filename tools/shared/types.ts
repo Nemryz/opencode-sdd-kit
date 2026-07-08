@@ -361,6 +361,10 @@ export function isEEXIST(err: unknown): boolean {
   return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "EEXIST"
 }
 
+export function isESRCH(err: unknown): boolean {
+  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "ESRCH"
+}
+
 // ─────────────────────────── File Locking ───────────────────────────
 
 export interface LockOptions {
@@ -393,8 +397,11 @@ function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
-  } catch {
-    return false
+  } catch (err) {
+    if (isESRCH(err)) {
+      return false
+    }
+    return true
   }
 }
 
@@ -449,6 +456,10 @@ export async function releaseLock(handle: LockHandle): Promise<void> {
   } catch {
     // idempotent
   }
+}
+
+export function resetLocks(): void {
+  heldLocks.clear()
 }
 
 export async function withLock<T>(filePath: string, fn: () => Promise<T>, options?: LockOptions): Promise<T> {
@@ -543,7 +554,7 @@ export async function getFeatureDirs(projectRoot: string): Promise<string[]> {
         }
       }
     }
-    dirs.sort((a, b) => a.nnn - b.nnn)
+    dirs.sort((a, b) => a.nnn - b.nnn || a.name.localeCompare(b.name))
     return dirs.map(d => d.name)
   } catch {
     return []

@@ -349,3 +349,28 @@ High risk categories (C-1 through C-7 in `high-risk.test.ts`) cover cross-tool r
 ### Integration first, not unit first
 
 Tests should hit real dependencies (filesystem, JSON files, directories). Mocks and pure-unit tests are reserved for pure functions like `slugify`, `parseNNN`, and `detectPhase`. Anything that reads or writes state must go through the real filesystem in a temp directory. This aligns with the Integration-First testing gate in the constitution.
+
+### Zod schema validation for all JSON state files
+
+Every `read*` function that parses a JSON file from disk MUST validate via Zod `safeParse` and return a safe fallback on failure. The pattern is:
+
+1. Define an exported Zod schema object (e.g. `SessionStateSchema`, `SpecJsonSchema`, `ConfigSchema`)
+2. Call `schema.safeParse(merged)` where `merged = { ...DEFAULT, ...parsed }`
+3. On `result.success`, return **`result.data`** (NOT `merged`) to ensure Zod-stripped clean output
+4. On failure, `console.warn` the ZodError and return the default object
+
+This was regressed in `readConfig` (returned `merged` instead of `result.data`) and fixed in commit `5ad4beb`.
+
+### CI must use `npm ci`, not `npm install`
+
+All CI workflows MUST use `npm ci` instead of `npm install --ignore-scripts`. The `npm ci` command is stricter — it installs exactly from `package-lock.json` and fails if the lockfile is out of sync with `package.json`. This guarantees reproducible builds across platforms and avoids CI-only failures.
+
+### Display-only phases must not be persisted to session.json
+
+Tools that compute transient display values (e.g. `validateTool` returning `"empty"`, `statusTool` returning `"none"` or `"unknown"`) MUST NOT write those values to `s.phase` in session.json. The `SessionStateSchema.phase` enum only allows `"init"`, `"spec"`, `"plan"`, `"tasks"`, `"ready"`, `"impl"`, `"complete"`. Persisting a display value causes subsequent `readSession` to fail validation and return `DEFAULT_SESSION`, silently destroying the user's session state.
+
+Fix: guard with `if (phase !== "empty")` (validate) or `if (phase !== "none" && phase !== "unknown")` (status).
+
+### Flaky parallel filesystem tests
+
+Tests using `Promise.all` with concurrent filesystem operations (directory creation, file locking) are inherently flaky across platforms. The C-5 test was changed from `Promise.all` to sequential calls after macOS CI failures. For parallel contention tests, use `Promise.allSettled` with tolerant assertions (e.g., `expect(successCount).toBeGreaterThanOrEqual(1)`) rather than strict `expect(r1.title).not.toBe("Error")`.

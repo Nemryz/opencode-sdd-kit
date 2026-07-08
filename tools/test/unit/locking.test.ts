@@ -6,6 +6,7 @@ import {
   acquireLock,
   releaseLock,
   withLock,
+  resetLocks,
   sleep,
   writeSession,
   readSession,
@@ -277,5 +278,27 @@ describe("sleep", () => {
     const start = Date.now()
     await sleep(50)
     expect(Date.now() - start).toBeGreaterThanOrEqual(40)
+  })
+})
+
+// ── resetLocks ─────────────────────────────────────────────
+
+describe("resetLocks", () => {
+  it("clears all held locks", async () => {
+    const wt = await worktree()
+    const fp = path.join(wt, "test.lock")
+    const handle = await acquireLock(fp)
+    expect(handle.reentrant).toBe(false)
+
+    const reentry = await acquireLock(fp)
+    expect(reentry.reentrant).toBe(true)
+    await releaseLock(reentry)
+
+    resetLocks()
+    await releaseLock(handle)
+
+    const afterReset = await acquireLock(fp, { timeout: 5000 })
+    expect(afterReset.reentrant).toBe(false)
+    await releaseLock(afterReset)
   })
 })
