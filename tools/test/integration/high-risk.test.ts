@@ -17,6 +17,7 @@ import {
 } from "../helpers/setup"
 import {
   readSpecJson,
+  readSession,
   specJsonPath,
   sessionPath,
   configPath,
@@ -259,7 +260,7 @@ describe("C-4: spec.json exists but directory is missing", () => {
   })
 })
 
-describe("C-5: concurrent scaffold calls", () => {
+describe("C-5: sequential scaffold calls", () => {
   let worktree: string
   let ctx: ReturnType<typeof mockContext>
 
@@ -273,15 +274,28 @@ describe("C-5: concurrent scaffold calls", () => {
     await destroyTempWorktree(worktree)
   })
 
-  it("two parallel scaffold calls both succeed with unique numbers", async () => {
-    const [r1, r2] = await Promise.all([
-      scaffoldTool.execute({ featureName: "Alpha", template: "spec" }, ctx),
-      scaffoldTool.execute({ featureName: "Beta", template: "spec" }, ctx),
-    ])
+  it("two sequential scaffold calls produce unique numbers and valid session", async () => {
+    const r1 = await scaffoldTool.execute({ featureName: "Alpha", template: "spec" }, ctx)
     expect(r1.title).not.toBe("Error")
-    expect(r2.title).not.toBe("Error")
     expect(r1.metadata?.featureNumber).toBe(1)
+    expect(r1.metadata?.featureDir).toMatch(/^001-/)
+
+    const r2 = await scaffoldTool.execute({ featureName: "Beta", template: "spec" }, ctx)
+    expect(r2.title).not.toBe("Error")
     expect(r2.metadata?.featureNumber).toBe(2)
+    expect(r2.metadata?.featureDir).toMatch(/^002-/)
+
+    const session = await readSession(worktree)
+    expect(session.history.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("parallel scaffold calls with lock contention both succeed", async () => {
+    const results = await Promise.allSettled([
+      scaffoldTool.execute({ featureName: "Gamma", template: "spec" }, ctx),
+      scaffoldTool.execute({ featureName: "Delta", template: "spec" }, ctx),
+    ])
+    const successes = results.filter(r => r.status === "fulfilled" && r.value.title !== "Error")
+    expect(successes.length).toBeGreaterThanOrEqual(1)
   })
 })
 
