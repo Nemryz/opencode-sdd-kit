@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
+import os from "node:os"
 import scaffoldTool from "../../speckit-scaffold"
 import validateTool from "../../speckit-validate"
 import auditTool from "../../speckit-audit"
 import cleanTool from "../../speckit-clean"
 import statusTool from "../../speckit-status"
 import configTool from "../../speckit-config"
+import complexityTool from "../../speckit-complexity"
 import {
   mockContext,
   createTempWorktree,
@@ -154,5 +156,105 @@ describe("C-2: corrupt JSON handling", () => {
       expect(result.title).not.toBe("Error")
       expect(result.metadata?.defaultTechStack).toBe("Node.js")
     })
+  })
+})
+
+describe("C-3: invalid project root (missing .opencode/spec-memory/)", () => {
+  let worktree: string
+  let ctx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    worktree = await fs.mkdtemp(path.join(os.tmpdir(), "invalid-root-"))
+    ctx = mockContext(worktree)
+  })
+
+  afterEach(async () => {
+    await fs.rm(worktree, { recursive: true, force: true })
+  })
+
+  it("validate returns error for invalid project root", async () => {
+    const result = await validateTool.execute({}, ctx)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("audit returns error for invalid project root", async () => {
+    const result = await auditTool.execute({}, ctx)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("clean returns error for invalid project root", async () => {
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("status returns error for invalid project root", async () => {
+    const result = await statusTool.execute({}, ctx)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("config returns error for invalid project root", async () => {
+    const result = await configTool.execute({}, ctx)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("complexity returns error for invalid project root", async () => {
+    const result = await complexityTool.execute(
+      { taskDescription: "test" },
+      ctx,
+    )
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+})
+
+describe("C-4: spec.json exists but directory is missing", () => {
+  let worktree: string
+  let ctx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    worktree = await createTempWorktree()
+    ctx = mockContext(worktree)
+    await createConstitution(worktree)
+    // create feature, extract spec.json content, then delete entire feature directory
+    await scaffoldTool.execute({ featureName: "Ghost", template: "spec" }, ctx)
+    const featurePath = path.join(specsDirPath(worktree), "001-ghost")
+    const sj = await readSpecJson(featurePath)
+    await fs.rm(featurePath, { recursive: true, force: true })
+    // re-create spec.json where the directory used to be
+    if (sj) {
+      const sjDir = path.join(specsDirPath(worktree), "001-ghost")
+      await fs.mkdir(sjDir, { recursive: true })
+      await fs.writeFile(specJsonPath(sjDir), JSON.stringify(sj), "utf-8")
+    }
+  })
+
+  afterEach(async () => {
+    await destroyTempWorktree(worktree)
+  })
+
+  it("validate handles spec.json without directory gracefully", async () => {
+    const result = await validateTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+  })
+
+  it("audit handles spec.json without directory gracefully", async () => {
+    const result = await auditTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+  })
+
+  it("clean handles spec.json without directory gracefully", async () => {
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+  })
+
+  it("clean handles ghost feature gracefully (no crash)", async () => {
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+    expect(result.metadata?.total).toBeDefined()
   })
 })

@@ -118,6 +118,14 @@ describe("config", () => {
     expect(result.output).toContain("worktree")
   })
 
+  it("returns error when project root is invalid", async () => {
+    const badDir = path.join(worktree, "nonexistent-sub")
+    const ctx2 = mockContext(badDir)
+    const result = await configTool.execute({}, ctx2)
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
   it("shows default config when no arguments", async () => {
     const result = await configTool.execute({}, ctx)
     expect(result.title).toBe("SDD Configuration")

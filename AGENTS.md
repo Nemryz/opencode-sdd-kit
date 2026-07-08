@@ -329,3 +329,19 @@ The template directory was resolved as `os.homedir() + "/.config/opencode/templa
 The `createTempWorktree()` helper in `tools/test/helpers/setup.ts` pre-creates `.opencode/spec-memory/`, which means no test exercises the real cold-start path. This hid the R-2 deadlock through 493 tests.
 
 **Prevention guideline:** When adding a new test helper, verify it does not silently satisfy a precondition that production code must satisfy on its own. Add at least one test that starts from a truly empty directory without the helper.
+
+---
+
+## Test Patterns
+
+### Cold start bootstrap
+
+Every new project follows the same entry path: `mkdir` → `git clone` → `opencode` → constitution → spec → plan → tasks. The `cold-start.test.ts` suite replicates this exact sequence starting from a raw `mkdtemp()` with no pre-created state. When adding new preconditions that require `.opencode/` subdirectories, add a corresponding cold-start test variant.
+
+### High risk boundary tests
+
+High risk categories (C-1 through C-8 in `high-risk.test.ts`) cover cross-tool resilience: no worktree, corrupt JSON, invalid project root, deleted directories mid-operation, and malformed feature references. These tests exercise every tool against the same failure scenario in a single describe block, so a single change to `isValidProjectRoot` or `readSpecJson` is caught regardless of which tool calls it.
+
+### Integration first, not unit first
+
+Tests should hit real dependencies (filesystem, JSON files, directories). Mocks and pure-unit tests are reserved for pure functions like `slugify`, `parseNNN`, and `detectPhase`. Anything that reads or writes state must go through the real filesystem in a temp directory. This aligns with the Integration-First testing gate in the constitution.
