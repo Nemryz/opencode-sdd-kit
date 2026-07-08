@@ -30,9 +30,7 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const fp = configPath(root)
   const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
-  await withLock(fp, async () => {
-    await fs.writeFile(fp, JSON.stringify(cfg, null, 2), "utf-8")
-  })
+  await fs.writeFile(fp, JSON.stringify(cfg, null, 2), "utf-8")
 }
 
 export default tool({

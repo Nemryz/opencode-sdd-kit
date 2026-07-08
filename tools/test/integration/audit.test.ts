@@ -340,4 +340,34 @@ describe("audit auto-fix", () => {
     const findings = result.metadata?.findings ?? []
     expect(findings.some((f: any) => f.category === "spec-json")).toBe(true)
   })
+
+  it("fixes ready-violation when fix=true", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    let sj = await readSpecJson(base)
+    sj.ready_for_implementation = true
+    await writeSpecJson(sj, base)
+    const result = await auditTool.execute({ fix: true }, ctx)
+    const findings = result.metadata?.findings ?? []
+    const fixed = findings.filter((f: any) => f.message.includes("auto-fixed") && f.category === "ready-violation")
+    expect(fixed.length).toBeGreaterThanOrEqual(1)
+    const fixedSj = await readSpecJson(base)
+    expect(fixedSj?.ready_for_implementation).toBe(false)
+  })
+
+  it("fixes approval when fix=true", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    let sj = await readSpecJson(base)
+    sj.approvals.spec.generated = false
+    await writeSpecJson(sj, base)
+    const result = await auditTool.execute({ fix: true }, ctx)
+    const findings = result.metadata?.findings ?? []
+    const fixed = findings.filter((f: any) => f.message.includes("auto-fixed") && f.category === "approval")
+    expect(fixed.length).toBeGreaterThanOrEqual(1)
+    const fixedSj = await readSpecJson(base)
+    expect(fixedSj?.approvals.spec.generated).toBe(true)
+  })
 })

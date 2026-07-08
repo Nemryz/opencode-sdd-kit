@@ -296,6 +296,48 @@ export default tool({
                 }
               })
             }
+          } else if (finding.severity === "error" && finding.category === "ready-violation") {
+            const sjPath = finding.file
+            if (sjPath && sjPath.endsWith("spec.json")) {
+              const base = path.dirname(sjPath)
+              await withLock(specJsonPath(base), async () => {
+                const sjPrev = await readSpecJson(base)
+                if (sjPrev && sjPrev.ready_for_implementation) {
+                  sjPrev.ready_for_implementation = false
+                  await writeSpecJson(sjPrev, base)
+                  finding.message += " (auto-fixed)"
+                  fixedCount++
+                }
+              })
+            }
+          } else if (finding.severity === "info" && finding.category === "approval") {
+            const sjPath = finding.file
+            if (sjPath && sjPath.endsWith("spec.json")) {
+              const base = path.dirname(sjPath)
+              await withLock(specJsonPath(base), async () => {
+                const sjPrev = await readSpecJson(base)
+                if (sjPrev) {
+                  let changed = false
+                  if (!sjPrev.approvals.spec.generated && finding.message.includes("spec")) {
+                    sjPrev.approvals.spec.generated = true
+                    changed = true
+                  }
+                  if (!sjPrev.approvals.plan.generated && finding.message.includes("plan")) {
+                    sjPrev.approvals.plan.generated = true
+                    changed = true
+                  }
+                  if (!sjPrev.approvals.tasks.generated && finding.message.includes("tasks")) {
+                    sjPrev.approvals.tasks.generated = true
+                    changed = true
+                  }
+                  if (changed) {
+                    await writeSpecJson(sjPrev, base)
+                    finding.message += " (auto-fixed)"
+                    fixedCount++
+                  }
+                }
+              })
+            }
           }
         }
         if (fixedCount > 0) {
