@@ -22,6 +22,7 @@ interface AuditFinding {
   category: string
   message: string
   file?: string
+  artifact?: "spec" | "plan" | "tasks"
 }
 
 interface AuditReport {
@@ -91,6 +92,7 @@ async function auditFeature(
     findings.push({
       severity: "info",
       category: "approval",
+      artifact: "spec",
       message: `${dirName}: spec.md exists but spec approval not marked generated`,
       file: path.join(base, "spec.json"),
     })
@@ -99,6 +101,7 @@ async function auditFeature(
     findings.push({
       severity: "info",
       category: "approval",
+      artifact: "plan",
       message: `${dirName}: plan.md exists but plan approval not marked generated`,
       file: path.join(base, "spec.json"),
     })
@@ -107,6 +110,7 @@ async function auditFeature(
     findings.push({
       severity: "info",
       category: "approval",
+      artifact: "tasks",
       message: `${dirName}: tasks.md exists but tasks approval not marked generated`,
       file: path.join(base, "spec.json"),
     })
@@ -318,15 +322,15 @@ export default tool({
                 const sjPrev = await readSpecJson(base)
                 if (sjPrev) {
                   let changed = false
-                  if (!sjPrev.approvals.spec.generated && finding.message.includes("spec")) {
+                  if (!sjPrev.approvals.spec.generated && finding.artifact === "spec") {
                     sjPrev.approvals.spec.generated = true
                     changed = true
                   }
-                  if (!sjPrev.approvals.plan.generated && finding.message.includes("plan")) {
+                  if (!sjPrev.approvals.plan.generated && finding.artifact === "plan") {
                     sjPrev.approvals.plan.generated = true
                     changed = true
                   }
-                  if (!sjPrev.approvals.tasks.generated && finding.message.includes("tasks")) {
+                  if (!sjPrev.approvals.tasks.generated && finding.artifact === "tasks") {
                     sjPrev.approvals.tasks.generated = true
                     changed = true
                   }

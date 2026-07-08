@@ -370,4 +370,26 @@ describe("audit auto-fix", () => {
     const fixedSj = await readSpecJson(base)
     expect(fixedSj?.approvals.spec.generated).toBe(true)
   })
+
+  it("does not overcorrect approval when feature name contains phase substring (artifact field)", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "tasks view", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-tasks-view")
+    let sj = await readSpecJson(base)
+    expect(sj).not.toBeNull()
+    if (!sj) return
+    sj.approvals.spec.generated = false
+    sj.approvals.tasks.generated = false
+    await writeSpecJson(sj, base)
+    const result = await auditTool.execute({ fix: true }, ctx)
+    const findings = result.metadata?.findings ?? []
+    const approvalFindings = findings.filter((f: any) => f.category === "approval")
+    const specFinding = approvalFindings.find((f: any) => f.artifact === "spec")
+    const tasksFinding = approvalFindings.find((f: any) => f.artifact === "tasks")
+    expect(specFinding).toBeDefined()
+    expect(tasksFinding).toBeUndefined()
+    const fixedSj = await readSpecJson(base)
+    expect(fixedSj?.approvals.spec.generated).toBe(true)
+    expect(fixedSj?.approvals.tasks.generated).toBe(false)
+  })
 })
