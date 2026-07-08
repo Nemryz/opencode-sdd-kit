@@ -258,3 +258,83 @@ describe("C-4: spec.json exists but directory is missing", () => {
     expect(result.metadata?.total).toBeDefined()
   })
 })
+
+describe("C-5: concurrent scaffold calls", () => {
+  let worktree: string
+  let ctx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    worktree = await createTempWorktree()
+    ctx = mockContext(worktree)
+    await createConstitution(worktree)
+  })
+
+  afterEach(async () => {
+    await destroyTempWorktree(worktree)
+  })
+
+  it("two parallel scaffold calls both succeed with unique numbers", async () => {
+    const [r1, r2] = await Promise.all([
+      scaffoldTool.execute({ featureName: "Alpha", template: "spec" }, ctx),
+      scaffoldTool.execute({ featureName: "Beta", template: "spec" }, ctx),
+    ])
+    expect(r1.title).not.toBe("Error")
+    expect(r2.title).not.toBe("Error")
+    expect(r1.metadata?.featureNumber).toBe(1)
+    expect(r2.metadata?.featureNumber).toBe(2)
+  })
+})
+
+describe("C-6: stale lock on session.json", () => {
+  let worktree: string
+  let ctx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    worktree = await createTempWorktree()
+    ctx = mockContext(worktree)
+    await createConstitution(worktree)
+  })
+
+  afterEach(async () => {
+    await destroyTempWorktree(worktree)
+  })
+
+  it("scaffold recovers from stale session lock held by dead process", async () => {
+    const lockDir = sessionPath(worktree) + ".lock"
+    await fs.mkdir(lockDir, { recursive: true })
+    await fs.writeFile(
+      path.join(lockDir, "lock.json"),
+      JSON.stringify({ pid: 999999, createdAt: new Date().toISOString() }),
+      "utf-8",
+    )
+    const result = await scaffoldTool.execute(
+      { featureName: "test", template: "spec" },
+      ctx,
+    )
+    expect(result.title).not.toBe("Error")
+    expect(result.metadata?.featureNumber).toBe(1)
+  })
+})
+
+describe("C-7: truncated session.json on disk", () => {
+  let worktree: string
+  let ctx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    worktree = await createTempWorktree()
+    ctx = mockContext(worktree)
+    await createConstitution(worktree)
+  })
+
+  afterEach(async () => {
+    await destroyTempWorktree(worktree)
+  })
+
+  it("status does not crash when session.json is truncated", async () => {
+    await scaffoldTool.execute({ featureName: "test", template: "spec" }, ctx)
+    const sp = sessionPath(worktree)
+    await fs.writeFile(sp, '{"phase": "spec", "history": "trunc', "utf-8")
+    const result = await statusTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+  })
+})

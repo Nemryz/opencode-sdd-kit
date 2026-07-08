@@ -344,7 +344,7 @@ Every scaffold fallback text MUST include its corresponding placeholder variable
 
 ### High risk boundary tests
 
-High risk categories (C-1 through C-4 in `high-risk.test.ts`) cover cross-tool resilience: no worktree, corrupt JSON, invalid project root, and ghost spec.json without its directory. These tests exercise every tool against the same failure scenario in a single describe block, so a single change to `isValidProjectRoot` or `readSpecJson` is caught regardless of which tool calls it.
+High risk categories (C-1 through C-7 in `high-risk.test.ts`) cover cross-tool resilience: no worktree, corrupt JSON, invalid project root, ghost spec.json without its directory, concurrent scaffold calls, stale locks, and truncated session.json. These tests exercise every tool against the same failure scenario in a single describe block, so a single change to `isValidProjectRoot`, `readSpecJson`, or `readSession` is caught regardless of which tool calls it.
 
 ### Integration first, not unit first
 
