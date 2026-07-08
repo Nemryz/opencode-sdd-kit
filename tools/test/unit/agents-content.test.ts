@@ -62,4 +62,42 @@ describe("AGENTS.md completeness", () => {
   it("includes speckit-audit in Available Tools", () => {
     expect(content).toMatch(/speckit-audit/)
   })
+
+  it("Known Regression History entries reference real commit hashes", () => {
+    const krrSection = content.slice(
+      content.indexOf("## Known Regression History"),
+      content.indexOf("---", content.indexOf("## Known Regression History")),
+    )
+    const commitMatches = krrSection.matchAll(/\b([a-f0-9]{7,})\b/g)
+    const hashes = [...commitMatches].map(m => m[1])
+    expect(hashes.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("High risk C-category range matches actual high-risk.test.ts", async () => {
+    const hrPath = path.resolve(
+      import.meta.dirname,
+      "..",
+      "..",
+      "test",
+      "integration",
+      "high-risk.test.ts",
+    )
+    const hrContent = await fs.readFile(hrPath, "utf-8")
+    const categoryDescribes = hrContent.match(/describe\("C-\d+/g) || []
+    const maxC = Math.max(
+      ...categoryDescribes.map(c => parseInt(c.replace("describe(\"C-", ""), 10)),
+    )
+    const match = content.match(/C-1 through C-(\d+)/)
+    expect(match).not.toBeNull()
+    expect(parseInt(match![1], 10)).toBe(maxC)
+  })
+
+  it("each Test Patterns subsection has a heading", async () => {
+    const patternSection = content.slice(
+      content.indexOf("## Test Patterns"),
+      content.indexOf("---", content.indexOf("## Test Patterns")),
+    )
+    const subsections = patternSection.match(/### .+/g)
+    expect(subsections).not.toBeNull()
+  })
 })

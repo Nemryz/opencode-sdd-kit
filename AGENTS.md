@@ -338,9 +338,13 @@ The `createTempWorktree()` helper in `tools/test/helpers/setup.ts` pre-creates `
 
 Every new project follows the same entry path: `mkdir` → `git clone` → `opencode` → constitution → spec → plan → tasks. The `cold-start.test.ts` suite replicates this exact sequence starting from a raw `mkdtemp()` with no pre-created state. When adding new preconditions that require `.opencode/` subdirectories, add a corresponding cold-start test variant.
 
+### Fallback template placeholders
+
+Every scaffold fallback text MUST include its corresponding placeholder variable (`[PROJECT NAME]`, `[FEATURE NAME]`) so that `replace()` calls in production code produce the correct output. Files that reference the project name (`constitution`, `steering`, `domain-map`) use `[PROJECT NAME]`. Files that reference a feature (`data-model`, `research`) use `[FEATURE NAME]`. The `scaffold-fallback.test.ts` suite verifies each fallback contains the right placeholder.
+
 ### High risk boundary tests
 
-High risk categories (C-1 through C-8 in `high-risk.test.ts`) cover cross-tool resilience: no worktree, corrupt JSON, invalid project root, deleted directories mid-operation, and malformed feature references. These tests exercise every tool against the same failure scenario in a single describe block, so a single change to `isValidProjectRoot` or `readSpecJson` is caught regardless of which tool calls it.
+High risk categories (C-1 through C-4 in `high-risk.test.ts`) cover cross-tool resilience: no worktree, corrupt JSON, invalid project root, and ghost spec.json without its directory. These tests exercise every tool against the same failure scenario in a single describe block, so a single change to `isValidProjectRoot` or `readSpecJson` is caught regardless of which tool calls it.
 
 ### Integration first, not unit first
 
