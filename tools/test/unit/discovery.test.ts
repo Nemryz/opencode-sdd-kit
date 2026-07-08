@@ -91,6 +91,10 @@ describe("detectFramework", () => {
   it("returns null for unknown dependencies", async () => {
     await expect(detectFramework("", ["lodash", "axios"])).resolves.toBeNull()
   })
+
+  it("detects next before react when both present (priority order)", async () => {
+    await expect(detectFramework("", ["react", "next"])).resolves.toBe("next")
+  })
 })
 
 // ── detectConfigFiles ───────────────────────────────────

@@ -52,6 +52,14 @@ describe("parseNNN", () => {
   it("returns 0 when no dash follows the number", () => {
     expect(parseNNN("123")).toBe(0)
   })
+
+  it("extracts number when name ends with dash", () => {
+    expect(parseNNN("001-")).toBe(1)
+  })
+
+  it("extracts number with trailing non-numeric chars after dash", () => {
+    expect(parseNNN("002-foo-bar")).toBe(2)
+  })
 })
 
 // ── detectPhase ──────────────────────────────────────────────

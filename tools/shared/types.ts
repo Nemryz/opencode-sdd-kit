@@ -198,25 +198,25 @@ const PACKAGE_MANAGER_FILES: Record<string, "npm" | "yarn" | "pnpm" | "bun"> = {
   "bun.lockb": "bun",
 }
 
-const FRAMEWORK_PATTERNS: Record<string, RegExp[]> = {
-  next: [/^next$/i, /^@next\//i],
-  remix: [/^remix$/i, /^@remix-run\//i],
-  nuxt: [/^nuxt$/i, /^nuxt\//i],
-  gatsby: [/^gatsby$/i, /^gatsby-\//i],
-  astro: [/^astro$/i, /^@astrojs\//i],
-  vite: [/^vite$/i, /^@vitejs\//i],
-  express: [/^express$/i],
-  fastify: [/^fastify$/i],
-  nest: [/^@nestjs\//i],
-  hono: [/^hono$/i],
-  react: [/^react$/i, /^react-dom$/i],
-  vue: [/^vue$/i, /^vue-router$/i],
-  svelte: [/^svelte$/i, /^@sveltejs\//i],
-  solid: [/^solid-js$/i, /^@solidjs\//i],
-  angular: [/^@angular\//i],
-  electron: [/^electron$/i],
-  tauri: [/^@tauri-apps\//i],
-}
+const FRAMEWORK_PATTERNS: readonly [string, RegExp[]][] = [
+  ["next", [/^next$/i, /^@next\//i]],
+  ["remix", [/^remix$/i, /^@remix-run\//i]],
+  ["nuxt", [/^nuxt$/i, /^nuxt\//i]],
+  ["gatsby", [/^gatsby$/i, /^gatsby-\//i]],
+  ["astro", [/^astro$/i, /^@astrojs\//i]],
+  ["vite", [/^vite$/i, /^@vitejs\//i]],
+  ["express", [/^express$/i]],
+  ["fastify", [/^fastify$/i]],
+  ["nest", [/^@nestjs\//i]],
+  ["hono", [/^hono$/i]],
+  ["react", [/^react$/i, /^react-dom$/i]],
+  ["vue", [/^vue$/i, /^vue-router$/i]],
+  ["svelte", [/^svelte$/i, /^@sveltejs\//i]],
+  ["solid", [/^solid-js$/i, /^@solidjs\//i]],
+  ["angular", [/^@angular\//i]],
+  ["electron", [/^electron$/i]],
+  ["tauri", [/^@tauri-apps\//i]],
+] as const
 
 export async function detectPackageManager(root: string): Promise<"npm" | "yarn" | "pnpm" | "bun" | "unknown"> {
   for (const [fileName, pm] of Object.entries(PACKAGE_MANAGER_FILES)) {
@@ -229,7 +229,7 @@ export async function detectPackageManager(root: string): Promise<"npm" | "yarn"
 
 export async function detectFramework(root: string, dependencies: string[]): Promise<string | null> {
   if (dependencies.length === 0) return null
-  for (const [framework, patterns] of Object.entries(FRAMEWORK_PATTERNS)) {
+  for (const [framework, patterns] of FRAMEWORK_PATTERNS) {
     for (const pattern of patterns) {
       if (dependencies.some(dep => pattern.test(dep))) {
         return framework

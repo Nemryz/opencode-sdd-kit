@@ -44,6 +44,10 @@ jobs:
             README.md LICENSE .github/ \
             agents/ commands/ templates/ skills/ tools/ docs/
 
+      - name: Generate checksum
+        run: |
+          shasum -a 256 speckit-sdd-${{ github.ref_name }}.tar.gz > speckit-sdd-${{ github.ref_name }}.tar.gz.sha256
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -52,5 +56,6 @@ jobs:
           generate_release_notes: true
           files: |
             speckit-sdd-${{ github.ref_name }}.tar.gz
+            speckit-sdd-${{ github.ref_name }}.tar.gz.sha256
             install.sh
             install.ps1
