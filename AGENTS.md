@@ -330,6 +330,19 @@ The `createTempWorktree()` helper in `tools/test/helpers/setup.ts` pre-creates `
 
 **Prevention guideline:** When adding a new test helper, verify it does not silently satisfy a precondition that production code must satisfy on its own. Add at least one test that starts from a truly empty directory without the helper.
 
+### R-4: Approval auto-fix substring collision — message.includes instead of explicit artifact field
+
+**Introduced in:** `babb4ac` (audit auto-fix extension to ready-violation and approval categories)
+**Fixed in:** `4101e4d`
+
+The approval auto-fix loop used `finding.message.includes("spec"/"plan"/"tasks")` to decide which approval field to flip. Since `finding.message` includes the feature directory name (e.g., `"001-tasks-view: spec.md exists but spec approval not marked generated"`), a feature named "tasks view" would cause `includes("tasks")` to match on **all** approval findings for that feature, not just the tasks one.
+
+**Root cause:** No explicit discriminator field on the `AuditFinding` interface; the fix logic relied on substring matching against a human-readable message that contained unrelated data (the directory name).
+
+**Fix:** Added `artifact?: "spec" | "plan" | "tasks"` to `AuditFinding`, set at creation time in `auditFeature()`, and switched the fix loop from `finding.message.includes("spec")` to `finding.artifact === "spec"`.
+
+**Test coverage:** `audit.test.ts` (29 tests) includes a regression test that creates feature `001-tasks-view` with only `spec.md` and verifies `--fix` does not overcorrect `approvals.tasks.generated`.
+
 ---
 
 ## Test Patterns
@@ -374,3 +387,11 @@ Fix: guard with `if (phase !== "empty")` (validate) or `if (phase !== "none" && 
 ### Flaky parallel filesystem tests
 
 Tests using `Promise.all` with concurrent filesystem operations (directory creation, file locking) are inherently flaky across platforms. The C-5 test was changed from `Promise.all` to sequential calls after macOS CI failures. For parallel contention tests, use `Promise.allSettled` with tolerant assertions (e.g., `expect(successCount).toBeGreaterThanOrEqual(1)`) rather than strict `expect(r1.title).not.toBe("Error")`.
+
+### Explicit discriminator fields on fixable findings
+
+When a fix loop needs to distinguish between multiple sub-items (e.g., spec/plan/tasks approvals), add an explicit discriminator field to the finding interface (e.g., `artifact?: "spec" | "plan" | "tasks"`) rather than string-sniffing on the human-readable message. String matching on `finding.message.includes("spec")` is fragile because the message includes the feature directory name, which may contain the same substrings. Set the discriminator at creation time and switch on it in the fix loop.
+
+**Reproduced in:** `speckit-audit.ts` approval auto-fix (commit `4101e4d`): `finding.artifact === "spec"` replaced `finding.message.includes("spec")`.
+
+**Test pattern:** Create a feature whose name contains a phase word (e.g., "tasks view" → `001-tasks-view`), set only `spec.md`, unmark approvals, run `--fix`, and assert that only `approvals.spec.generated` flips to `true` while `approvals.tasks.generated` stays `false`.
