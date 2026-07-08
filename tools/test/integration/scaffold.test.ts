@@ -31,6 +31,19 @@ describe("scaffold constitution", () => {
     expect(content).toContain("My Project")
   })
 
+  it("loads template content from relative path (not fallback)", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "TestProj", template: "constitution" },
+      ctx,
+    )
+    expect(result.title).toBe("Constitution created")
+    const filePath = path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+    const content = await fs.readFile(filePath, "utf-8")
+    expect(content).toContain("Article I")
+    expect(content).toContain("Article II")
+    expect(content).toContain("TestProj")
+  })
+
   it("returns exists=true when constitution already exists without overwrite", async () => {
     await scaffoldTool.execute({ featureName: "P1", template: "constitution" }, ctx)
     const result = await scaffoldTool.execute(

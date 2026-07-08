@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import path from "node:path"
 import fs from "node:fs/promises"
+import { existsSync } from "node:fs"
 import os from "node:os"
 import {
   readSession,
@@ -20,7 +21,11 @@ import {
   PATHS,
 } from "./shared/types"
 
-const TEMPLATES_DIR = path.join(os.homedir(), ".config", "opencode", "templates")
+const TEMPLATES_DIR = (() => {
+  const rel = path.resolve(import.meta.dirname, "..", "templates")
+  if (existsSync(rel)) return rel
+  return path.join(os.homedir(), ".config", "opencode", "templates")
+})()
 
 function slugify(text: string, maxLen: number = 80): { slug: string; truncated: boolean } {
   const raw = text
