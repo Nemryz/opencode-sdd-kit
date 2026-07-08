@@ -146,7 +146,7 @@ export default tool({
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      if (args.template !== "constitution" && !await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const template = await readTemplate(args.template)
 
       if (args.template === "steering") {

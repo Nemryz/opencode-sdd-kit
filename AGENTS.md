@@ -291,3 +291,41 @@ Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-
 - Use `node:fs`, `node:path`, `node:os` import prefixes (`import fs from "node:fs/promises"`).
 - Avoid complex type inference patterns (reduce with spread, conditional await chains).
 - Prefer simple `for` loops over `.reduce()`, `.filter().map()` chains for type stability.
+
+---
+
+## Known Regression History
+
+### R-1: TEMPLATES_DIR using os.homedir() instead of module-relative path
+
+**Introduced in:** `5cd31f2` (scaffold robustness fix)
+**Fixed in:** `797f1af`
+
+The template directory was resolved as `os.homedir() + "/.config/opencode/templates"`, which only works when the kit is cloned at `~/.config/opencode/`. On CI, other dev machines, or any clone outside the config directory, `readTemplate()` would always return `null`.
+
+**Root cause:** The original code used a relative path (`path.resolve(__dirname, "..", "templates")`) which was incorrectly replaced with an absolute os.homedir() path.
+
+**Fix:** Resolve relative to `import.meta.dirname` first, with os.homedir() as fallback.
+
+**Test coverage:** `scaffold.test.ts` verifies real template content (Article I, Article II) loads from the correct path.
+
+### R-2: isValidProjectRoot deadlock — constitution cannot bootstrap a new project
+
+**Introduced in:** `060e469` (scaffold race condition fix)
+**Fixed in:** current
+
+`isValidProjectRoot` requires `.opencode/spec-memory/` to exist, but the only code path that creates that directory is constitution scaffolding — which also calls `isValidProjectRoot` and rejects the operation on a fresh directory.
+
+**Root cause:** The project root validation was changed from a blacklist ("deny if inside ~/.config/opencode") to a whitelist ("must have .opencode/spec-memory/"), without exempting the bootstrap command.
+
+**Fix:** Exempt `template: "constitution"` from the `isValidProjectRoot` check in `speckit-scaffold.ts`.
+
+**Test coverage:** `cold-start.test.ts` (7 tests) verifies the full bootstrap sequence from an empty directory with no pre-created spec-memory.
+
+### R-3: Test helpers must not hide production preconditions
+
+**First identified in:** R-2 investigation
+
+The `createTempWorktree()` helper in `tools/test/helpers/setup.ts` pre-creates `.opencode/spec-memory/`, which means no test exercises the real cold-start path. This hid the R-2 deadlock through 493 tests.
+
+**Prevention guideline:** When adding a new test helper, verify it does not silently satisfy a precondition that production code must satisfy on its own. Add at least one test that starts from a truly empty directory without the helper.

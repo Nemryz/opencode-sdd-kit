@@ -109,7 +109,7 @@ Skills. Adjust the SKILL.md files in the skills directory to modify agent behavi
 
 ## Test Suite
 
-The project includes 485 automated tests distributed across 23 test files, covering unit tests, integration tests, content assertions for skill files, phase gate verification for all 10 commands, concurrent lock safety, edge case handling for stale locks, status fallback with deleted directories, config tool performance with special characters, clean repair paths, discovery detection for package managers and frameworks, and full e2e lifecycle validation from spec through audit. Tests run with vitest via npm test.
+The project includes 493 automated tests distributed across 24 test files, covering unit tests, integration tests, content assertions for skill files, phase gate verification for all 10 commands, concurrent lock safety, edge case handling for stale locks, status fallback with deleted directories, config tool performance with special characters, clean repair paths, discovery detection for package managers and frameworks, full e2e lifecycle validation from spec through audit, and cold-start bootstrap from an empty directory. Tests run with vitest via npm test.
 
 ## Contributing
 
