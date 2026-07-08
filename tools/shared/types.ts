@@ -75,6 +75,17 @@ export const SpecJsonSchema = z.object({
   ready_for_implementation: z.boolean(),
 })
 
+export const SessionStateSchema = z.object({
+  command: z.string().nullable(),
+  phase: z.string(),
+  featureDir: z.string().nullable(),
+  featureNumber: z.number().nullable(),
+  featureName: z.string().nullable(),
+  nextStep: z.string().nullable(),
+  lastResult: z.string().nullable(),
+  history: z.array(z.string()),
+})
+
 // ─────────────────────────── Types ───────────────────────────
 
 export interface ApprovalState {
@@ -457,7 +468,14 @@ export function parsePhase(s: string): Phase {
 export async function readSession(root: string): Promise<SessionState> {
   try {
     const data = await fs.readFile(sessionPath(root), "utf-8")
-    return { ...DEFAULT_SESSION, ...JSON.parse(data) }
+    const parsed = JSON.parse(data)
+    const merged = { ...DEFAULT_SESSION, ...parsed }
+    const result = SessionStateSchema.safeParse(merged)
+    if (result.success) {
+      return result.data
+    }
+    console.warn(`session.json validation failed for ${root}:`, result.error)
+    return { ...DEFAULT_SESSION }
   } catch {
     return { ...DEFAULT_SESSION }
   }

@@ -24,6 +24,7 @@ import {
   techSteeringPath,
   structureSteeringPath,
   SpecJsonSchema,
+  SessionStateSchema,
 } from "../../shared/types"
 
 // ── parseNNN ────────────────────────────────────────────────
@@ -267,6 +268,37 @@ describe("DEFAULT_SESSION", () => {
     expect(DEFAULT_SESSION.nextStep).toBe("/spec <description>")
     expect(DEFAULT_SESSION.lastResult).toBeNull()
     expect(DEFAULT_SESSION.history).toEqual([])
+  })
+})
+
+// ── SessionStateSchema ─────────────────────────────────────
+
+describe("SessionStateSchema", () => {
+  it("passes for a valid full session object", () => {
+    const result = SessionStateSchema.safeParse(DEFAULT_SESSION)
+    expect(result.success).toBe(true)
+  })
+
+  it("passes for a partial session merged with defaults", () => {
+    const merged = { ...DEFAULT_SESSION, phase: "spec", featureName: "test" }
+    const result = SessionStateSchema.safeParse(merged)
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects when history is not an array", () => {
+    const result = SessionStateSchema.safeParse({
+      ...DEFAULT_SESSION,
+      history: "not-an-array",
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects when phase is not a string", () => {
+    const result = SessionStateSchema.safeParse({
+      ...DEFAULT_SESSION,
+      phase: 12345,
+    })
+    expect(result.success).toBe(false)
   })
 })
 

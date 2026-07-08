@@ -80,6 +80,15 @@ describe("readSession", () => {
     const result = await readSession(root)
     expect(result).toEqual(DEFAULT_SESSION)
   })
+
+  it("returns DEFAULT_SESSION when session.json has wrong types", async () => {
+    const root = await worktree()
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, JSON.stringify({ history: "not-an-array", phase: 12345 }), "utf-8")
+    const result = await readSession(root)
+    expect(result).toEqual(DEFAULT_SESSION)
+  })
 })
 
 // ── writeSession + readSession roundtrip ───────────────────
