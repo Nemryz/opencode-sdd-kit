@@ -171,7 +171,7 @@ export default tool({
             continue
           }
           const tmpl = await readTemplate(files[i])
-          let content = tmpl ?? `# ${labels[files[i]]} Steering\n\nSteering document for ${labels[files[i]]} context.\n`
+          let content = tmpl ?? `# ${labels[files[i]]} Steering\n\nSteering document for [PROJECT NAME]: ${labels[files[i]]} context.\n`
           content = content.replace(/\[PROJECT NAME\]/g, args.featureName)
           await fs.writeFile(filePath, content, "utf-8")
           created.push(fileName)
@@ -198,7 +198,7 @@ export default tool({
           }
         }
         await fs.mkdir(dir, { recursive: true })
-        let content = template ?? "# Project Constitution\n\nDefault articles TBD."
+        let content = template ?? "# [PROJECT NAME] Constitution\n\nDefault articles TBD."
         content = content.replace(/\[PROJECT NAME\]/g, args.featureName)
         await fs.writeFile(filePath, content, "utf-8")
         return {
@@ -222,7 +222,7 @@ export default tool({
           }
         }
         await fs.mkdir(dir, { recursive: true })
-        let content = template ?? `# ${args.template === "domain-map" ? "Domain Map" : "Domain Glossary"}\n\nOptional ${args.template} for the project.\n`
+        let content = template ?? `# ${args.template === "domain-map" ? "Domain Map" : "Domain Glossary"}\n\nOptional ${args.template} for [PROJECT NAME].\n`
         content = content.replace(/\[PROJECT NAME\]/g, args.featureName)
         await fs.writeFile(filePath, content, "utf-8")
         return {
@@ -253,7 +253,7 @@ export default tool({
             metadata: { exists: true, path: filePath },
           }
         }
-        let content = template ?? "# Data Model\n\nData model for the feature.\n"
+        let content = template ?? "# Data Model\n\nData model for [FEATURE NAME].\n"
         content = content.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
         await fs.writeFile(filePath, content, "utf-8")
         return {
@@ -286,7 +286,7 @@ export default tool({
               metadata: { exists: true, path: filePath },
             }
           }
-          let content = template ?? "# Research\n\nTechnology research notes.\n"
+          let content = template ?? "# Research\n\nTechnology research notes for [FEATURE NAME].\n"
           content = content.replace(/\[FEATURE NAME\]/g, args.featureName).replace(/NNN-feature-name/g, targetDir!)
           await fs.writeFile(filePath, content, "utf-8")
           return {

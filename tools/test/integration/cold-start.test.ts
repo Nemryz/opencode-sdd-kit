@@ -5,6 +5,8 @@ import os from "node:os"
 import scaffoldTool from "../../speckit-scaffold"
 import validateTool from "../../speckit-validate"
 import statusTool from "../../speckit-status"
+import auditTool from "../../speckit-audit"
+import cleanTool from "../../speckit-clean"
 import { mockContext } from "../helpers/setup"
 import { isValidProjectRoot, sessionPath, specsDirPath } from "../../shared/types"
 
@@ -96,5 +98,60 @@ describe("cold start from completely empty directory", () => {
     )
     expect(r.title).toBe("Error")
     expect(r.output).toContain("Not a valid project directory")
+  })
+
+  it("constitution content includes project name after bootstrap", async () => {
+    await scaffoldTool.execute(
+      { featureName: "ColdStartApp", template: "constitution" },
+      ctx,
+    )
+    const filePath = path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+    const content = await fs.readFile(filePath, "utf-8")
+    expect(content).toContain("ColdStartApp")
+    expect(content).toContain("Constitution")
+  })
+
+  it("session.json is properly written after constitution bootstrap", async () => {
+    await scaffoldTool.execute(
+      { featureName: "Test App", template: "constitution" },
+      ctx,
+    )
+    await scaffoldTool.execute(
+      { featureName: "Auth", template: "spec" },
+      ctx,
+    )
+    const session = JSON.parse(
+      await fs.readFile(sessionPath(worktree), "utf-8"),
+    )
+    expect(session.featureDir).toBe("001-auth")
+    expect(session.phase).toBe("spec")
+    expect(session.command).toBe("/spec")
+  })
+
+  it("audit works after cold start bootstrap", async () => {
+    await scaffoldTool.execute(
+      { featureName: "My Project", template: "constitution" },
+      ctx,
+    )
+    await scaffoldTool.execute(
+      { featureName: "Auth", template: "spec" },
+      ctx,
+    )
+    const result = await auditTool.execute({}, ctx)
+    expect(result.title).not.toBe("Error")
+    expect(result.metadata?.errorCount).toBe(0)
+  })
+
+  it("clean works after cold start bootstrap", async () => {
+    await scaffoldTool.execute(
+      { featureName: "My Project", template: "constitution" },
+      ctx,
+    )
+    await scaffoldTool.execute(
+      { featureName: "Auth", template: "spec" },
+      ctx,
+    )
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.metadata?.total).toBe(1)
   })
 })
