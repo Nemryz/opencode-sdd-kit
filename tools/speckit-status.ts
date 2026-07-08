@@ -66,7 +66,9 @@ export default tool({
               .join(", ")
 
         session.command = "/status"
-        session.phase = latestPhase
+        if (latestPhase !== "none" && latestPhase !== "unknown") {
+          session.phase = latestPhase
+        }
         session.featureDir = latest
         session.nextStep = PHASE_NEXT_STEP[session.phase] ?? "/spec <description>"
         session.lastResult = summary

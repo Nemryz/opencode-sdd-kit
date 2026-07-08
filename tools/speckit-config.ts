@@ -17,7 +17,7 @@ async function readConfig(root: string): Promise<SDDConfig> {
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
     if (result.success) {
-      return merged
+      return result.data
     }
     console.warn(`config.json validation failed for ${root}:`, result.error)
     return { ...DEFAULT_CONFIG }

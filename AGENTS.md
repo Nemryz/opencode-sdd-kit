@@ -80,10 +80,10 @@ Produces a report with severity ratings (HIGH / MED / LOW).
 Show workflow state. Uses `speckit-status` tool.
 Reports current phase and next step.
 
-### `/clean [--dry-run]`
+### `/clean`
 Scan all features for inconsistencies. Uses `speckit-clean` tool.
-Auto-fixes session.json when features are renamed or deleted.
-Use `--dry-run` for report only, without fixes.
+Use `--fix` to auto-repair phase mismatches and stale session references.
+Without `--fix`, runs as read-only report.
 
 ### `/audit [--fix]`
 Run a comprehensive project audit for phase consistency and artifact health. Uses `speckit-audit` tool.
@@ -320,7 +320,7 @@ The template directory was resolved as `os.homedir() + "/.config/opencode/templa
 
 **Fix:** Exempt `template: "constitution"` from the `isValidProjectRoot` check in `speckit-scaffold.ts`.
 
-**Test coverage:** `cold-start.test.ts` (7 tests) verifies the full bootstrap sequence from an empty directory with no pre-created spec-memory.
+**Test coverage:** `cold-start.test.ts` (11 tests) verifies the full bootstrap sequence from an empty directory with no pre-created spec-memory.
 
 ### R-3: Test helpers must not hide production preconditions
 

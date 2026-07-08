@@ -90,7 +90,9 @@ export default tool({
         }
 
         s.command = args.command ? "/" + args.command : "/review"
-        s.phase = phase
+        if (phase !== "empty") {
+          s.phase = phase
+        }
         s.featureDir = featureDir || s.featureDir
         s.nextStep = nextStep
         s.lastResult = parts.join(" | ")

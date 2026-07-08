@@ -62,7 +62,7 @@ const ApprovalStateSchema = z.object({
 })
 
 export const SpecJsonSchema = z.object({
-  feature_name: z.string(),
+  feature_name: z.string().min(1),
   feature_number: z.number(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -77,7 +77,7 @@ export const SpecJsonSchema = z.object({
 
 export const SessionStateSchema = z.object({
   command: z.string().nullable(),
-  phase: z.string(),
+  phase: z.enum(["init", "spec", "plan", "tasks", "ready", "impl", "complete"]),
   featureDir: z.string().nullable(),
   featureNumber: z.number().nullable(),
   featureName: z.string().nullable(),

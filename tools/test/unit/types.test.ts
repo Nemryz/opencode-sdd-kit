@@ -467,4 +467,35 @@ describe("SpecJsonSchema rejection", () => {
     const r = SpecJsonSchema.safeParse({ ...valid, extra_field: "surprise" })
     expect(r.success).toBe(true)
   })
+
+  it("rejects empty string feature_name", () => {
+    const r = SpecJsonSchema.safeParse({ ...valid, feature_name: "" })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("SessionStateSchema enum phases", () => {
+  const VALID_PHASES = ["init", "spec", "plan", "tasks", "ready", "impl", "complete"] as const
+
+  it("accepts every valid phase value", () => {
+    for (const p of VALID_PHASES) {
+      const r = SessionStateSchema.safeParse({ ...DEFAULT_SESSION, phase: p })
+      expect(r.success).toBe(true)
+    }
+  })
+
+  it("rejects invalid phase value", () => {
+    const r = SessionStateSchema.safeParse({ ...DEFAULT_SESSION, phase: "invalid-phase" })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("ConfigSchema unknown field stripping", () => {
+  it("strips extra unknown fields from safeParse output", () => {
+    const r = ConfigSchema.safeParse({ ...DEFAULT_CONFIG, extra_field: "should-be-stripped" })
+    expect(r.success).toBe(true)
+    if (r.success) {
+      expect((r.data as any).extra_field).toBeUndefined()
+    }
+  })
 })
