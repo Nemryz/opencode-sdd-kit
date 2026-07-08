@@ -4,6 +4,7 @@ import {
   isValidProjectRoot,
   SDDConfig,
   DEFAULT_CONFIG,
+  ConfigSchema,
   withLock,
 } from "./shared/types"
 import fs from "node:fs/promises"
@@ -12,7 +13,14 @@ import path from "node:path"
 async function readConfig(root: string): Promise<SDDConfig> {
   try {
     const data = await fs.readFile(configPath(root), "utf-8")
-    return { ...DEFAULT_CONFIG, ...JSON.parse(data) }
+    const parsed = JSON.parse(data)
+    const merged = { ...DEFAULT_CONFIG, ...parsed }
+    const result = ConfigSchema.safeParse(merged)
+    if (result.success) {
+      return merged
+    }
+    console.warn(`config.json validation failed for ${root}:`, result.error)
+    return { ...DEFAULT_CONFIG }
   } catch {
     return { ...DEFAULT_CONFIG }
   }

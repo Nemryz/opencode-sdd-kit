@@ -86,6 +86,13 @@ export const SessionStateSchema = z.object({
   history: z.array(z.string()),
 })
 
+export const ConfigSchema = z.object({
+  defaultTechStack: z.string().nullable(),
+  lastUsedLanguage: z.string().nullable(),
+  expressMode: z.boolean(),
+  preferences: z.record(z.string()),
+})
+
 // ─────────────────────────── Types ───────────────────────────
 
 export interface ApprovalState {

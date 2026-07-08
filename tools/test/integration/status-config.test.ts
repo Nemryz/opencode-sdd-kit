@@ -112,6 +112,12 @@ describe("status", () => {
 })
 
 describe("config", () => {
+  it("reads expressMode via key lookup", async () => {
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    const result = await configTool.execute({ key: "expressMode" }, ctx)
+    expect(result.output).toContain("true")
+  })
+
   it("returns error when no worktree", async () => {
     const result = await configTool.execute({}, { worktree: "" })
     expect(result.title).toBe("Error")
@@ -212,12 +218,6 @@ describe("config", () => {
     const raw = await fs.readFile(cfgPath, "utf-8")
     const cfg = JSON.parse(raw)
     expect(cfg.expressMode).toBe(false)
-  })
-
-  it("reads expressMode via key lookup", async () => {
-    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
-    const result = await configTool.execute({ key: "expressMode" }, ctx)
-    expect(result.output).toContain("true")
   })
 
   it("defaults expressMode to false when config file missing", async () => {

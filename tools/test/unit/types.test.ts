@@ -25,6 +25,7 @@ import {
   structureSteeringPath,
   SpecJsonSchema,
   SessionStateSchema,
+  ConfigSchema,
 } from "../../shared/types"
 
 // ── parseNNN ────────────────────────────────────────────────
@@ -309,6 +310,37 @@ describe("DEFAULT_CONFIG", () => {
     expect(DEFAULT_CONFIG.defaultTechStack).toBeNull()
     expect(DEFAULT_CONFIG.lastUsedLanguage).toBeNull()
     expect(DEFAULT_CONFIG.preferences).toEqual({})
+  })
+})
+
+// ── ConfigSchema ────────────────────────────────────────────
+
+describe("ConfigSchema", () => {
+  it("passes for a valid config object", () => {
+    const result = ConfigSchema.safeParse(DEFAULT_CONFIG)
+    expect(result.success).toBe(true)
+  })
+
+  it("passes for a partial config merged with defaults", () => {
+    const merged = { ...DEFAULT_CONFIG, defaultTechStack: "Node.js" }
+    const result = ConfigSchema.safeParse(merged)
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects when expressMode is not a boolean", () => {
+    const result = ConfigSchema.safeParse({
+      ...DEFAULT_CONFIG,
+      expressMode: "yes",
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects when preferences is not an object", () => {
+    const result = ConfigSchema.safeParse({
+      ...DEFAULT_CONFIG,
+      preferences: "none",
+    })
+    expect(result.success).toBe(false)
   })
 })
 
