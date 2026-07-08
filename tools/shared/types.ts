@@ -90,7 +90,7 @@ export const ConfigSchema = z.object({
   defaultTechStack: z.string().nullable(),
   lastUsedLanguage: z.string().nullable(),
   expressMode: z.boolean(),
-  preferences: z.record(z.string()),
+  preferences: z.record(z.string(), z.string()),
 })
 
 // ─────────────────────────── Types ───────────────────────────
