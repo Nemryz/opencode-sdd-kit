@@ -481,6 +481,10 @@ describe("parsePhase", () => {
   it("falls back to spec for empty string", () => {
     expect(parsePhase("")).toBe("spec")
   })
+
+  it("maps init to spec", () => {
+    expect(parsePhase("init")).toBe("spec")
+  })
 })
 
 // ── makeSpecJson ────────────────────────────────────────────

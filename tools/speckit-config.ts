@@ -64,7 +64,7 @@ export default tool({
           if (args.key === "expressMode") {
             innerCfg.expressMode = args.value === "true"
           } else if (args.key === "defaultTechStack") {
-            innerCfg.defaultTechStack = args.value || null
+            innerCfg.defaultTechStack = args.value ?? null
           } else {
             innerCfg.preferences[args.key] = args.value
           }

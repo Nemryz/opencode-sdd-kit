@@ -57,6 +57,7 @@ export default tool({
 
       const reports: FeatureReport[] = []
       const issues: string[] = []
+      let specJsonMismatches = 0
 
       for (const dir of entries) {
         const base = path.join(specsDir, dir)
@@ -100,6 +101,7 @@ export default tool({
           const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
           if (sj.phase !== filesPhase) {
             issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
+            specJsonMismatches++
           }
           if (sj.ready_for_implementation && filesPhase !== "ready") {
             issues.push(`${dir}: marked ready_for_implementation but files show phase "${filesPhase}"`)
@@ -203,8 +205,6 @@ export default tool({
       const okCount = reports.filter(r => r.status === "ok").length
       const incompleteCount = reports.filter(r => r.status === "incomplete").length
       const orphanCount = reports.filter(r => r.status === "orphan").length
-
-      const specJsonMismatches = issues.filter(i => i.includes("spec.json")).length
 
       return {
         title: `Clean: ${reports.length} features, ${issues.length} issues`,
