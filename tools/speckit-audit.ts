@@ -15,6 +15,8 @@ import {
   detectPhaseFromFiles,
   parsePhase,
   withLock,
+  corruptionWarnings,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 export interface AuditFinding {
@@ -205,6 +207,16 @@ async function auditProject(projectRoot: string): Promise<AuditReport> {
       file: constitutionPath(projectRoot),
     })
   }
+
+  for (const w of corruptionWarnings) {
+    findings.push({
+      severity: "warn",
+      category: "corruption",
+      message: `${w.file}: ${w.message}`,
+      file: w.file,
+    })
+  }
+  clearCorruptionWarnings()
 
   const steeringDir = steeringDirPath(projectRoot)
   const steeringExists = await exists(steeringDir)

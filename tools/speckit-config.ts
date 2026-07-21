@@ -9,23 +9,29 @@ import {
   acquireLock,
   releaseLock,
   withLock,
+  isENOENT,
   pushCorruptionWarning,
 } from "./shared/types"
 import fs from "node:fs/promises"
 import path from "node:path"
 
-async function readConfig(root: string): Promise<SDDConfig> {
+export async function readConfig(root: string): Promise<SDDConfig> {
   try {
-    const data = await fs.readFile(configPath(root), "utf-8")
+    const fp = configPath(root)
+    const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
     if (result.success) {
       return result.data
     }
-    pushCorruptionWarning(configPath(root), result.error.message)
+    pushCorruptionWarning(fp, result.error.message)
     return { ...DEFAULT_CONFIG }
-  } catch {
+  } catch (err) {
+    if (!isENOENT(err)) {
+      const msg = err instanceof Error ? err.message : String(err)
+      pushCorruptionWarning(configPath(root), msg)
+    }
     return { ...DEFAULT_CONFIG }
   }
 }

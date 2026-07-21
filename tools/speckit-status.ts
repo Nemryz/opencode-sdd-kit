@@ -14,6 +14,8 @@ import {
   specsDirPath,
   sessionPath,
   withLock,
+  corruptionWarnings,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 export default tool({
@@ -78,13 +80,17 @@ export default tool({
         await writeSession(projectRoot, session)
       })
 
+      const corruptionLines = corruptionWarnings.map(w => `[CORRUPTION] ${w.file}: ${w.message}`)
+      clearCorruptionWarnings()
+
       const dashboard = featurePhases.map(f => `${f.dir} (${f.phase})`).join("  ")
+      const corruptionPart = corruptionLines.length > 0 ? "\n" + corruptionLines.join("\n") : ""
       const line = dirs.length === 0
-        ? "No features yet. Next: /spec <description>"
-        : `${summary}  ${dashboard}`
+        ? "No features yet. Next: /spec <description>" + corruptionPart
+        : `${summary}  ${dashboard}${corruptionPart}`
 
       return {
-        title: `Status: ${dirs.length} feature(s)`,
+        title: `Status: ${dirs.length} feature(s)` + (corruptionLines.length > 0 ? " [corruption detected]" : ""),
         output: line,
         metadata: {
           phase: latestPhase,

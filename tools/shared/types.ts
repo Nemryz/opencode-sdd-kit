@@ -522,16 +522,22 @@ export function pushCorruptionWarning(fp: string, errorMsg: string): void {
 
 export async function readSession(root: string): Promise<SessionState> {
   try {
-    const data = await fs.readFile(sessionPath(root), "utf-8")
+    const fp = sessionPath(root)
+    const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_SESSION, ...parsed }
     const result = SessionStateSchema.safeParse(merged)
     if (result.success) {
       return result.data
     }
-    pushCorruptionWarning(sessionPath(root), result.error.message)
+    pushCorruptionWarning(fp, result.error.message)
     return { ...DEFAULT_SESSION }
-  } catch {
+  } catch (err) {
+    const fp = sessionPath(root)
+    if (!isENOENT(err)) {
+      const msg = err instanceof Error ? err.message : String(err)
+      pushCorruptionWarning(fp, msg)
+    }
     return { ...DEFAULT_SESSION }
   }
 }
@@ -554,15 +560,21 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
 
 export async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
   try {
-    const data = await fs.readFile(specJsonPath(featureDir), "utf-8")
+    const fp = specJsonPath(featureDir)
+    const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const result = SpecJsonSchema.safeParse(parsed)
     if (result.success) {
       return result.data
     }
-    pushCorruptionWarning(specJsonPath(featureDir), result.error.message)
+    pushCorruptionWarning(fp, result.error.message)
     return null
-  } catch {
+  } catch (err) {
+    const fp = specJsonPath(featureDir)
+    if (!isENOENT(err)) {
+      const msg = err instanceof Error ? err.message : String(err)
+      pushCorruptionWarning(fp, msg)
+    }
     return null
   }
 }
