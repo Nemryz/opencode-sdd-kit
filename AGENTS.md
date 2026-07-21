@@ -343,6 +343,32 @@ The approval auto-fix loop used `finding.message.includes("spec"/"plan"/"tasks")
 
 **Test coverage:** `audit.test.ts` (29 tests) includes a regression test that creates feature `001-tasks-view` with only `spec.md` and verifies `--fix` does not overcorrect `approvals.tasks.generated`.
 
+### R-5: SessionState.phase typed as string vs Zod z.enum allowing silent interface-schema divergence
+
+**Introduced in:** Initial (interface and schema were always manual copies)
+**Fixed in:** `7a8ccf0`
+
+`SessionState.phase` was typed as `string` in the interface but `z.enum([...])` in the Zod schema. A typo like `"imp"` would pass TypeScript but be rejected by `safeParse` on the next `readSession`, silently resetting the entire session to `DEFAULT_SESSION`. Additionally, `writeSession`, `writeSpecJson`, and `writeConfig` serialized directly without validation, so invalid data would persist to disk before any read-side validation caught it.
+
+**Root cause:** Manual duplication of type definitions across interface and Zod schema; no runtime validation gate on write paths.
+
+**Fix:** Replaced all 4 manual interfaces (`SessionState`, `SpecJson`, `SDDConfig`, `ApprovalState`) with `export type Foo = z.infer<typeof FooSchema>` so the Zod schema is the single source of truth for both compile-time types and runtime validation. Added `safeParse` gates at the start of every write function, skipping the write on validation failure.
+
+**Test coverage:** `shared-io.test.ts` verifies that writing invalid session/spec data skips the write and preserves the existing file.
+
+### R-6: Direct fs.writeFile risked file corruption on interruption
+
+**Introduced in:** Initial (all write functions used `fs.writeFile` directly)
+**Fixed in:** `d7f4ac1`
+
+`writeSession`, `writeSpecJson`, and `writeConfig` all called `fs.writeFile(fp, data)` directly. If the process was interrupted during the write (power loss, crash), the file would be left truncated or corrupt with no recovery option. For session.json in particular, corruption causes `safeParse` to return `DEFAULT_SESSION`, losing the user's working state.
+
+**Root cause:** No atomic write pattern; direct mutation of the target file.
+
+**Fix:** Added an `atomicWriteFile(fp, data)` helper that writes to `fp + ".tmp"` first, then atomically renames `.tmp` to `fp` via `fs.rename`. If the write or rename fails, the `.tmp` file is cleaned up and the original file is untouched. All three write functions now use this helper.
+
+**Test coverage:** `shared-io.test.ts` verifies `.tmp` cleanup, overwrite correctness, parent directory creation, and empty content handling.
+
 ---
 
 ## Test Patterns
@@ -383,6 +409,22 @@ All CI workflows MUST use `npm ci` instead of `npm install --ignore-scripts`. Th
 Tools that compute transient display values (e.g. `validateTool` returning `"empty"`, `statusTool` returning `"none"` or `"unknown"`) MUST NOT write those values to `s.phase` in session.json. The `SessionStateSchema.phase` enum only allows `"init"`, `"spec"`, `"plan"`, `"tasks"`, `"ready"`, `"impl"`, `"complete"`. Persisting a display value causes subsequent `readSession` to fail validation and return `DEFAULT_SESSION`, silently destroying the user's session state.
 
 Fix: guard with `if (phase !== "empty")` (validate) or `if (phase !== "none" && phase !== "unknown")` (status).
+
+### TypeScript types derived from Zod schemas via z.infer
+
+Every persisted data structure must have exactly one source of truth — the Zod schema. Use `export type Foo = z.infer<typeof FooSchema>` instead of a manually maintained interface. This eliminates the risk of silent divergence between runtime validation and compile-time types. Additionally, validate data with `schema.safeParse()` at write time (defense-in-depth), so invalid data is caught at the write site rather than silently corrupting state.
+
+**Reproduced in:** R-5 — `SessionState`, `SpecJson`, `SDDConfig`, and `ApprovalState` were all manual interfaces that could diverge from their Zod schemas.
+
+**Test pattern:** Write invalid data via `as any` bypass and assert the existing file is preserved.
+
+### Atomic file writes via tmp + rename
+
+All write functions (`writeSession`, `writeSpecJson`, `writeConfig`) MUST use the `atomicWriteFile` helper instead of direct `fs.writeFile`. The helper writes to `fp + ".tmp"` first, then atomically renames `.tmp` to `fp` via `fs.rename`. If the write or rename fails, the `.tmp` file is cleaned up and the original file is untouched. This prevents file corruption on process interruption.
+
+**Introduced in:** `d7f4ac1`.
+
+**Test pattern:** Write to a temp path, verify the `.tmp` file is removed after success. Overwrite an existing file and verify content. Verify parent directories are created automatically.
 
 ### Flaky parallel filesystem tests
 
