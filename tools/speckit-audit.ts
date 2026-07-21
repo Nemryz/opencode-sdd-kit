@@ -17,7 +17,7 @@ import {
   withLock,
 } from "./shared/types"
 
-interface AuditFinding {
+export interface AuditFinding {
   severity: "info" | "warn" | "error"
   category: string
   message: string

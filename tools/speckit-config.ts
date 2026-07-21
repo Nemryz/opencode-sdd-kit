@@ -6,6 +6,8 @@ import {
   DEFAULT_CONFIG,
   ConfigSchema,
   atomicWriteFile,
+  acquireLock,
+  releaseLock,
   withLock,
 } from "./shared/types"
 import fs from "node:fs/promises"
@@ -33,7 +35,12 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
     throw new Error(`writeConfig: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = configPath(root)
-  await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
+  const handle = await acquireLock(fp)
+  try {
+    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
+  } finally {
+    await releaseLock(handle)
+  }
 }
 
 export default tool({

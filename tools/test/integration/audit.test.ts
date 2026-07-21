@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
-import auditTool from "../../speckit-audit"
+import auditTool, { AuditFinding } from "../../speckit-audit"
 import scaffoldTool from "../../speckit-scaffold"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
 import { readSpecJson, writeSpecJson, steeringDirPath, PATHS } from "../../shared/types"
@@ -22,7 +22,7 @@ describe("audit project-level findings", () => {
   it("reports warn when constitution missing", async () => {
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const constitutionFindings = findings.filter((f: any) => f.category === "constitution")
+    const constitutionFindings = findings.filter((f: AuditFinding) => f.category === "constitution")
     expect(constitutionFindings).toHaveLength(1)
     expect(constitutionFindings[0].severity).toBe("warn")
   })
@@ -31,7 +31,7 @@ describe("audit project-level findings", () => {
     await createConstitution(worktree)
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const constitutionFindings = findings.filter((f: any) => f.category === "constitution")
+    const constitutionFindings = findings.filter((f: AuditFinding) => f.category === "constitution")
     expect(constitutionFindings).toHaveLength(1)
     expect(constitutionFindings[0].severity).toBe("info")
   })
@@ -40,8 +40,8 @@ describe("audit project-level findings", () => {
     await createConstitution(worktree)
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const steeringFindings = findings.filter((f: any) => f.category === "steering")
-    expect(steeringFindings.some((f: any) => f.message.includes("No steering directory"))).toBe(true)
+    const steeringFindings = findings.filter((f: AuditFinding) => f.category === "steering")
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("No steering directory"))).toBe(true)
   })
 
   it("reports warn when steering directory empty", async () => {
@@ -50,8 +50,8 @@ describe("audit project-level findings", () => {
     await fs.mkdir(steeringDir, { recursive: true })
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const steeringFindings = findings.filter((f: any) => f.category === "steering")
-    expect(steeringFindings.some((f: any) => f.message.includes("empty"))).toBe(true)
+    const steeringFindings = findings.filter((f: AuditFinding) => f.category === "steering")
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("empty"))).toBe(true)
   })
 
   it("reports info for full steering context", async () => {
@@ -63,7 +63,7 @@ describe("audit project-level findings", () => {
     await fs.writeFile(path.join(steeringDir, PATHS.STRUCTURE_STEERING_FILE), "structure")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const fullSteering = findings.filter((f: any) => f.category === "steering" && f.message.includes("Full steering"))
+    const fullSteering = findings.filter((f: AuditFinding) => f.category === "steering" && f.message.includes("Full steering"))
     expect(fullSteering).toHaveLength(1)
   })
 
@@ -74,11 +74,11 @@ describe("audit project-level findings", () => {
     await fs.writeFile(path.join(steeringDir, PATHS.PRODUCT_STEERING_FILE), "product")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    const steeringFindings = findings.filter((f: AuditFinding) => f.category === "steering")
     expect(steeringFindings).toHaveLength(2)
-    expect(steeringFindings.every((f: any) => f.severity === "info")).toBe(true)
-    expect(steeringFindings.some((f: any) => f.message.includes("missing tech.md"))).toBe(true)
-    expect(steeringFindings.some((f: any) => f.message.includes("missing structure.md"))).toBe(true)
+    expect(steeringFindings.every((f: AuditFinding) => f.severity === "info")).toBe(true)
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("missing tech.md"))).toBe(true)
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("missing structure.md"))).toBe(true)
   })
 
   it("reports info when only tech.md exists", async () => {
@@ -88,10 +88,10 @@ describe("audit project-level findings", () => {
     await fs.writeFile(path.join(steeringDir, PATHS.TECH_STEERING_FILE), "tech")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    const steeringFindings = findings.filter((f: AuditFinding) => f.category === "steering")
     expect(steeringFindings).toHaveLength(2)
-    expect(steeringFindings.some((f: any) => f.message.includes("missing product.md"))).toBe(true)
-    expect(steeringFindings.some((f: any) => f.message.includes("missing structure.md"))).toBe(true)
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("missing product.md"))).toBe(true)
+    expect(steeringFindings.some((f: AuditFinding) => f.message.includes("missing structure.md"))).toBe(true)
   })
 
   it("reports info when two of three steering files exist", async () => {
@@ -102,7 +102,7 @@ describe("audit project-level findings", () => {
     await fs.writeFile(path.join(steeringDir, PATHS.TECH_STEERING_FILE), "tech")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const steeringFindings = findings.filter((f: any) => f.category === "steering")
+    const steeringFindings = findings.filter((f: AuditFinding) => f.category === "steering")
     expect(steeringFindings).toHaveLength(1)
     expect(steeringFindings[0].severity).toBe("info")
     expect(steeringFindings[0].message).toContain("missing structure.md")
@@ -112,7 +112,7 @@ describe("audit project-level findings", () => {
     await createConstitution(worktree)
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "features" && f.message.includes("No feature"))).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "features" && f.message.includes("No feature"))).toBe(true)
   })
 
   it("reports info with feature count", async () => {
@@ -121,7 +121,7 @@ describe("audit project-level findings", () => {
     await scaffoldTool.execute({ featureName: "Billing", template: "spec" }, ctx)
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "features" && f.message.includes("2 feature"))).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "features" && f.message.includes("2 feature"))).toBe(true)
   })
 })
 
@@ -132,7 +132,7 @@ describe("audit per-feature findings", () => {
     await fs.writeFile(path.join(worktree, "specs", "001-auth", "spec.md"), "# Auth")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "spec-json" && f.severity === "warn")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "spec-json" && f.severity === "warn")).toBe(true)
   })
 
   it("reports error on phase mismatch: ready but files missing", async () => {
@@ -146,7 +146,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "phase-mismatch" && f.severity === "error")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "phase-mismatch" && f.severity === "error")).toBe(true)
   })
 
   it("reports error on phase mismatch: spec.json says spec but spec.md missing", async () => {
@@ -161,7 +161,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "phase-mismatch")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "phase-mismatch")).toBe(true)
   })
 
   it("reports error on phase mismatch: spec.json says plan but plan.md missing", async () => {
@@ -175,7 +175,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "phase-mismatch")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "phase-mismatch")).toBe(true)
   })
 
   it("reports error on phase mismatch: spec.json says tasks but tasks.md missing", async () => {
@@ -190,7 +190,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "phase-mismatch")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "phase-mismatch")).toBe(true)
   })
 
   it("skips phase mismatch check for impl and complete phases", async () => {
@@ -204,7 +204,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "phase-mismatch")).toBe(false)
+    expect(findings.some((f: AuditFinding) => f.category === "phase-mismatch")).toBe(false)
   })
 
   it("reports info when approval not marked generated", async () => {
@@ -218,9 +218,9 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    const approvalFindings = findings.filter((f: any) => f.category === "approval")
+    const approvalFindings = findings.filter((f: AuditFinding) => f.category === "approval")
     expect(approvalFindings.length).toBeGreaterThanOrEqual(1)
-    expect(approvalFindings.every((f: any) => f.severity === "info")).toBe(true)
+    expect(approvalFindings.every((f: AuditFinding) => f.severity === "info")).toBe(true)
   })
 
   it("reports warn when spec approved but plan not generated", async () => {
@@ -236,7 +236,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "approval-order" && f.severity === "warn")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "approval-order" && f.severity === "warn")).toBe(true)
   })
 
   it("reports error for ready_violation when ready_for_implementation set but artifacts missing", async () => {
@@ -250,7 +250,7 @@ describe("audit per-feature findings", () => {
     }
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "ready-violation" && f.severity === "error")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "ready-violation" && f.severity === "error")).toBe(true)
   })
 
   it("reports warn when spec.md contains NEEDS CLARIFICATION", async () => {
@@ -260,7 +260,7 @@ describe("audit per-feature findings", () => {
     await fs.appendFile(specPath, "\n[NEEDS CLARIFICATION] auth flow\n")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "spec-clarity" && f.severity === "warn")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "spec-clarity" && f.severity === "warn")).toBe(true)
   })
 
   it("reports info when tasks.md has no Boundary annotations", async () => {
@@ -271,7 +271,7 @@ describe("audit per-feature findings", () => {
     await fs.writeFile(tasksPath, "# Tasks\n- Task one\n- Task two")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "tasks-boundary" && f.severity === "info")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "tasks-boundary" && f.severity === "info")).toBe(true)
   })
 
   it("reports info for optional artifacts", async () => {
@@ -282,8 +282,8 @@ describe("audit per-feature findings", () => {
     await fs.writeFile(path.join(base, "research.md"), "# Research")
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "optional-artifact" && f.message.includes("research.md"))).toBe(true)
-    expect(findings.some((f: any) => f.category === "optional-artifact" && f.message.includes("contracts/"))).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "optional-artifact" && f.message.includes("research.md"))).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "optional-artifact" && f.message.includes("contracts/"))).toBe(true)
   })
 
   it("passes audit when no errors", async () => {
@@ -309,7 +309,7 @@ describe("audit auto-fix", () => {
     }
     const result = await auditTool.execute({ fix: true }, ctx)
     const findings = result.metadata?.findings ?? []
-    const fixed = findings.filter((f: any) => f.message.includes("auto-fixed"))
+    const fixed = findings.filter((f: AuditFinding) => f.message.includes("auto-fixed"))
     expect(fixed.length).toBeGreaterThanOrEqual(1)
     const fixedSj = await readSpecJson(base)
     expect(fixedSj?.phase).not.toBe("ready")
@@ -338,7 +338,7 @@ describe("audit auto-fix", () => {
     await fs.writeFile(path.join(worktree, "specs", "001-auth", "spec.md"), "# Auth")
     const result = await auditTool.execute({ fix: true }, ctx)
     const findings = result.metadata?.findings ?? []
-    expect(findings.some((f: any) => f.category === "spec-json")).toBe(true)
+    expect(findings.some((f: AuditFinding) => f.category === "spec-json")).toBe(true)
   })
 
   it("fixes ready-violation when fix=true", async () => {
@@ -350,7 +350,7 @@ describe("audit auto-fix", () => {
     await writeSpecJson(sj, base)
     const result = await auditTool.execute({ fix: true }, ctx)
     const findings = result.metadata?.findings ?? []
-    const fixed = findings.filter((f: any) => f.message.includes("auto-fixed") && f.category === "ready-violation")
+    const fixed = findings.filter((f: AuditFinding) => f.message.includes("auto-fixed") && f.category === "ready-violation")
     expect(fixed.length).toBeGreaterThanOrEqual(1)
     const fixedSj = await readSpecJson(base)
     expect(fixedSj?.ready_for_implementation).toBe(false)
@@ -365,7 +365,7 @@ describe("audit auto-fix", () => {
     await writeSpecJson(sj, base)
     const result = await auditTool.execute({ fix: true }, ctx)
     const findings = result.metadata?.findings ?? []
-    const fixed = findings.filter((f: any) => f.message.includes("auto-fixed") && f.category === "approval")
+    const fixed = findings.filter((f: AuditFinding) => f.message.includes("auto-fixed") && f.category === "approval")
     expect(fixed.length).toBeGreaterThanOrEqual(1)
     const fixedSj = await readSpecJson(base)
     expect(fixedSj?.approvals.spec.generated).toBe(true)
@@ -383,9 +383,9 @@ describe("audit auto-fix", () => {
     await writeSpecJson(sj, base)
     const result = await auditTool.execute({ fix: true }, ctx)
     const findings = result.metadata?.findings ?? []
-    const approvalFindings = findings.filter((f: any) => f.category === "approval")
-    const specFinding = approvalFindings.find((f: any) => f.artifact === "spec")
-    const tasksFinding = approvalFindings.find((f: any) => f.artifact === "tasks")
+    const approvalFindings = findings.filter((f: AuditFinding) => f.category === "approval")
+    const specFinding = approvalFindings.find((f: AuditFinding) => f.artifact === "spec")
+    const tasksFinding = approvalFindings.find((f: AuditFinding) => f.artifact === "tasks")
     expect(specFinding).toBeDefined()
     expect(tasksFinding).toBeUndefined()
     const fixedSj = await readSpecJson(base)

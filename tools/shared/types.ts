@@ -322,18 +322,26 @@ export function detectPhaseFromFiles(
   return "ready"
 }
 
-// ─────────────────────────── Error / Cast helpers ───────────────────────────
+// ─────────────────────────── Error helpers ───────────────────────────
+
+interface ErrorWithCode extends Error {
+  code: string
+}
+
+function isErrorWithCode(err: unknown): err is ErrorWithCode {
+  return err instanceof Error && typeof (err as ErrorWithCode).code === "string"
+}
 
 export function isENOENT(err: unknown): boolean {
-  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "ENOENT"
+  return isErrorWithCode(err) && err.code === "ENOENT"
 }
 
 export function isEEXIST(err: unknown): boolean {
-  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "EEXIST"
+  return isErrorWithCode(err) && err.code === "EEXIST"
 }
 
 export function isESRCH(err: unknown): boolean {
-  return err instanceof Error && "code" in err && (err as Record<string, unknown>).code === "ESRCH"
+  return isErrorWithCode(err) && err.code === "ESRCH"
 }
 
 // ─────────────────────────── File Locking ───────────────────────────
@@ -449,6 +457,7 @@ function isPhase(s: string): s is Phase {
 }
 
 export function parsePhase(s: string): Phase {
+  if (s === "init") return "spec"
   return isPhase(s) ? s : "spec"
 }
 

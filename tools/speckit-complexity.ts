@@ -32,7 +32,7 @@ export default tool({
       }
 
       const result = await assessComplexity(
-        args.taskDescription,
+        args.taskDescription ?? "",
         filesAffected,
         hasNewDeps,
         hasBoundary,
