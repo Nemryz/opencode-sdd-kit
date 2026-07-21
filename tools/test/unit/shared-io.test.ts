@@ -8,6 +8,7 @@ import {
   writeSession,
   readSpecJson,
   writeSpecJson,
+  atomicWriteFile,
   getFeatureDirs,
   getLatestFeatureDir,
   makeSpecJson,
@@ -180,6 +181,42 @@ describe("writeSpecJson + readSpecJson", () => {
     const result = await readSpecJson(root)
     expect(result).not.toBeNull()
     expect(result!.feature_name).toBe("original")
+  })
+})
+
+// ── atomicWriteFile ─────────────────────────────────────
+
+describe("atomicWriteFile", () => {
+  it("writes file and cleans up tmp", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "test.json")
+    await atomicWriteFile(fp, JSON.stringify({ a: 1 }))
+    const content = await fs.readFile(fp, "utf-8")
+    expect(JSON.parse(content)).toEqual({ a: 1 })
+    expect(await exists(fp + ".tmp")).toBe(false)
+  })
+
+  it("overwrites existing file atomically", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "test.json")
+    await atomicWriteFile(fp, JSON.stringify({ v: "old" }))
+    await atomicWriteFile(fp, JSON.stringify({ v: "new" }))
+    const content = JSON.parse(await fs.readFile(fp, "utf-8"))
+    expect(content.v).toBe("new")
+  })
+
+  it("creates parent directories", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "deep", "nested", "file.json")
+    await atomicWriteFile(fp, JSON.stringify({ ok: true }))
+    expect(JSON.parse(await fs.readFile(fp, "utf-8"))).toEqual({ ok: true })
+  })
+
+  it("handles empty content", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "empty.json")
+    await atomicWriteFile(fp, "")
+    expect(await fs.readFile(fp, "utf-8")).toBe("")
   })
 })
 

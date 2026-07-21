@@ -91,6 +91,16 @@ describe("detectPhase", () => {
     expect(r.phase).toBe("ready")
     expect(r.nextStep).toContain("/impl")
   })
+
+  it("returns init even when all files exist but constitution is missing", () => {
+    const r = detectPhase(true, true, true, false)
+    expect(r.phase).toBe("init")
+  })
+
+  it("returns spec when constitution exists but no files exist", () => {
+    const r = detectPhase(false, false, false, true)
+    expect(r.phase).toBe("spec")
+  })
 })
 
 // ── detectPhaseFromFiles ─────────────────────────────────────
@@ -383,6 +393,33 @@ describe("SessionStateSchema", () => {
       phase: 12345,
     })
     expect(result.success).toBe(false)
+  })
+
+  it("strips extra unknown fields from parsed data", () => {
+    const result = SessionStateSchema.safeParse({
+      ...DEFAULT_SESSION,
+      extraField: "should be stripped",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect((result.data as any).extraField).toBeUndefined()
+    }
+  })
+
+  it("coerces null phase to null but rejects via enum", () => {
+    const result = SessionStateSchema.safeParse({
+      ...DEFAULT_SESSION,
+      phase: null,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("accepts all valid phase values", () => {
+    const valid = ["init", "spec", "plan", "tasks", "ready", "impl", "complete"] as const
+    for (const p of valid) {
+      const result = SessionStateSchema.safeParse({ ...DEFAULT_SESSION, phase: p })
+      expect(result.success).toBe(true)
+    }
   })
 })
 

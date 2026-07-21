@@ -452,6 +452,21 @@ export function parsePhase(s: string): Phase {
   return isPhase(s) ? s : "spec"
 }
 
+// ─────────────────────────── Atomic file write ───────────────────────────
+
+export async function atomicWriteFile(fp: string, data: string): Promise<void> {
+  const tmp = fp + ".tmp"
+  const dir = path.dirname(fp)
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(tmp, data, "utf-8")
+  try {
+    await fs.rename(tmp, fp)
+  } catch {
+    await fs.rm(tmp, { force: true })
+    throw new Error(`atomicWriteFile: rename failed for ${fp}`)
+  }
+}
+
 // ─────────────────────────── Session I/O ───────────────────────────
 
 export async function readSession(root: string): Promise<SessionState> {
@@ -477,11 +492,9 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
     return
   }
   const fp = sessionPath(root)
-  const dir = path.dirname(fp)
-  await fs.mkdir(dir, { recursive: true })
   const handle = await acquireLock(fp)
   try {
-    await fs.writeFile(fp, JSON.stringify(result.data, null, 2), "utf-8")
+    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
   } finally {
     await releaseLock(handle)
   }
@@ -514,7 +527,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   const fp = specJsonPath(featureDir)
   const handle = await acquireLock(fp)
   try {
-    await fs.writeFile(fp, JSON.stringify(result.data, null, 2), "utf-8")
+    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
   } finally {
     await releaseLock(handle)
   }

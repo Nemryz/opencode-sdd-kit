@@ -5,6 +5,7 @@ import {
   SDDConfig,
   DEFAULT_CONFIG,
   ConfigSchema,
+  atomicWriteFile,
   withLock,
 } from "./shared/types"
 import fs from "node:fs/promises"
@@ -33,9 +34,7 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
     return
   }
   const fp = configPath(root)
-  const dir = path.dirname(fp)
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(fp, JSON.stringify(result.data, null, 2), "utf-8")
+  await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
 }
 
 export default tool({
