@@ -3,7 +3,7 @@
   "model": "opencode/deepseek-v4-flash-free",
   "permission": {
     "external_directory": {
-      "C:\\Users\\ignac\\.config\\opencode\\**": "allow"
+      "~/.config/opencode/**": "allow"
     }
   }
 }

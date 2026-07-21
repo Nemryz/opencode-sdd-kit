@@ -108,11 +108,11 @@ describe("writeSession + readSession", () => {
     expect(result.featureName).toBe("my feature")
   })
 
-  it("skips write and preserves existing file when session data is invalid", async () => {
+  it("throws on invalid session data and preserves existing file", async () => {
     const root = await worktree()
     const valid = { ...DEFAULT_SESSION, phase: "spec", featureName: "original" }
     await writeSession(root, valid)
-    await writeSession(root, { phase: "bogus" } as any)
+    await expect(writeSession(root, { phase: "bogus" } as any)).rejects.toThrow("writeSession: validation failed")
     const result = await readSession(root)
     expect(result.phase).toBe("spec")
     expect(result.featureName).toBe("original")
@@ -173,11 +173,11 @@ describe("writeSpecJson + readSpecJson", () => {
     expect(result!.feature_number).toBe(2)
   })
 
-  it("skips write and preserves existing spec.json when data is invalid", async () => {
+  it("throws on invalid spec data and preserves existing file", async () => {
     const root = await worktree()
     const valid = makeSpecJson("original", 1)
     await writeSpecJson(valid, root)
-    await writeSpecJson({ bad: true } as any, root)
+    await expect(writeSpecJson({ bad: true } as any, root)).rejects.toThrow("writeSpecJson: validation failed")
     const result = await readSpecJson(root)
     expect(result).not.toBeNull()
     expect(result!.feature_name).toBe("original")

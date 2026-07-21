@@ -30,8 +30,7 @@ async function readConfig(root: string): Promise<SDDConfig> {
 async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const result = ConfigSchema.safeParse(cfg)
   if (!result.success) {
-    console.warn(`writeConfig: validation failed, skipping write:`, result.error)
-    return
+    throw new Error(`writeConfig: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = configPath(root)
   await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))

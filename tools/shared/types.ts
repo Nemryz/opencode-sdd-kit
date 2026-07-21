@@ -488,8 +488,7 @@ export async function readSession(root: string): Promise<SessionState> {
 export async function writeSession(root: string, s: SessionState): Promise<void> {
   const result = SessionStateSchema.safeParse(s)
   if (!result.success) {
-    console.warn(`writeSession: validation failed, skipping write:`, result.error)
-    return
+    throw new Error(`writeSession: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = sessionPath(root)
   const handle = await acquireLock(fp)
@@ -521,8 +520,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   sj.updated_at = new Date().toISOString()
   const result = SpecJsonSchema.safeParse(sj)
   if (!result.success) {
-    console.warn(`writeSpecJson: validation failed, skipping write:`, result.error)
-    return
+    throw new Error(`writeSpecJson: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = specJsonPath(featureDir)
   const handle = await acquireLock(fp)
@@ -596,6 +594,7 @@ const COMPLEXITY_KEYWORDS: { pattern: RegExp; score: number; reason: string }[] 
   { pattern: /\bapi\b|\bendpoint\b|\bgraphql\b|\brest\b/i, score: 1, reason: "API surface changes: needs versioning consideration" },
   { pattern: /\bconcurrent\b|\bparallel\b|\basync\b|\brace condition\b/i, score: 1, reason: "concurrency work: needs careful synchronization" },
   { pattern: /\bcach(e|ing)\b|\bqueue\b|\bpub\.sub\b|\bmessaging\b/i, score: 1, reason: "infrastructure changes: messaging, caching, or queues" },
+  { pattern: /\bscrap(e|ing)\b|\brate.?limit\b|\bthrottl(e|ing)\b|\brobots\.txt\b/i, score: 1, reason: "external site scraping: fragile to markup drift and anti-bot measures" },
 ]
 
 export async function assessComplexity(
