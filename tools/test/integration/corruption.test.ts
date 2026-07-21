@@ -89,4 +89,25 @@ describe("corruption warnings", () => {
     await readSession(worktree)
     expect(corruptionWarnings.length).toBe(0)
   })
+
+  it("warns on empty session.json (SyntaxError edge case)", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    await fs.writeFile(sp, "", "utf-8")
+    clearCorruptionWarnings()
+    await readSession(worktree)
+    expect(corruptionWarnings.length).toBeGreaterThanOrEqual(1)
+    expect(corruptionWarnings[0].file).toBe(sp)
+  })
+
+  it("warns on empty spec.json (SyntaxError edge case)", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const sjp = specJsonPath(specDir)
+    await fs.writeFile(sjp, "", "utf-8")
+    clearCorruptionWarnings()
+    await readSpecJson(specDir)
+    expect(corruptionWarnings.length).toBeGreaterThanOrEqual(1)
+    expect(corruptionWarnings[0].file).toBe(sjp)
+  })
 })
