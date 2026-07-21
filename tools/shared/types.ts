@@ -463,6 +463,28 @@ export function parsePhase(s: string): Phase {
 
 // ─────────────────────────── Atomic file write ───────────────────────────
 
+const BACKUP_DIR_NAME = ".opencode/backups"
+const MAX_BACKUPS = 10
+
+export async function writeWithBackup(fp: string, data: string): Promise<void> {
+  const existing = await fs.readFile(fp, "utf-8").catch(() => null)
+  if (existing !== null) {
+    const backupDir = path.join(path.dirname(fp), BACKUP_DIR_NAME)
+    const timestamp = Date.now()
+    const bakFile = path.join(backupDir, `${path.basename(fp)}.${timestamp}.bak`)
+    await fs.mkdir(backupDir, { recursive: true })
+    await fs.writeFile(bakFile, existing, "utf-8")
+    const allBaks = await fs.readdir(backupDir).catch(() => [])
+    if (allBaks.length > MAX_BACKUPS) {
+      const sorted = allBaks.sort()
+      for (const old of sorted.slice(0, allBaks.length - MAX_BACKUPS)) {
+        await fs.rm(path.join(backupDir, old), { force: true })
+      }
+    }
+  }
+  await atomicWriteFile(fp, data)
+}
+
 export async function atomicWriteFile(fp: string, data: string): Promise<void> {
   const tmp = fp + ".tmp"
   const dir = path.dirname(fp)
@@ -476,6 +498,26 @@ export async function atomicWriteFile(fp: string, data: string): Promise<void> {
   }
 }
 
+// ─────────────────────────── Corruption Warnings ───────────────────────────
+
+export interface CorruptionWarning {
+  file: string
+  message: string
+  timestamp: number
+}
+
+export let corruptionWarnings: CorruptionWarning[] = []
+
+export function clearCorruptionWarnings(): void {
+  corruptionWarnings = []
+}
+
+export function pushCorruptionWarning(fp: string, errorMsg: string): void {
+  const warn: CorruptionWarning = { file: fp, message: errorMsg, timestamp: Date.now() }
+  corruptionWarnings.push(warn)
+  console.warn(`[SDD] Corruption detected in ${fp}: using defaults. ${errorMsg}`)
+}
+
 // ─────────────────────────── Session I/O ───────────────────────────
 
 export async function readSession(root: string): Promise<SessionState> {
@@ -487,7 +529,7 @@ export async function readSession(root: string): Promise<SessionState> {
     if (result.success) {
       return result.data
     }
-    console.warn(`session.json validation failed for ${root}:`, result.error)
+    pushCorruptionWarning(sessionPath(root), result.error.message)
     return { ...DEFAULT_SESSION }
   } catch {
     return { ...DEFAULT_SESSION }
@@ -502,7 +544,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
   const fp = sessionPath(root)
   const handle = await acquireLock(fp)
   try {
-    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
   } finally {
     await releaseLock(handle)
   }
@@ -518,7 +560,7 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
     if (result.success) {
       return result.data
     }
-    console.warn(`spec.json validation failed for ${featureDir}:`, result.error)
+    pushCorruptionWarning(specJsonPath(featureDir), result.error.message)
     return null
   } catch {
     return null
@@ -534,7 +576,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   const fp = specJsonPath(featureDir)
   const handle = await acquireLock(fp)
   try {
-    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
   } finally {
     await releaseLock(handle)
   }

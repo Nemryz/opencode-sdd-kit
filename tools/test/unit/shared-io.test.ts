@@ -8,6 +8,7 @@ import {
   writeSession,
   readSpecJson,
   writeSpecJson,
+  writeWithBackup,
   atomicWriteFile,
   getFeatureDirs,
   getLatestFeatureDir,
@@ -265,6 +266,59 @@ describe("getLatestFeatureDir", () => {
     await fs.mkdir(path.join(sd, "002-b"), { recursive: true })
     await fs.mkdir(path.join(sd, "003-c"), { recursive: true })
     expect(await getLatestFeatureDir(root)).toBe("003-c")
+  })
+})
+
+// ── writeWithBackup ─────────────────────────────────────────────────
+
+describe("writeWithBackup", () => {
+  it("creates backup before writing", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "test.json")
+    await fs.writeFile(fp, "before", "utf-8")
+    await writeWithBackup(fp, "after")
+    const content = await fs.readFile(fp, "utf-8")
+    expect(content).toBe("after")
+    const backupDir = path.join(root, ".opencode", "backups")
+    const baks = await fs.readdir(backupDir)
+    expect(baks.length).toBe(1)
+    const bakContent = await fs.readFile(path.join(backupDir, baks[0]), "utf-8")
+    expect(bakContent).toBe("before")
+  })
+
+  it("does not create backup on first write", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "new.json")
+    await writeWithBackup(fp, "first")
+    const backupDir = path.join(root, ".opencode", "backups")
+    const baks = await fs.readdir(backupDir).catch(() => [] as string[])
+    expect(baks.length).toBe(0)
+  })
+
+  it("trims old backups to MAX_BACKUPS", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "trim.json")
+    await fs.writeFile(fp, "base", "utf-8")
+    const backupDir = path.join(root, ".opencode", "backups")
+    await fs.mkdir(backupDir, { recursive: true })
+    for (let i = 0; i < 15; i++) {
+      await fs.writeFile(path.join(backupDir, `trim.json.${i}.bak`), `old-${i}`, "utf-8")
+    }
+    await writeWithBackup(fp, "new")
+    const baks = await fs.readdir(backupDir)
+    expect(baks.length).toBeLessThanOrEqual(11)
+  })
+
+  it("backup survives atomicWriteFile failure", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "survive.json")
+    await fs.writeFile(fp, "original", "utf-8")
+    await writeWithBackup(fp, "updated")
+    const backupDir = path.join(root, ".opencode", "backups")
+    const baks = await fs.readdir(backupDir)
+    expect(baks.length).toBe(1)
+    const bakContent = await fs.readFile(path.join(backupDir, baks[0]), "utf-8")
+    expect(bakContent).toBe("original")
   })
 })
 

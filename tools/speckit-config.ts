@@ -5,10 +5,11 @@ import {
   SDDConfig,
   DEFAULT_CONFIG,
   ConfigSchema,
-  atomicWriteFile,
+  writeWithBackup,
   acquireLock,
   releaseLock,
   withLock,
+  pushCorruptionWarning,
 } from "./shared/types"
 import fs from "node:fs/promises"
 import path from "node:path"
@@ -22,7 +23,7 @@ async function readConfig(root: string): Promise<SDDConfig> {
     if (result.success) {
       return result.data
     }
-    console.warn(`config.json validation failed for ${root}:`, result.error)
+    pushCorruptionWarning(configPath(root), result.error.message)
     return { ...DEFAULT_CONFIG }
   } catch {
     return { ...DEFAULT_CONFIG }
@@ -37,7 +38,7 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const fp = configPath(root)
   const handle = await acquireLock(fp)
   try {
-    await atomicWriteFile(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
   } finally {
     await releaseLock(handle)
   }
