@@ -9,6 +9,7 @@ import {
   getLatestFeatureDir,
   isValidProjectRoot,
   SpecJson,
+  SessionState,
   PHASE_NEXT_STEP,
   constitutionPath,
   specsDirPath,
@@ -36,7 +37,7 @@ export default tool({
         let planOk = false
         let tasksOk = false
         let specJson: SpecJson | null = null
-        let specJsonPhase: string | null = null
+        let specJsonPhase: SessionState["phase"] | null = null
         let mismatch = false
 
         if (featureDir) {
@@ -78,7 +79,7 @@ export default tool({
           parts.push("no features")
         }
 
-        let phase: string, nextStep: string
+        let phase: SessionState["phase"] | "empty", nextStep: string
         if (!featureDir) {
           phase = "empty"
           nextStep = constitutionExists ? "/spec <description>" : "create constitution.md first"

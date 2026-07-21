@@ -56,7 +56,7 @@ export function structureSteeringPath(root: string): string {
 
 // ─────────────────────────── Zod schemas ───────────────────────────
 
-const ApprovalStateSchema = z.object({
+export const ApprovalStateSchema = z.object({
   generated: z.boolean(),
   approved: z.boolean(),
 })
@@ -95,44 +95,15 @@ export const ConfigSchema = z.object({
 
 // ─────────────────────────── Types ───────────────────────────
 
-export interface ApprovalState {
-  generated: boolean
-  approved: boolean
-}
+export type ApprovalState = z.infer<typeof ApprovalStateSchema>
 
-export type Phase = "spec" | "plan" | "tasks" | "ready" | "impl" | "complete"
+export type Phase = z.infer<typeof SpecJsonSchema>["phase"]
 
-export interface SpecJson {
-  feature_name: string
-  feature_number: number
-  created_at: string
-  updated_at: string
-  phase: Phase
-  approvals: {
-    spec: ApprovalState
-    plan: ApprovalState
-    tasks: ApprovalState
-  }
-  ready_for_implementation: boolean
-}
+export type SpecJson = z.infer<typeof SpecJsonSchema>
 
-export interface SessionState {
-  command: string | null
-  phase: string
-  featureDir: string | null
-  featureNumber: number | null
-  featureName: string | null
-  nextStep: string | null
-  lastResult: string | null
-  history: string[]
-}
+export type SessionState = z.infer<typeof SessionStateSchema>
 
-export interface SDDConfig {
-  defaultTechStack: string | null
-  lastUsedLanguage: string | null
-  expressMode: boolean
-  preferences: Record<string, string>
-}
+export type SDDConfig = z.infer<typeof ConfigSchema>
 
 // ─────────────────────────── Constants ───────────────────────────
 
@@ -324,7 +295,7 @@ export function detectPhase(
   planOk: boolean,
   tasksOk: boolean,
   constitutionExists: boolean,
-): { phase: string; nextStep: string } {
+): { phase: "init" | "spec" | "plan" | "tasks" | "ready"; nextStep: string } {
   if (!constitutionExists) {
     return { phase: "init", nextStep: "/spec <description>" }
   }
@@ -344,7 +315,7 @@ export function detectPhaseFromFiles(
   specOk: boolean,
   planOk: boolean,
   tasksOk: boolean,
-): string {
+): "spec" | "plan" | "tasks" | "ready" {
   if (!specOk) return "spec"
   if (!planOk) return "plan"
   if (!tasksOk) return "tasks"
@@ -500,12 +471,17 @@ export async function readSession(root: string): Promise<SessionState> {
 }
 
 export async function writeSession(root: string, s: SessionState): Promise<void> {
+  const result = SessionStateSchema.safeParse(s)
+  if (!result.success) {
+    console.warn(`writeSession: validation failed, skipping write:`, result.error)
+    return
+  }
   const fp = sessionPath(root)
   const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
   const handle = await acquireLock(fp)
   try {
-    await fs.writeFile(fp, JSON.stringify(s, null, 2), "utf-8")
+    await fs.writeFile(fp, JSON.stringify(result.data, null, 2), "utf-8")
   } finally {
     await releaseLock(handle)
   }
@@ -530,10 +506,15 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
 
 export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<void> {
   sj.updated_at = new Date().toISOString()
+  const result = SpecJsonSchema.safeParse(sj)
+  if (!result.success) {
+    console.warn(`writeSpecJson: validation failed, skipping write:`, result.error)
+    return
+  }
   const fp = specJsonPath(featureDir)
   const handle = await acquireLock(fp)
   try {
-    await fs.writeFile(fp, JSON.stringify(sj, null, 2), "utf-8")
+    await fs.writeFile(fp, JSON.stringify(result.data, null, 2), "utf-8")
   } finally {
     await releaseLock(handle)
   }

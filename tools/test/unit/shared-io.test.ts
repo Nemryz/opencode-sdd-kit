@@ -106,6 +106,16 @@ describe("writeSession + readSession", () => {
     expect(result.phase).toBe("plan")
     expect(result.featureName).toBe("my feature")
   })
+
+  it("skips write and preserves existing file when session data is invalid", async () => {
+    const root = await worktree()
+    const valid = { ...DEFAULT_SESSION, phase: "spec", featureName: "original" }
+    await writeSession(root, valid)
+    await writeSession(root, { phase: "bogus" } as any)
+    const result = await readSession(root)
+    expect(result.phase).toBe("spec")
+    expect(result.featureName).toBe("original")
+  })
 })
 
 // ── readSpecJson ───────────────────────────────────────────
@@ -160,6 +170,16 @@ describe("writeSpecJson + readSpecJson", () => {
     expect(result).not.toBeNull()
     expect(result!.feature_name).toBe("roundtrip")
     expect(result!.feature_number).toBe(2)
+  })
+
+  it("skips write and preserves existing spec.json when data is invalid", async () => {
+    const root = await worktree()
+    const valid = makeSpecJson("original", 1)
+    await writeSpecJson(valid, root)
+    await writeSpecJson({ bad: true } as any, root)
+    const result = await readSpecJson(root)
+    expect(result).not.toBeNull()
+    expect(result!.feature_name).toBe("original")
   })
 })
 

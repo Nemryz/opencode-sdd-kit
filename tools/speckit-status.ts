@@ -9,6 +9,7 @@ import {
   getFeatureDirs,
   isValidProjectRoot,
   PHASE_NEXT_STEP,
+  SessionState,
   constitutionPath,
   specsDirPath,
   sessionPath,
@@ -25,10 +26,10 @@ export default tool({
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const constitutionExists = await exists(constitutionPath(projectRoot))
       const dirs = await getFeatureDirs(projectRoot)
-      const featurePhases: { dir: string; phase: string }[] = []
+      const featurePhases: { dir: string; phase: SessionState["phase"] }[] = []
       const phaseCounts: Record<string, number> = {}
       let latest: string | null = null
-      let latestPhase = "none"
+      let latestPhase: SessionState["phase"] | "none" | "unknown" = "none"
       let summary = "No features yet."
 
       await withLock(sessionPath(projectRoot), async () => {
@@ -46,7 +47,7 @@ export default tool({
             exists(path.join(base, "tasks.md")),
           ])
 
-          let phase: string
+          let phase: SessionState["phase"]
           if (sj) {
             phase = sj.phase
           } else {
