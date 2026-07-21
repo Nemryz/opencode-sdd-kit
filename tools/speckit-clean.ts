@@ -18,6 +18,7 @@ import {
   sessionPath,
   parsePhase,
   withLock,
+  SpecJsonSchema,
 } from "./shared/types"
 
 export default tool({
@@ -110,92 +111,142 @@ export default tool({
       }
 
       if (args.fix) {
+        // ── Phase 1: Collect spec.json changes ──
+        interface PendingSpecChange {
+          base: string
+          dir: string
+          sj: import("./shared/types").SpecJson
+        }
+        const specChanges: PendingSpecChange[] = []
+
         for (const dir of entries) {
           const report = reports.find(r => r.dir === dir)
           if (!report) continue
           const base = path.join(specsDir, dir)
-          await withLock(specJsonPath(base), async () => {
-            const sj = await readSpecJson(base)
-            if (sj) {
-              const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
-              let changed = false
-              if (sj.phase !== filesPhase) {
-                sj.phase = parsePhase(filesPhase)
-                changed = true
-              }
-              const correctRfi = filesPhase === "ready" && sj.approvals.tasks.approved
-              if (sj.ready_for_implementation !== correctRfi) {
-                sj.ready_for_implementation = correctRfi
-                changed = true
-              }
-              if (changed) {
-                await writeSpecJson(sj, base)
-              }
+          const sj = await readSpecJson(base)
+          if (!sj) continue
+          const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+          let changed = false
+          if (sj.phase !== filesPhase) {
+            sj.phase = parsePhase(filesPhase)
+            changed = true
+          }
+          const correctRfi = filesPhase === "ready" && sj.approvals.tasks.approved
+          if (sj.ready_for_implementation !== correctRfi) {
+            sj.ready_for_implementation = correctRfi
+            changed = true
+          }
+          if (changed) {
+            specChanges.push({ base, dir, sj })
+          }
+        }
+
+        // ── Phase 2: Validate all spec.json changes ──
+        for (const change of specChanges) {
+          const result = SpecJsonSchema.safeParse(change.sj)
+          if (!result.success) {
+            throw new Error(`/clean --fix: validation failed for ${change.dir}: ${String(result.error)}`)
+          }
+        }
+
+        // ── Phase 3: Apply all spec.json changes ──
+        for (const change of specChanges) {
+          await writeSpecJson(change.sj, change.base)
+        }
+
+        // ── Phase 4: Collect session.json changes ──
+        interface PendingSessionChange {
+          field: string
+          apply: (s: import("./shared/types").SessionState) => void
+        }
+        const sessionChanges: PendingSessionChange[] = []
+
+        const s = await readSession(projectRoot)
+        for (const dir of entries) {
+          const report = reports.find(r => r.dir === dir)
+          if (!report) continue
+          const base = path.join(specsDir, dir)
+          const sj = await readSpecJson(base)
+          if (sj) {
+            const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+            if (sj.phase !== filesPhase) {
+              sessionChanges.push({
+                field: `${dir}: phase → ${filesPhase}`,
+                apply: () => {},
+              })
             }
+          }
+        }
+
+        if (s.featureDir) {
+          const stillExists = reports.some(r => r.dir === s.featureDir)
+          if (!stillExists) {
+            const newDir = reports.length > 0 ? reports[reports.length - 1].dir : null
+            sessionChanges.push({
+              field: "featureDir",
+              apply: (sess) => {
+                sess.featureDir = newDir
+                sess.featureNumber = newDir ? parseNNN(newDir) : null
+                sess.featureName = null
+              },
+            })
+          }
+        } else if (reports.length > 0) {
+          const newDir = reports[reports.length - 1].dir
+          sessionChanges.push({
+            field: "featureDir (assigned)",
+            apply: (sess) => {
+              sess.featureDir = newDir
+              sess.featureNumber = parseNNN(newDir)
+            },
           })
         }
 
-        const session = await withLock(sessionPath(projectRoot), async () => {
-          const s = await readSession(projectRoot)
-          const fixedFields: string[] = []
-          for (const dir of entries) {
-            const report = reports.find(r => r.dir === dir)
-            if (!report) continue
-            const base = path.join(specsDir, dir)
-            const sj = await readSpecJson(base)
-            if (sj) {
-              const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
-              if (sj.phase !== filesPhase) {
-                fixedFields.push(`${dir}: phase → ${filesPhase}`)
-              }
+        if (s.featureNumber != null && s.featureDir) {
+          const expected = parseNNN(s.featureDir)
+          if (s.featureNumber !== expected) {
+            sessionChanges.push({
+              field: "featureNumber",
+              apply: (sess) => { sess.featureNumber = expected },
+            })
+          }
+        }
+
+        if (s.featureDir) {
+          const report = reports.find(r => r.dir === s.featureDir)
+          if (report) {
+            const constitutionExists = await exists(constitutionPath(projectRoot))
+            const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
+              report.spec, report.plan, report.tasks, constitutionExists,
+            )
+            if (s.phase !== filesPhase) {
+              sessionChanges.push({
+                field: "session phase",
+                apply: (sess) => {
+                  sess.phase = filesPhase
+                  sess.nextStep = expectedNext
+                },
+              })
             }
           }
+        }
 
-          if (s.featureDir) {
-            const stillExists = reports.some(r => r.dir === s.featureDir)
-            if (!stillExists) {
-              s.featureDir = reports.length > 0 ? reports[reports.length - 1].dir : null
-              s.featureNumber = s.featureDir ? parseNNN(s.featureDir) : null
-              s.featureName = null
-              fixedFields.push("featureDir")
+        // ── Phase 5: Apply session.json changes ──
+        if (sessionChanges.length > 0) {
+          s.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
+          s.history.push("/clean")
+          if (s.history.length > 20) s.history = s.history.slice(-20)
+          await withLock(sessionPath(projectRoot), async () => {
+            const liveS = await readSession(projectRoot)
+            for (const change of sessionChanges) {
+              change.apply(liveS)
             }
-          } else if (reports.length > 0) {
-            s.featureDir = reports[reports.length - 1].dir
-            s.featureNumber = parseNNN(s.featureDir)
-            fixedFields.push("featureDir (assigned)")
-          }
-
-          if (s.featureNumber != null && s.featureDir) {
-            const expected = parseNNN(s.featureDir)
-            if (s.featureNumber !== expected) {
-              s.featureNumber = expected
-              fixedFields.push("featureNumber")
-            }
-          }
-
-          if (s.featureDir) {
-            const report = reports.find(r => r.dir === s.featureDir)
-            if (report) {
-              const constitutionExists = await exists(constitutionPath(projectRoot))
-              const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
-                report.spec, report.plan, report.tasks, constitutionExists,
-              )
-              if (s.phase !== filesPhase) {
-                s.phase = filesPhase
-                s.nextStep = expectedNext
-                fixedFields.push("session phase")
-              }
-            }
-          }
-
-          if (fixedFields.length > 0) {
-            s.lastResult = "repaired: " + fixedFields.join(", ")
-            s.history.push("/clean")
-            if (s.history.length > 20) s.history = s.history.slice(-20)
-            await writeSession(projectRoot, s)
-          }
-          return s
-        })
+            liveS.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
+            liveS.history.push("/clean")
+            if (liveS.history.length > 20) liveS.history = liveS.history.slice(-20)
+            await writeSession(projectRoot, liveS)
+          })
+        }
       }
 
       const summary = issues.length === 0
