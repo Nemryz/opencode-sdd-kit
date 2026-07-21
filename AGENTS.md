@@ -437,3 +437,93 @@ When a fix loop needs to distinguish between multiple sub-items (e.g., spec/plan
 **Reproduced in:** `speckit-audit.ts` approval auto-fix (commit `4101e4d`): `finding.artifact === "spec"` replaced `finding.message.includes("spec")`.
 
 **Test pattern:** Create a feature whose name contains a phase word (e.g., "tasks view" → `001-tasks-view`), set only `spec.md`, unmark approvals, run `--fix`, and assert that only `approvals.spec.generated` flips to `true` while `approvals.tasks.generated` stays `false`.
+
+### R-7: Write functions throw on validation failure instead of silent skip
+
+**Introduced in:** `96e8932`
+
+`writeSession`, `writeSpecJson`, and `writeConfig` previously returned `void` on validation failure, silently skipping the write. This caused caller desync: the caller assumed data was persisted but it was not. All three functions now throw on `safeParse` failure, ensuring the caller knows the write was skipped.
+
+Additionally, `opencode.jsonc` was sanitized — `C:\Users\ignac\` personal paths replaced with `~/.config/opencode/**` — and scraping/rate-limit patterns were added to `COMPLEXITY_KEYWORDS`.
+
+**Test pattern:** Pass invalid data to each write function (e.g., `{ phase: "bogus" }` to `writeSession`) and assert that it throws with "validation failed" in the message.
+
+### R-8: writeConfig lock, parsePhase init guard, isErrorWithCode type guard, nullish coalescing, AuditFinding type
+
+**Introduced in:** `5bcf5f7`
+
+Six hardening items in one round:
+
+- **P-HIGH-1**: `writeConfig` acquired its own `acquireLock`/`releaseLock` internally (matching `writeSession` and `writeSpecJson`), removing the dependency on the caller's `withLock`.
+- **P-MED-1**: `parsePhase("init")` now explicitly returns `"spec"` instead of silently falling through the `isPhase` check.
+- **P-MED-2**: Three `isENOENT`/`isEEXIST`/`isESRCH` helpers replaced `(err as Record<string, unknown>).code` with a shared `isErrorWithCode` type guard, isolating the unsafe cast inside a single narrow function.
+- **P-LOW-1**: `||` → `??` in `speckit-validate.ts` line 33.
+- **P-LOW-2**: `args.taskDescription` now guarded with `?? ""` in `speckit-complexity.ts`.
+- **P-LOW-3**: All 37 `(f: any)` in `audit.test.ts` replaced with `(f: AuditFinding)` after exporting the interface from `speckit-audit.ts`.
+
+**Test pattern:** Each item has a focused regression test: `parsePhase("init")` returns `"spec"`, `isErrorWithCode` rejects non-Error values, `AuditFinding` is a typed interface importable from the audit tool.
+
+### R-9: Remove string sniffing, `||` to `??` consistency
+
+**Introduced in:** `c1deb64`
+
+- `specJsonMismatches` in `speckit-clean.ts` changed from `issues.filter(i => i.includes("spec.json")).length` (string sniffing) to a direct counter incremented at the source during the loop.
+- `||` → `??` in `speckit-config.ts` line 67 for consistency with line 61 (`args.defaultTechStack ?? null`).
+- Added `parsePhase("init")` test.
+
+### R-10: Resilience Layer — Backups, Transactions, and Corruption Warnings
+
+**Introduced in:** `15018a1`, `1f30c7e`, `15e90c6`, `dd8374f`
+
+Three interconnected features forming a resilience layer for state files:
+
+#### R-10a: `writeWithBackup` — automatic pre-write backups
+
+All write functions (`writeSession`, `writeSpecJson`, `writeConfig`) now use `writeWithBackup` instead of direct `atomicWriteFile`. Before writing, the helper reads the existing file content and saves it as `<file>.<timestamp>.bak` in `<project>/.opencode/backups/`. Old backups are trimmed to a maximum of 10. If the file does not exist yet, no backup is created.
+
+**Rationale:** Any bug or incorrect `--fix` that corrupts state is recoverable by restoring the most recent `.bak` file.
+
+**Test pattern:** Write to an existing file, verify `.bak` is created with the previous content. Write 15 times in sequence, verify only 10 backups remain. First write to a new file creates no backup.
+
+#### R-10b: Two-phase commit in `/clean --fix`
+
+The fix operation now follows a strict collect → validate → apply pattern:
+
+1. **Collect**: Iterate all features, read spec.json, compute the correct phase and `ready_for_implementation` flag, store pending changes in memory.
+2. **Validate**: Run `SpecJsonSchema.safeParse` on every pending spec.json. If ANY fails, throw before writing anything.
+3. **Apply**: Write all validated spec.json files using `writeWithBackup`.
+
+The session.json fix follows the same pattern: collect changes as callbacks, then apply atomically under a single lock.
+
+**Rationale:** Prevents partial repairs. Before R-10b, if `/clean --fix --fix` was interrupted mid-loop, some features were repaired and others were not.
+
+#### R-10c: `corruptionWarnings` global warning channel
+
+A global `CorruptionWarning[]` array accumulates warnings whenever a `read*` function detects corruption:
+
+- `readSession`: catches `JSON.parse` errors and `safeParse` failures, pushes warning (skips ENOENT — file not found is normal).
+- `readSpecJson`: same pattern.
+- `readConfig` (in `speckit-config.ts`): same pattern.
+
+The `pushCorruptionWarning` helper also writes to `console.warn` with a `[SDD]` prefix. Tools that consume warnings:
+- `/audit`: emits findings with `category: "corruption"`, `severity: "warn"`.
+- `/status`: appends `[CORRUPTION]` lines to output and adds `[corruption detected]` to the title.
+
+After consumption, each tool calls `clearCorruptionWarnings()`.
+
+**Rationale:** Previously, corrupt state files were silently replaced with defaults. Users had no indication that their session or spec.json was corrupted.
+
+**Test pattern:** Write invalid JSON to each state file, call the corresponding `read*` function, verify the warning array has an entry. Run `/audit` with corruption present, verify a `corruption` category finding exists. Run `/status` with corruption, verify output includes `[CORRUPTION]`. Delete the state file (ENOENT case), verify no warning is emitted.
+
+#### R-10d: Integration tests for corruption edge cases
+
+The `corruption.test.ts` file covers:
+- Corrupt session.json (invalid JSON) → warning emitted, appears in audit
+- Corrupt spec.json (invalid JSON) → warning emitted
+- Corrupt config.json (invalid JSON) → warning emitted
+- Empty session.json (SyntaxError from `JSON.parse("")`) → warning emitted
+- Empty spec.json (SyntaxError) → warning emitted
+- Valid files → no warnings
+- `clearCorruptionWarnings()` resets the array
+- Manual `pushCorruptionWarning` adds to the array
+
