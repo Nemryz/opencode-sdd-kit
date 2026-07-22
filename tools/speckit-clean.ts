@@ -19,6 +19,8 @@ import {
   parsePhase,
   withLock,
   SpecJsonSchema,
+  corruptionWarnings,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 export default tool({
@@ -248,6 +250,11 @@ export default tool({
           })
         }
       }
+
+      for (const w of corruptionWarnings) {
+        issues.push(`[corruption] ${w.file}: ${w.message}`)
+      }
+      clearCorruptionWarnings()
 
       const summary = issues.length === 0
         ? "All features consistent"
