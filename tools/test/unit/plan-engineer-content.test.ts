@@ -26,8 +26,19 @@ describe("speckit-plan-engineer SKILL.md content", () => {
     expect(content).toMatch(/Confirmation/)
   })
 
-  it("mentions express mode skip in proposal section", () => {
-    expect(content).toMatch(/Express Mode/i)
+  it("express mode guard appears before generate plan step", () => {
+    const emIndex = content.indexOf("Express Mode")
+    const generateIndex = content.indexOf("Step 4: Generate Plan")
+    expect(emIndex).not.toBe(-1)
+    expect(emIndex).toBeLessThan(generateIndex)
+  })
+
+  it("express mode references config.json expressMode field", () => {
+    expect(content).toMatch(/expressMode.*true|expressMode|config\.json.*express/i)
+  })
+
+  it("express mode describes skip and proceed behavior", () => {
+    expect(content).toMatch(/skip this step and proceed directly/i)
   })
 
   it("waits for user confirmation before proceeding", () => {

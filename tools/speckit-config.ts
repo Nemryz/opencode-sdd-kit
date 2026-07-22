@@ -91,6 +91,13 @@ export default tool({
             metadata: cfg,
           }
         }
+        if (args.key === "autoVersioning") {
+          return {
+            title: "Configuration read",
+            output: `autoVersioning: ${cfg.autoVersioning}`,
+            metadata: cfg,
+          }
+        }
         if (args.key === "defaultTechStack") {
           return {
             title: "Configuration read",

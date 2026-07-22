@@ -37,8 +37,21 @@ describe("speckit-implementer SKILL.md content", () => {
     expect(content).toMatch(/Confirmation/)
   })
 
-  it("mentions express mode skip in conversational proposal section", () => {
-    expect(content).toMatch(/express.*mode.*skip|skip.*proposal|Express Mode/i)
+  it("express mode appears in load context step config section", () => {
+    const step1Idx = content.indexOf("Step 1: Load Context")
+    const contextAfter = content.slice(step1Idx, content.indexOf("### Step 2:", step1Idx))
+    expect(contextAfter).toMatch(/expressMode/i)
+  })
+
+  it("express mode guard appears before execute tasks step", () => {
+    const emIndex = content.indexOf("Express Mode")
+    const executeIndex = content.indexOf("Step 4: Execute Tasks")
+    expect(emIndex).not.toBe(-1)
+    expect(emIndex).toBeLessThan(executeIndex)
+  })
+
+  it("express mode describes skip and proceed to execution behavior", () => {
+    expect(content).toMatch(/skip this step and proceed directly to execution/i)
   })
 
   it("waits for user confirmation before proceeding", () => {
