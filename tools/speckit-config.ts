@@ -21,7 +21,7 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const fp = configPath(root)
   const handle = await acquireLock(fp)
   try {
-    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
   } finally {
     await releaseLock(handle)
   }

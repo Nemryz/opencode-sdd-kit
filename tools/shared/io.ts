@@ -144,13 +144,13 @@ export async function withLock<T>(filePath: string, fn: () => Promise<T>, option
 
 // ─────────────────────────── Atomic file write ───────────────────────────
 
-const BACKUP_DIR_NAME = ".opencode/backups"
+const BACKUP_DIR_NAME = "backups"
 const MAX_BACKUPS = 10
 
-export async function writeWithBackup(fp: string, data: string): Promise<void> {
+export async function writeWithBackup(fp: string, data: string, root: string): Promise<void> {
   const existing = await fs.readFile(fp, "utf-8").catch(() => null)
   if (existing !== null) {
-    const backupDir = path.join(path.dirname(fp), BACKUP_DIR_NAME)
+    const backupDir = path.join(root, ".opencode", BACKUP_DIR_NAME)
     const timestamp = Date.now()
     const bakFile = path.join(backupDir, `${path.basename(fp)}.${timestamp}.bak`)
     await fs.mkdir(backupDir, { recursive: true })
@@ -231,7 +231,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
   const fp = sessionPath(root)
   const handle = await acquireLock(fp)
   try {
-    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
   } finally {
     await releaseLock(handle)
   }
@@ -267,14 +267,14 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   if (!result.success) {
     throw new Error(`writeSpecJson: validation failed, data not written: ${String(result.error)}`)
   }
+  const root = path.dirname(path.dirname(featureDir))
   const fp = specJsonPath(featureDir)
   const handle = await acquireLock(fp)
   try {
-    await writeWithBackup(fp, JSON.stringify(result.data, null, 2))
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
   } finally {
     await releaseLock(handle)
   }
-  const root = path.dirname(path.dirname(featureDir))
   await tryAutoCommit(fp, root)
 }
 
