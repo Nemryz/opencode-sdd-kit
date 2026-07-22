@@ -102,7 +102,8 @@ export default tool({
 
         if (sj) {
           const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
-          if (sj.phase !== filesPhase) {
+          const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
+          if (sj.phase !== filesPhase && !isTasksNotApproved) {
             issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
             specJsonMismatches++
           }
@@ -128,8 +129,9 @@ export default tool({
           const sj = await readSpecJson(base)
           if (!sj) continue
           const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
+          const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
           let changed = false
-          if (sj.phase !== filesPhase) {
+          if (sj.phase !== filesPhase && !isTasksNotApproved) {
             sj.phase = parsePhase(filesPhase)
             changed = true
           }

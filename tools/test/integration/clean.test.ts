@@ -41,13 +41,14 @@ describe("clean with no features", () => {
 })
 
 describe("clean feature status detection", () => {
-  it("reports ok for complete feature (spec.json phase mismatch is separate)", async () => {
+  it("reports ok for complete feature with tasks not yet approved", async () => {
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
     const result = await cleanTool.execute({}, ctx)
     expect(result.metadata?.ok).toBe(1)
-    expect(result.metadata?.issues.some((i: string) => i.includes("spec.json"))).toBe(true)
+    const specJsonIssues = (result.metadata?.issues as string[] ?? []).filter((i: string) => i.includes("spec.json"))
+    expect(specJsonIssues).toHaveLength(0)
   })
 
   it("reports incomplete for spec-only feature", async () => {
@@ -113,6 +114,20 @@ describe("clean spec.json mismatch detection", () => {
     const issues: string[] = result.metadata?.issues ?? []
     const specJsonIssues = issues.filter((i: string) => i.includes("spec.json"))
     expect(specJsonIssues).toHaveLength(0)
+  })
+
+  it("detects genuine mismatch when phase is wrong for the files present", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "plan"
+      await writeSpecJson(sj, base)
+    }
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.metadata?.issues.some((i: string) => i.includes("spec.json"))).toBe(true)
   })
 })
 

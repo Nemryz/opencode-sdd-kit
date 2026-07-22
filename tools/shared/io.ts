@@ -317,8 +317,20 @@ export async function tryAutoCommit(fp: string, root: string): Promise<void> {
     const msg = AUTO_COMMIT_MESSAGES[basename] || `auto: update ${basename}`
     const { execSync } = await import("node:child_process")
     execSync(`git add "${fp}"`, { cwd: root, stdio: "ignore" })
+    const diff = execSync(`git diff --cached -- "${fp}"`, { cwd: root, encoding: "utf-8" })
+    if (onlyLastUsedLanguageChanged(diff)) {
+      execSync(`git checkout HEAD -- "${fp}"`, { cwd: root, stdio: "ignore" })
+      return
+    }
     execSync(`git commit -m "${msg}"`, { cwd: root, stdio: "ignore" })
   } catch {
     // fail silently
   }
+}
+
+function onlyLastUsedLanguageChanged(diff: string): boolean {
+  if (!diff) return false
+  const lines = diff.split("\n").filter(l => l.startsWith("+") || l.startsWith("-"))
+  if (lines.length === 0) return false
+  return lines.every(l => l.includes("lastUsedLanguage"))
 }
