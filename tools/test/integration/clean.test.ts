@@ -4,7 +4,7 @@ import path from "node:path"
 import cleanTool from "../../speckit-clean"
 import scaffoldTool from "../../speckit-scaffold"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
-import { readSpecJson, writeSpecJson, readSession, writeSession, specsDirPath } from "../../shared/types"
+import { readSpecJson, writeSpecJson, readSession, writeSession, specsDirPath, pushCorruptionWarning, corruptionWarnings, clearCorruptionWarnings } from "../../shared/types"
 
 let worktree: string
 let ctx: ReturnType<typeof mockContext>
@@ -296,5 +296,15 @@ describe("clean auto-fix", () => {
     expect(session2.nextStep).toBe("/impl or /review")
     const fixedSj = await readSpecJson(base)
     expect(fixedSj.phase).toBe("ready")
+  })
+
+  it("includes corruption warnings in issues output", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    clearCorruptionWarnings()
+    pushCorruptionWarning(path.join(worktree, "test.json"), "test corruption")
+    const result = await cleanTool.execute({}, ctx)
+    expect(result.metadata?.issues.some((i: string) => i.includes("[corruption]"))).toBe(true)
+    expect(result.metadata?.issues.some((i: string) => i.includes("test.json"))).toBe(true)
+    expect(corruptionWarnings.length).toBe(0)
   })
 })
