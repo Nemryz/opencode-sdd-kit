@@ -154,6 +154,16 @@ El orden de ejecucion actualizado es:
 5. Fase E (completo)
 6. Fase 3.2 (pendiente)
 
+## Fase G: Auto-versioning y self-heal (COMPLETO)
+
+Mejoras de robustez implementadas en julio 2026:
+- G-1: Fase A — || → ?? en status.ts y validate.ts, .opencode/backups/ en .gitignore, tests isErrorWithCode.
+- G-2: Fase B — types.ts dividido en schemas.ts + io.ts + types.ts.
+- G-3: Fase C — tryAutoCommit + autoVersioning en ConfigSchema, git add/commit automatico.
+- G-4: Fase F — specs/ removido de .gitignore, versionado completo de spec.json.
+- G-5: Fase E — tests unitarios para config execute branching, readTemplate, safeToWrite.
+- G-6: Fase D — herramienta /selfheal con health scan, categorizacion y fix loop.
+
 ## Resumen de metricas
 
 Fase A: 6 tareas (completo).
@@ -163,6 +173,7 @@ Fase D: 1 tarea (completo).
 Fase E: 1 tarea (completo).
 Fase F: 7 tareas (completo).
 Fase 3.2: 5 subfases (completo).
+Fase G: 6 subfases (completo).
 
-Total: 31 tareas (completo).
-Suite actual: 435+ tests en 20 archivos.
+Total: 37 tareas (completo).
+Suite actual: 608 tests en 27 archivos.

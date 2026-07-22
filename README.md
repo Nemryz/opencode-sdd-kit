@@ -34,7 +34,7 @@ Status and Cleanup. Workflow state tracking with automatic session repair when d
   docs/                  Reference documentation and roadmap
 ```
 
-Seven tools live in the tools directory, each one a self-contained TypeScript file registered as an opencode plugin: speckit-scaffold, speckit-validate, speckit-audit, speckit-clean, speckit-status, speckit-config, and speckit-complexity. Six skill files in the skills directory guide the agents through each phase. Shared rules for design principles, spec writing, and task generation reside in skills/rules/.
+Eight tools live in the tools directory, each one a self-contained TypeScript file registered as an opencode plugin: speckit-scaffold, speckit-validate, speckit-audit, speckit-clean, speckit-status, speckit-config, speckit-complexity, and speckit-selfheal. Six skill files in the skills directory guide the agents through each phase. Shared rules for design principles, spec writing, and task generation reside in skills/rules/.
 
 ## Installation
 
