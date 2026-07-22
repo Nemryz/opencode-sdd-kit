@@ -3,38 +3,15 @@ import {
   configPath,
   isValidProjectRoot,
   SDDConfig,
-  DEFAULT_CONFIG,
   ConfigSchema,
   writeWithBackup,
   acquireLock,
   releaseLock,
   withLock,
-  isENOENT,
   pushCorruptionWarning,
+  readConfig,
+  tryAutoCommit,
 } from "./shared/types"
-import fs from "node:fs/promises"
-import path from "node:path"
-
-export async function readConfig(root: string): Promise<SDDConfig> {
-  try {
-    const fp = configPath(root)
-    const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
-    const merged = { ...DEFAULT_CONFIG, ...parsed }
-    const result = ConfigSchema.safeParse(merged)
-    if (result.success) {
-      return result.data
-    }
-    pushCorruptionWarning(fp, result.error.message)
-    return { ...DEFAULT_CONFIG }
-  } catch (err) {
-    if (!isENOENT(err)) {
-      const msg = err instanceof Error ? err.message : String(err)
-      pushCorruptionWarning(configPath(root), msg)
-    }
-    return { ...DEFAULT_CONFIG }
-  }
-}
 
 async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   const result = ConfigSchema.safeParse(cfg)
@@ -48,6 +25,7 @@ async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
   } finally {
     await releaseLock(handle)
   }
+  await tryAutoCommit(fp, root)
 }
 
 export default tool({
@@ -70,6 +48,8 @@ export default tool({
         } else if (args.key && args.value !== undefined) {
           if (args.key === "expressMode") {
             innerCfg.expressMode = args.value === "true"
+          } else if (args.key === "autoVersioning") {
+            innerCfg.autoVersioning = args.value === "true"
           } else if (args.key === "defaultTechStack") {
             innerCfg.defaultTechStack = args.value ?? null
           } else {
@@ -102,6 +82,7 @@ export default tool({
           defaultTechStack: cfg.defaultTechStack,
           lastUsedLanguage: cfg.lastUsedLanguage,
           expressMode: String(cfg.expressMode),
+          autoVersioning: String(cfg.autoVersioning),
         }
         if (args.key === "expressMode") {
           return {
@@ -129,6 +110,7 @@ export default tool({
         `defaultTechStack: ${cfg.defaultTechStack ?? "(not set)"}`,
         `lastUsedLanguage: ${cfg.lastUsedLanguage ?? "(not set)"}`,
         `expressMode: ${cfg.expressMode}`,
+        `autoVersioning: ${cfg.autoVersioning}`,
         `preferences: ${Object.keys(cfg.preferences).length} key(s)`,
       ]
 

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import auditTool from "../../speckit-audit"
-import { readConfig } from "../../speckit-config"
 import {
+  readConfig,
   readSession,
   readSpecJson,
   sessionPath,

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import configTool from "../../speckit-config"
+import { writeWithBackup, configPath } from "../../shared/types"
 import { mockContext, createTempWorktree, destroyTempWorktree } from "../helpers/setup"
 
 let worktree: string
@@ -120,5 +121,67 @@ describe("config execute branching", () => {
     const result = await configTool.execute({ defaultTechStack: "FastAPI" }, ctx)
     expect(result.metadata).toBeDefined()
     expect(result.metadata!.defaultTechStack).toBe("FastAPI")
+  })
+
+  // ── Item 1: autoVersioning CLI ─────────────────────────────
+
+  it("sets autoVersioning to true via key=value", async () => {
+    const result = await configTool.execute({ key: "autoVersioning", value: "true" }, ctx)
+    expect(result.title).toBe("Configuration updated")
+    expect(result.output).toContain("autoVersioning: true")
+  })
+
+  it("sets autoVersioning to false via key=value", async () => {
+    await configTool.execute({ key: "autoVersioning", value: "true" }, ctx)
+    const result = await configTool.execute({ key: "autoVersioning", value: "false" }, ctx)
+    expect(result.title).toBe("Configuration updated")
+    expect(result.output).toContain("autoVersioning: false")
+  })
+
+  it("reads autoVersioning via key lookup", async () => {
+    await configTool.execute({ key: "autoVersioning", value: "true" }, ctx)
+    const result = await configTool.execute({ key: "autoVersioning" }, ctx)
+    expect(result.title).toBe("Configuration read")
+    expect(result.output).toContain("autoVersioning: true")
+  })
+
+  it("shows autoVersioning in default config display", async () => {
+    await configTool.execute({ key: "autoVersioning", value: "true" }, ctx)
+    const result = await configTool.execute({}, ctx)
+    expect(result.output).toContain("autoVersioning: true")
+  })
+
+  it("defaults autoVersioning to false when config file missing", async () => {
+    const result = await configTool.execute({}, ctx)
+    expect(result.metadata?.autoVersioning).toBe(false)
+  })
+
+  // ── Item 2: writeConfig triggers tryAutoCommit ─────────────
+
+  it("auto-commits config.json when autoVersioning is enabled", async () => {
+    const { execSync } = await import("node:child_process")
+    execSync("git init", { cwd: worktree, stdio: "ignore" })
+    execSync('git config user.email "test@test.com"', { cwd: worktree, stdio: "ignore" })
+    execSync('git config user.name "Test"', { cwd: worktree, stdio: "ignore" })
+    const fp = configPath(worktree)
+    await writeWithBackup(fp, JSON.stringify({ autoVersioning: true }))
+    execSync("git add -A", { cwd: worktree, stdio: "ignore" })
+    execSync("git commit -m initial", { cwd: worktree, stdio: "ignore" })
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    const log = execSync("git log --oneline", { cwd: worktree, encoding: "utf-8" })
+    expect(log).toContain("auto: update config")
+  })
+
+  it("does not auto-commit when autoVersioning is disabled", async () => {
+    const { execSync } = await import("node:child_process")
+    await fs.writeFile(path.join(worktree, ".gitkeep"), "", "utf-8")
+    execSync("git init", { cwd: worktree, stdio: "ignore" })
+    execSync('git config user.email "test@test.com"', { cwd: worktree, stdio: "ignore" })
+    execSync('git config user.name "Test"', { cwd: worktree, stdio: "ignore" })
+    execSync("git add -A", { cwd: worktree, stdio: "ignore" })
+    execSync("git commit -m initial", { cwd: worktree, stdio: "ignore" })
+    await configTool.execute({ key: "expressMode", value: "true" }, ctx)
+    const log = execSync("git log --oneline", { cwd: worktree, encoding: "utf-8" })
+    expect(log).not.toContain("auto: update config")
   })
 })
