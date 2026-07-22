@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin"
+import { tool, type ToolResult } from "@opencode-ai/plugin"
 import path from "node:path"
 import {
   isValidProjectRoot,
@@ -7,6 +7,10 @@ import {
 } from "./shared/types"
 import auditTool from "./speckit-audit"
 import cleanTool from "./speckit-clean"
+
+function toolResult(r: ToolResult): { output: string; metadata?: Record<string, unknown> } {
+  return typeof r === "string" ? { output: r } : r
+}
 
 interface SelfHealFinding {
   id: string
@@ -73,8 +77,8 @@ export default tool({
       let cleanOutput = ""
 
       // D1: Health Scan — audit
-      const auditResult = await auditTool.execute({ fix: args.fix }, context)
-      const auditFindings = (auditResult.metadata as Record<string, unknown>)?.findings as Array<Record<string, unknown>> ?? []
+      const auditResult = toolResult(await auditTool.execute({ fix: args.fix }, context))
+      const auditFindings = (auditResult.metadata?.findings ?? []) as Array<Record<string, unknown>>
       for (const f of auditFindings) {
         const cat = categorize(String(f.category ?? ""), String(f.severity ?? "info"))
         findings.push({
@@ -88,12 +92,11 @@ export default tool({
           originalCategory: String(f.category ?? ""),
         })
       }
-      auditOutput = String(auditResult.output ?? "")
+      auditOutput = auditResult.output
 
       // D1: Health Scan — clean
-      const cleanResult = await cleanTool.execute({ fix: args.fix }, context)
-      const cleanReport = cleanResult.metadata as Record<string, unknown> | undefined
-      const cleanIssues = cleanReport?.issues as Array<Record<string, unknown>> ?? []
+      const cleanResult = toolResult(await cleanTool.execute({ fix: args.fix }, context))
+      const cleanIssues = (cleanResult.metadata?.issues ?? []) as Array<Record<string, unknown>>
       for (const issue of cleanIssues) {
         const severity = String(issue.severity ?? "info")
         const cat = categorize("phase-mismatch", severity)
@@ -107,7 +110,7 @@ export default tool({
           originalCategory: "clean",
         })
       }
-      cleanOutput = String(cleanResult.output ?? "")
+      cleanOutput = cleanResult.output
 
       // D1: Health Scan — corruption warnings
       for (const w of corruptionWarnings) {
@@ -145,9 +148,9 @@ export default tool({
       let skipped = 0
       let failed = 0
       if (args.fix && findings.length > 0) {
-        const fixAudit = await auditTool.execute({ fix: true }, context)
-        const fixClean = await cleanTool.execute({ fix: true }, context)
-        const fixedFindings = (fixAudit.metadata as Record<string, unknown>)?.findings as Array<{ message: string }> ?? []
+        const fixAudit = toolResult(await auditTool.execute({ fix: true }, context))
+        await cleanTool.execute({ fix: true }, context)
+        const fixedFindings = (fixAudit.metadata?.findings ?? []) as Array<{ message: string }>
         for (const ff of fixedFindings) {
           if (ff.message?.includes("(auto-fixed)")) {
             fixed++

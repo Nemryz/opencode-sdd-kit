@@ -1,7 +1,7 @@
 import path from "node:path"
 import fs from "node:fs/promises"
 import { PATHS, SpecJson, SessionState, specsDirPath } from "./schemas"
-import { exists, isENOENT } from "./io"
+import { isENOENT } from "./io"
 
 // Re-export everything from schemas and io for backward compatibility
 export * from "./schemas"
