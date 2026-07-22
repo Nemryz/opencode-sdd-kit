@@ -14,9 +14,13 @@ import {
   getLatestFeatureDir,
   makeSpecJson,
   DEFAULT_SESSION,
+  DEFAULT_CONFIG,
   sessionPath,
   specJsonPath,
   specsDirPath,
+  configPath,
+  readConfig,
+  tryAutoCommit,
 } from "../../shared/types"
 
 let tmp: string
@@ -319,6 +323,105 @@ describe("writeWithBackup", () => {
     expect(baks.length).toBe(1)
     const bakContent = await fs.readFile(path.join(backupDir, baks[0]), "utf-8")
     expect(bakContent).toBe("original")
+  })
+})
+
+// ── readConfig ──────────────────────────────────────────────────────
+
+describe("readConfig", () => {
+  it("returns DEFAULT_CONFIG when the file does not exist", async () => {
+    const root = await worktree()
+    const result = await readConfig(root)
+    expect(result).toEqual(DEFAULT_CONFIG)
+  })
+
+  it("returns DEFAULT_CONFIG on invalid JSON", async () => {
+    const root = await worktree()
+    const fp = configPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, "not json", "utf-8")
+    const result = await readConfig(root)
+    expect(result).toEqual(DEFAULT_CONFIG)
+  })
+
+  it("merges stored values with DEFAULT_CONFIG", async () => {
+    const root = await worktree()
+    const fp = configPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, JSON.stringify({ autoVersioning: true }), "utf-8")
+    const result = await readConfig(root)
+    expect(result.autoVersioning).toBe(true)
+    expect(result.expressMode).toBe(false)
+    expect(result.defaultTechStack).toBeNull()
+  })
+})
+
+// ── tryAutoCommit ───────────────────────────────────────────────────
+
+describe("tryAutoCommit", () => {
+  it("is a no-op when root is not a git repo", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "test.txt")
+    await fs.writeFile(fp, "hello", "utf-8")
+    await expect(tryAutoCommit(fp, root)).resolves.toBeUndefined()
+  })
+
+  it("is a no-op when autoVersioning is false", async () => {
+    const root = await worktree()
+    const fp = path.join(root, "test.txt")
+    await fs.writeFile(fp, "hello", "utf-8")
+    await expect(tryAutoCommit(fp, root)).resolves.toBeUndefined()
+  })
+
+  it("auto-commits when autoVersioning is true and git repo exists", async () => {
+    const root = await worktree()
+    const fp = configPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, JSON.stringify({ autoVersioning: true }), "utf-8")
+    const { execSync } = await import("node:child_process")
+    execSync("git init", { cwd: root, stdio: "ignore" })
+    execSync('git config user.email "test@test.com"', { cwd: root, stdio: "ignore" })
+    execSync('git config user.name "Test"', { cwd: root, stdio: "ignore" })
+    const testFile = path.join(root, "hello.txt")
+    await fs.writeFile(testFile, "world", "utf-8")
+    execSync("git add -A", { cwd: root, stdio: "ignore" })
+    execSync("git commit -m initial", { cwd: root, stdio: "ignore" })
+    await fs.writeFile(testFile, "updated", "utf-8")
+    await tryAutoCommit(testFile, root)
+    const log = execSync("git log --oneline", { cwd: root, encoding: "utf-8" })
+    expect(log).toContain("auto: update hello.txt")
+  })
+
+  it("fails silently on git errors", async () => {
+    const root = await worktree()
+    const fp = configPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, JSON.stringify({ autoVersioning: true }), "utf-8")
+    const { execSync } = await import("node:child_process")
+    execSync("git init", { cwd: root, stdio: "ignore" })
+    execSync('git config user.email "test@test.com"', { cwd: root, stdio: "ignore" })
+    execSync('git config user.name "Test"', { cwd: root, stdio: "ignore" })
+    const testFile = path.join(root, "missing.txt")
+    await expect(tryAutoCommit(testFile, root)).resolves.toBeUndefined()
+  })
+})
+
+// ── writeSession auto-commit integration ────────────────────────────
+
+describe("writeSession with autoVersioning", () => {
+  it("auto-commits session.json when autoVersioning is enabled", async () => {
+    const root = await worktree()
+    const fp = configPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await fs.writeFile(fp, JSON.stringify({ autoVersioning: true }), "utf-8")
+    const { execSync } = await import("node:child_process")
+    execSync("git init", { cwd: root, stdio: "ignore" })
+    execSync('git config user.email "test@test.com"', { cwd: root, stdio: "ignore" })
+    execSync('git config user.name "Test"', { cwd: root, stdio: "ignore" })
+    const s = { ...DEFAULT_SESSION, phase: "spec" }
+    await writeSession(root, s)
+    const log = execSync("git log --oneline", { cwd: root, encoding: "utf-8" })
+    expect(log).toContain("auto: update session state")
   })
 })
 
