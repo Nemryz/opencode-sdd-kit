@@ -170,3 +170,72 @@ describe("scaffold fallback content (no template files)", () => {
     expect(dirs).toContain("002-f2")
   })
 })
+
+describe("safeToWrite behavior via constitution scaffolding", () => {
+  it("returns safe=true when file does not exist", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "NewProj", template: "constitution" },
+      ctx,
+    )
+    expect(result.title).toBe("Constitution created")
+    const filePath = path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+    const exists = await fs.access(filePath).then(() => true).catch(() => false)
+    expect(exists).toBe(true)
+  })
+
+  it("returns safe=false when exists and overwrite not set", async () => {
+    await scaffoldTool.execute({ featureName: "P1", template: "constitution" }, ctx)
+    const result = await scaffoldTool.execute(
+      { featureName: "P2", template: "constitution" },
+      ctx,
+    )
+    expect(result.metadata?.exists).toBe(true)
+    expect(result.title).toBe("Constitution exists")
+  })
+
+  it("returns safe=true when exists and overwrite is set", async () => {
+    await scaffoldTool.execute({ featureName: "Original", template: "constitution" }, ctx)
+    const result = await scaffoldTool.execute(
+      { featureName: "Overwritten", template: "constitution", overwrite: true },
+      ctx,
+    )
+    expect(result.title).toBe("Constitution created")
+  })
+})
+
+describe("readTemplate content loading", () => {
+  it("loads real template content when template files exist", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "TestProj", template: "constitution" },
+      ctx,
+    )
+    expect(result.title).toBe("Constitution created")
+    const filePath = path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+    const content = await fs.readFile(filePath, "utf-8")
+    expect(content).toContain("Article I")
+    expect(content).toContain("TestProj")
+  })
+
+  it("falls back to embed placeholder when template file is missing", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "Fallback Spec", template: "spec" },
+      ctx,
+    )
+    const filePath = path.join(worktree, "specs", "001-fallback-spec", "spec.md")
+    const content = await fs.readFile(filePath, "utf-8")
+    expect(content).toContain("spec: Fallback Spec")
+    expect(content).toContain("Content pending skill generation")
+  })
+
+  it("steering uses fallback content with replaced project name", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "TestKit", template: "steering" },
+      ctx,
+    )
+    expect(result.metadata?.created).toHaveLength(3)
+    const productPath = path.join(worktree, ".opencode", "steering", "product.md")
+    const content = await fs.readFile(productPath, "utf-8")
+    expect(content).toContain("TestKit")
+    expect(content).toContain("Steering")
+  })
+})
