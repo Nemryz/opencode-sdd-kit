@@ -94,7 +94,7 @@ export default tool({
         if (phase !== "empty") {
           s.phase = phase
         }
-        s.featureDir = featureDir || s.featureDir
+        s.featureDir = featureDir ?? s.featureDir
         s.nextStep = nextStep
         s.lastResult = parts.join(" | ")
         s.history.push(args.command ? "/" + args.command : "/review")

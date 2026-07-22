@@ -149,6 +149,10 @@ describe("isENOENT", () => {
   it("returns false for an Error without a code property", () => {
     expect(isENOENT(new Error("generic"))).toBe(false)
   })
+
+  it("returns false for a plain object with code ENOENT", () => {
+    expect(isENOENT({ code: "ENOENT" })).toBe(false)
+  })
 })
 
 // ── isEEXIST ───────────────────────────────────────────────
@@ -177,6 +181,10 @@ describe("isEEXIST", () => {
   it("returns false for an Error without a code property", () => {
     expect(isEEXIST(new Error("generic"))).toBe(false)
   })
+
+  it("returns false for a plain object with code EEXIST", () => {
+    expect(isEEXIST({ code: "EEXIST" })).toBe(false)
+  })
 })
 
 // ── isESRCH ───────────────────────────────────────────────
@@ -204,6 +212,10 @@ describe("isESRCH", () => {
 
   it("returns false for an Error without a code property", () => {
     expect(isESRCH(new Error("generic"))).toBe(false)
+  })
+
+  it("returns false for a plain object with code ESRCH", () => {
+    expect(isESRCH({ code: "ESRCH" })).toBe(false)
   })
 })
 

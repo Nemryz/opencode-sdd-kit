@@ -56,7 +56,7 @@ export default tool({
             ;({ phase } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
           }
           featurePhases.push({ dir, phase })
-          phaseCounts[phase] = (phaseCounts[phase] || 0) + 1
+          phaseCounts[phase] = (phaseCounts[phase] ?? 0) + 1
         }
 
         latestPhase = latest
