@@ -2,6 +2,5 @@ node_modules/
 .opencode/spec-memory/session.json
 .opencode/spec-memory/config.json
 .opencode/backups/
-specs/
 *.log
 .DS_Store
