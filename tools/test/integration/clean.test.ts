@@ -129,6 +129,38 @@ describe("clean spec.json mismatch detection", () => {
     const result = await cleanTool.execute({}, ctx)
     expect(result.metadata?.issues.some((i: string) => i.includes("spec.json"))).toBe(true)
   })
+
+  it("does not downgrade complete phase to ready", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "complete"
+      await writeSpecJson(sj, base)
+    }
+    const result = await cleanTool.execute({}, ctx)
+    const issues: string[] = result.metadata?.issues ?? []
+    const specJsonIssues = issues.filter((i: string) => i.includes("spec.json") && i.includes("phase"))
+    expect(specJsonIssues).toHaveLength(0)
+  })
+
+  it("does not downgrade impl phase to ready", async () => {
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.phase = "impl"
+      await writeSpecJson(sj, base)
+    }
+    const result = await cleanTool.execute({}, ctx)
+    const issues: string[] = result.metadata?.issues ?? []
+    const specJsonIssues = issues.filter((i: string) => i.includes("spec.json") && i.includes("phase"))
+    expect(specJsonIssues).toHaveLength(0)
+  })
 })
 
 describe("clean multiple features", () => {

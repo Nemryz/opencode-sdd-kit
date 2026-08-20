@@ -103,7 +103,9 @@ export default tool({
         if (sj) {
           const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
           const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
-          if (sj.phase !== filesPhase && !isTasksNotApproved) {
+          const isCompleteNotDowngraded = sj.phase === "complete" && filesPhase === "ready"
+          const isImplNotDowngraded = sj.phase === "impl" && filesPhase === "ready"
+          if (sj.phase !== filesPhase && !isTasksNotApproved && !isCompleteNotDowngraded && !isImplNotDowngraded) {
             issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
             specJsonMismatches++
           }
@@ -130,8 +132,10 @@ export default tool({
           if (!sj) continue
           const filesPhase = detectPhaseFromFiles(report.spec, report.plan, report.tasks)
           const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
+          const isCompleteNotDowngraded = sj.phase === "complete" && filesPhase === "ready"
+          const isImplNotDowngraded = sj.phase === "impl" && filesPhase === "ready"
           let changed = false
-          if (sj.phase !== filesPhase && !isTasksNotApproved) {
+          if (sj.phase !== filesPhase && !isTasksNotApproved && !isCompleteNotDowngraded && !isImplNotDowngraded) {
             sj.phase = parsePhase(filesPhase)
             changed = true
           }
