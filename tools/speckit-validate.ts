@@ -8,6 +8,7 @@ import {
   detectPhase,
   getLatestFeatureDir,
   isValidProjectRoot,
+  detectParentProjectWithoutSession,
   SpecJson,
   SessionState,
   PHASE_NEXT_STEP,
@@ -30,6 +31,14 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const parentProject = await detectParentProjectWithoutSession(projectRoot)
+      if (parentProject) {
+        return {
+          title: "Warning",
+          output: `Parent project detected at ${parentProject} without session. Do you want to continue?`,
+          metadata: { parentProject, requiresConfirmation: true },
+        }
+      }
       const toolResult = await withLock(sessionPath(projectRoot), async () => {
         const s = await readSession(projectRoot)
         const featureDir = args.featureDir ?? s.featureDir ?? (await getLatestFeatureDir(projectRoot))

@@ -17,6 +17,7 @@ import {
   exists,
   isENOENT,
   isValidProjectRoot,
+  detectParentProjectWithoutSession,
   withLock,
   clearCorruptionWarnings,
   PATHS,
@@ -149,6 +150,14 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (args.template !== "constitution" && !await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const parentProject = await detectParentProjectWithoutSession(projectRoot)
+      if (parentProject) {
+        return {
+          title: "Warning",
+          output: `Parent project detected at ${parentProject} without session. Do you want to continue?`,
+          metadata: { parentProject, requiresConfirmation: true },
+        }
+      }
       const template = await readTemplate(args.template)
 
       if (args.template === "steering") {

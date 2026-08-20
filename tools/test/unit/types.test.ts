@@ -11,6 +11,7 @@ import {
   isESRCH,
   getFeatureDirs,
   isValidProjectRoot,
+  detectParentProjectWithoutSession,
   parsePhase,
   makeSpecJson,
   PHASE_NEXT_STEP,
@@ -249,6 +250,79 @@ describe("isValidProjectRoot", () => {
   it("rejects a directory with only .opencode/ but no spec-memory/", async () => {
     await fs.mkdir(path.join(tmpDir, ".opencode"), { recursive: true })
     expect(await isValidProjectRoot(tmpDir)).toBe(false)
+  })
+
+  it("rejects C:\\ drive root", async () => {
+    expect(await isValidProjectRoot("C:\\")).toBe(false)
+  })
+
+  it("rejects D:\\ drive root", async () => {
+    expect(await isValidProjectRoot("D:\\")).toBe(false)
+  })
+
+  it("rejects C: without backslash", async () => {
+    expect(await isValidProjectRoot("C:")).toBe(false)
+  })
+
+  it("rejects lowercase drive root", async () => {
+    expect(await isValidProjectRoot("c:\\")).toBe(false)
+  })
+})
+
+describe("detectParentProjectWithoutSession", () => {
+  let tmpDir: string
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "parent-test-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  it("returns null when no parent project exists", async () => {
+    const child = path.join(tmpDir, "child")
+    await fs.mkdir(path.join(child, ".opencode", "spec-memory"), { recursive: true })
+    // Create session.json in all parent directories that have spec-memory
+    let current = path.dirname(child)
+    while (current !== path.dirname(current)) {
+      const parentSpecMemory = path.join(current, ".opencode", "spec-memory")
+      try {
+        await fs.access(parentSpecMemory)
+        await fs.writeFile(path.join(parentSpecMemory, "session.json"), "{}")
+      } catch {
+        // no parent project
+      }
+      current = path.dirname(current)
+    }
+    expect(await detectParentProjectWithoutSession(child)).toBeNull()
+  })
+
+  it("returns null when parent has session", async () => {
+    const parent = tmpDir
+    const child = path.join(parent, "child")
+    await fs.mkdir(path.join(parent, ".opencode", "spec-memory"), { recursive: true })
+    await fs.writeFile(path.join(parent, ".opencode", "spec-memory", "session.json"), "{}")
+    await fs.mkdir(path.join(child, ".opencode", "spec-memory"), { recursive: true })
+    expect(await detectParentProjectWithoutSession(child)).toBeNull()
+  })
+
+  it("returns parent path when parent has no session", async () => {
+    const parent = tmpDir
+    const child = path.join(parent, "child")
+    await fs.mkdir(path.join(parent, ".opencode", "spec-memory"), { recursive: true })
+    await fs.mkdir(path.join(child, ".opencode", "spec-memory"), { recursive: true })
+    expect(await detectParentProjectWithoutSession(child)).toBe(parent)
+  })
+
+  it("handles multiple nesting levels", async () => {
+    const grandparent = tmpDir
+    const parent = path.join(grandparent, "parent")
+    const child = path.join(parent, "child")
+    await fs.mkdir(path.join(grandparent, ".opencode", "spec-memory"), { recursive: true })
+    await fs.mkdir(path.join(parent, ".opencode", "spec-memory"), { recursive: true })
+    await fs.mkdir(path.join(child, ".opencode", "spec-memory"), { recursive: true })
+    expect(await detectParentProjectWithoutSession(child)).toBe(parent)
   })
 })
 

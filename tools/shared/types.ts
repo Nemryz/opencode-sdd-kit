@@ -9,7 +9,10 @@ export * from "./io"
 
 // ─────────────────────────── Project root validation ───────────
 
+const DRIVE_ROOT_RE = /^[A-Z]:\\?$/i
+
 export async function isValidProjectRoot(root: string): Promise<boolean> {
+  if (DRIVE_ROOT_RE.test(root)) return false
   try {
     const specMemoryDir = path.join(root, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
     await fs.access(specMemoryDir)
@@ -17,6 +20,27 @@ export async function isValidProjectRoot(root: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+export async function detectParentProjectWithoutSession(root: string): Promise<string | null> {
+  let current = path.dirname(root)
+  while (current !== path.dirname(current)) {
+    const parentSpecMemory = path.join(current, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
+    const parentSession = path.join(parentSpecMemory, PATHS.SESSION_FILE)
+    try {
+      await fs.access(parentSpecMemory)
+      try {
+        await fs.access(parentSession)
+        return null
+      } catch {
+        return current
+      }
+    } catch {
+      // no parent project
+    }
+    current = path.dirname(current)
+  }
+  return null
 }
 
 // ─────────────────────────── Project Discovery ───────────────────────────

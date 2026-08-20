@@ -155,3 +155,72 @@ describe("cold start from completely empty directory", () => {
     expect(result.metadata?.total).toBe(1)
   })
 })
+
+describe("drive root protection", () => {
+  it("scaffold fails on drive root", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "Test", template: "spec" },
+      mockContext("C:\\")
+    )
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("validate fails on drive root", async () => {
+    const result = await validateTool.execute({}, mockContext("C:\\"))
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("clean fails on drive root", async () => {
+    const result = await cleanTool.execute({}, mockContext("C:\\"))
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+
+  it("audit fails on drive root", async () => {
+    const result = await auditTool.execute({}, mockContext("C:\\"))
+    expect(result.title).toBe("Error")
+    expect(result.output).toContain("Not a valid project directory")
+  })
+})
+
+describe("parent project warning", () => {
+  let parentWorktree: string
+  let childWorktree: string
+  let childCtx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    parentWorktree = await fs.mkdtemp(path.join(os.tmpdir(), "parent-test-"))
+    childWorktree = path.join(parentWorktree, "child")
+    await fs.mkdir(path.join(parentWorktree, ".opencode", "spec-memory"), { recursive: true })
+    await fs.mkdir(path.join(childWorktree, ".opencode", "spec-memory"), { recursive: true })
+    childCtx = mockContext(childWorktree)
+  })
+
+  afterEach(async () => {
+    await fs.rm(parentWorktree, { recursive: true, force: true })
+  })
+
+  it("shows warning when parent has no session", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "Test", template: "spec" },
+      childCtx
+    )
+    expect(result.title).toBe("Warning")
+    expect(result.output).toContain("Parent project detected")
+    expect(result.metadata?.requiresConfirmation).toBe(true)
+  })
+
+  it("does not show warning when parent has session", async () => {
+    await fs.writeFile(
+      path.join(parentWorktree, ".opencode", "spec-memory", "session.json"),
+      JSON.stringify({ command: null, phase: "init", featureDir: null, featureNumber: null, featureName: null, nextStep: "/spec", lastResult: null, history: [] })
+    )
+    const result = await scaffoldTool.execute(
+      { featureName: "Test", template: "spec" },
+      childCtx
+    )
+    expect(result.title).not.toBe("Warning")
+  })
+})

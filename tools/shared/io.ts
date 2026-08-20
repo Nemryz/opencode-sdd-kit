@@ -87,7 +87,12 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
 
   while (true) {
     try {
-      await fs.mkdir(path.dirname(lockDir), { recursive: true })
+      const parentDir = path.dirname(lockDir)
+      try {
+        await fs.access(parentDir)
+      } catch {
+        await fs.mkdir(parentDir, { recursive: true })
+      }
       await fs.mkdir(lockDir, { recursive: false })
       await fs.writeFile(
         path.join(lockDir, "lock.json"),
