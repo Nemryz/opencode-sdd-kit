@@ -179,6 +179,43 @@ export async function atomicWriteFile(fp: string, data: string): Promise<void> {
   }
 }
 
+// ─────────────────────────── Backup Restore ───────────────────────────
+
+export async function findLatestValidBackup<T>(
+  fp: string,
+  root: string,
+  schema: { safeParse: (data: unknown) => { success: boolean; data?: T } },
+): Promise<T | null> {
+  const backupDir = path.join(root, ".opencode", BACKUP_DIR_NAME)
+  const basename = path.basename(fp)
+
+  let files: string[]
+  try {
+    files = await fs.readdir(backupDir)
+  } catch {
+    return null
+  }
+
+  const backups = files
+    .filter(f => f.startsWith(basename) && f.endsWith(".bak"))
+    .sort()
+    .reverse()
+
+  for (const bak of backups) {
+    try {
+      const content = await fs.readFile(path.join(backupDir, bak), "utf-8")
+      const parsed = JSON.parse(content)
+      const result = schema.safeParse(parsed)
+      if (result.success) {
+        return result.data as T
+      }
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
 // ─────────────────────────── Corruption Warnings ───────────────────────────
 
 export interface CorruptionWarning {
@@ -202,8 +239,8 @@ export function pushCorruptionWarning(fp: string, errorMsg: string): void {
 // ─────────────────────────── Session I/O ───────────────────────────
 
 export async function readSession(root: string): Promise<SessionState> {
+  const fp = sessionPath(root)
   try {
-    const fp = sessionPath(root)
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_SESSION, ...parsed }
@@ -212,12 +249,21 @@ export async function readSession(root: string): Promise<SessionState> {
       return result.data
     }
     pushCorruptionWarning(fp, result.error.message)
+    const restored = await findLatestValidBackup<SessionState>(fp, root, SessionStateSchema)
+    if (restored) {
+      console.warn(`[SDD] Restored ${fp} from backup`)
+      return restored
+    }
     return { ...DEFAULT_SESSION }
   } catch (err) {
-    const fp = sessionPath(root)
     if (!isENOENT(err)) {
       const msg = err instanceof Error ? err.message : String(err)
       pushCorruptionWarning(fp, msg)
+      const restored = await findLatestValidBackup<SessionState>(fp, root, SessionStateSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup`)
+        return restored
+      }
     }
     return { ...DEFAULT_SESSION }
   }
@@ -241,8 +287,9 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
 // ─────────────────────────── SpecJson I/O ───────────────────────────
 
 export async function readSpecJson(featureDir: string): Promise<SpecJson | null> {
+  const fp = specJsonPath(featureDir)
+  const root = path.dirname(path.dirname(featureDir))
   try {
-    const fp = specJsonPath(featureDir)
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const result = SpecJsonSchema.safeParse(parsed)
@@ -250,12 +297,21 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
       return result.data
     }
     pushCorruptionWarning(fp, result.error.message)
+    const restored = await findLatestValidBackup<SpecJson>(fp, root, SpecJsonSchema)
+    if (restored) {
+      console.warn(`[SDD] Restored ${fp} from backup`)
+      return restored
+    }
     return null
   } catch (err) {
-    const fp = specJsonPath(featureDir)
     if (!isENOENT(err)) {
       const msg = err instanceof Error ? err.message : String(err)
       pushCorruptionWarning(fp, msg)
+      const restored = await findLatestValidBackup<SpecJson>(fp, root, SpecJsonSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup`)
+        return restored
+      }
     }
     return null
   }
