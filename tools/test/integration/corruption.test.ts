@@ -86,6 +86,14 @@ describe("corruption warnings", () => {
     expect(corruptionWarnings.length).toBe(0)
   })
 
+  it("deduplicates warnings for same file and message", () => {
+    pushCorruptionWarning("/tmp/test.json", "test error")
+    pushCorruptionWarning("/tmp/test.json", "test error")
+    pushCorruptionWarning("/tmp/test.json", "different error")
+    expect(corruptionWarnings.length).toBe(2)
+    clearCorruptionWarnings()
+  })
+
   it("no warnings for valid files", async () => {
     await createConstitution(worktree)
     clearCorruptionWarnings()

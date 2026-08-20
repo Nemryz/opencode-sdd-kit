@@ -11,6 +11,7 @@ import {
   pushCorruptionWarning,
   readConfig,
   tryAutoCommit,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
@@ -36,6 +37,7 @@ export default tool({
     defaultTechStack: tool.schema.string().optional().describe("Set default tech stack for /plan"),
   },
   async execute(args, context) {
+    clearCorruptionWarnings()
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }

@@ -18,6 +18,7 @@ import {
   isENOENT,
   isValidProjectRoot,
   withLock,
+  clearCorruptionWarnings,
   PATHS,
 } from "./shared/types"
 
@@ -143,6 +144,7 @@ export default tool({
     overwrite: tool.schema.boolean().optional().describe("Overwrite existing files if they exist"),
   },
   async execute(args, context) {
+    clearCorruptionWarnings()
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }

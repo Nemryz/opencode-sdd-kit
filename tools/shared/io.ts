@@ -231,6 +231,8 @@ export function clearCorruptionWarnings(): void {
 }
 
 export function pushCorruptionWarning(fp: string, errorMsg: string): void {
+  const existing = corruptionWarnings.find(w => w.file === fp && w.message === errorMsg)
+  if (existing) return
   const warn: CorruptionWarning = { file: fp, message: errorMsg, timestamp: Date.now() }
   corruptionWarnings.push(warn)
   console.warn(`[SDD] Corruption detected in ${fp}: using defaults. ${errorMsg}`)

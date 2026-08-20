@@ -3,6 +3,7 @@ import {
   assessComplexity,
   discoverProject,
   isValidProjectRoot,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 export default tool({
@@ -16,6 +17,7 @@ export default tool({
     useProjectContext: tool.schema.boolean().optional().describe("Whether to enrich assessment with auto-detected project context"),
   },
   async execute(args, context) {
+    clearCorruptionWarnings()
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }

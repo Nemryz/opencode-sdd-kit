@@ -15,6 +15,7 @@ import {
   specsDirPath,
   sessionPath,
   withLock,
+  clearCorruptionWarnings,
 } from "./shared/types"
 
 export default tool({
@@ -24,6 +25,7 @@ export default tool({
     command: tool.schema.string().optional().describe("Command name that triggered this validation (e.g., plan, tasks, impl)"),
   },
   async execute(args, context) {
+    clearCorruptionWarnings()
     try {
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
