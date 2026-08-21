@@ -15,6 +15,7 @@ import {
   PHASE_NEXT_STEP,
   constitutionPath,
   specsDirPath,
+  specJsonPath,
   sessionPath,
   withLock,
   clearCorruptionWarnings,
@@ -59,12 +60,15 @@ export default tool({
         let specJson: SpecJson | null = null
         let specJsonPhase: SessionState["phase"] | null = null
         let mismatch = false
+        let specJsonCorrupted = false
 
         if (featureDir) {
           const base = path.join(specsDirPath(projectRoot), featureDir)
           specOk = await exists(path.join(base, "spec.md"))
           planOk = await exists(path.join(base, "plan.md"))
           tasksOk = await exists(path.join(base, "tasks.md"))
+          const specJsonFile = specJsonPath(base)
+          const specJsonExists = await exists(specJsonFile)
           specJson = await readSpecJson(base)
           if (specJson) {
             specJsonPhase = specJson.phase
@@ -80,6 +84,8 @@ export default tool({
             } else if ((specJson.phase === "impl" || specJson.phase === "complete") && !filesOk) {
               mismatch = true
             }
+          } else if (specJsonExists) {
+            specJsonCorrupted = true
           }
         }
 
@@ -92,6 +98,9 @@ export default tool({
           parts.push(specOk ? "spec ok" : "spec missing")
           parts.push(planOk ? "plan ok" : "plan missing")
           parts.push(tasksOk ? "tasks ok" : "tasks missing")
+          if (specJsonCorrupted) {
+            parts.push("WARN: spec.json corrupted")
+          }
           if (mismatch) {
             parts.push("WARN: spec.json phase ≠ reality")
           }

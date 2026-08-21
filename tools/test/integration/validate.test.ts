@@ -230,3 +230,25 @@ describe("validate output formatting", () => {
     expect(result.title).toBe("Ready to implement")
   })
 })
+
+describe("validate with corrupted spec.json", () => {
+  it("shows WARN when spec.json is corrupted", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const specJsonFile = path.join(base, "spec.json")
+    await fs.writeFile(specJsonFile, "{invalid json", "utf-8")
+    const result = await validateTool.execute({ featureDir: "001-auth" }, ctx)
+    expect(result.output).toContain("WARN: spec.json corrupted")
+  })
+
+  it("does not show warning when spec.json does not exist", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const specJsonFile = path.join(base, "spec.json")
+    await fs.rm(specJsonFile, { force: true })
+    const result = await validateTool.execute({ featureDir: "001-auth" }, ctx)
+    expect(result.output).not.toContain("WARN: spec.json corrupted")
+  })
+})
