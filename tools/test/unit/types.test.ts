@@ -11,6 +11,7 @@ import {
   isESRCH,
   getFeatureDirs,
   isValidProjectRoot,
+  getProjectRootWarnings,
   detectParentProjectWithoutSession,
   parsePhase,
   makeSpecJson,
@@ -323,6 +324,76 @@ describe("detectParentProjectWithoutSession", () => {
     await fs.mkdir(path.join(parent, ".opencode", "spec-memory"), { recursive: true })
     await fs.mkdir(path.join(child, ".opencode", "spec-memory"), { recursive: true })
     expect(await detectParentProjectWithoutSession(child)).toBe(parent)
+  })
+})
+
+// ── getProjectRootWarnings ──────────────────────────────────
+
+describe("getProjectRootWarnings", () => {
+  let tmpDir: string
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "warnings-test-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  it("returns empty array for valid project path", async () => {
+    const validPath = path.join(tmpDir, "user", "projects", "my-app")
+    const warnings = await getProjectRootWarnings(validPath)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it("returns kit-installation warning when root is inside kit dir", async () => {
+    const homeDir = os.homedir()
+    const kitDir = path.join(homeDir, ".config", "opencode")
+    const warnings = await getProjectRootWarnings(kitDir)
+    expect(warnings.some(w => w.type === "kit-installation")).toBe(true)
+  })
+
+  it("returns shallow-path warning for paths with less than 3 segments", async () => {
+    const warnings = await getProjectRootWarnings("C:\\Users")
+    expect(warnings.some(w => w.type === "shallow-path")).toBe(true)
+  })
+
+  it("returns system-directory warning for Windows system dirs", async () => {
+    const warnings = await getProjectRootWarnings("C:\\Windows")
+    expect(warnings.some(w => w.type === "system-directory")).toBe(true)
+  })
+
+  it("returns system-directory warning for Program Files", async () => {
+    const warnings = await getProjectRootWarnings("C:\\Program Files")
+    expect(warnings.some(w => w.type === "system-directory")).toBe(true)
+  })
+
+  it("returns multiple warnings for overlapping conditions", async () => {
+    const warnings = await getProjectRootWarnings("C:\\Windows")
+    const types = warnings.map(w => w.type)
+    expect(types).toContain("system-directory")
+  })
+
+  it("returns empty array for drive root", async () => {
+    const warnings = await getProjectRootWarnings("C:\\")
+    expect(warnings).toHaveLength(0)
+  })
+
+  it("handles trailing path separator", async () => {
+    const warnings = await getProjectRootWarnings("C:\\Users\\")
+    expect(warnings.some(w => w.type === "shallow-path")).toBe(true)
+  })
+
+  it("handles mixed case system directories", async () => {
+    const warnings = await getProjectRootWarnings("c:\\windows")
+    expect(warnings.some(w => w.type === "system-directory")).toBe(true)
+  })
+
+  it("detects nested kit directory", async () => {
+    const homeDir = os.homedir()
+    const nestedKitDir = path.join(homeDir, ".config", "opencode", "something", "else")
+    const warnings = await getProjectRootWarnings(nestedKitDir)
+    expect(warnings.some(w => w.type === "kit-installation")).toBe(true)
   })
 })
 

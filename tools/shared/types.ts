@@ -1,4 +1,5 @@
 import path from "node:path"
+import os from "node:os"
 import fs from "node:fs/promises"
 import { PATHS, SpecJson, SessionState, specsDirPath } from "./schemas"
 import { isENOENT } from "./io"
@@ -41,6 +42,74 @@ export async function detectParentProjectWithoutSession(root: string): Promise<s
     current = path.dirname(current)
   }
   return null
+}
+
+// ─────────────────────────── Project root warnings ───────────
+
+export type ProjectRootWarningType = "kit-installation" | "shallow-path" | "system-directory"
+
+export interface ProjectRootWarning {
+  type: ProjectRootWarningType
+  message: string
+}
+
+const SYSTEM_DIRS = [
+  "windows",
+  "program files",
+  "program files (x86)",
+  "programdata",
+  "recovery",
+  "system volume information",
+  "perflogs",
+  "msocache",
+  "inetpub",
+  "boot",
+  "usr",
+  "etc",
+  "bin",
+  "sbin",
+  "var",
+  "sys",
+  "proc",
+  "dev",
+]
+
+export async function getProjectRootWarnings(root: string): Promise<ProjectRootWarning[]> {
+  const warnings: ProjectRootWarning[] = []
+
+  // Skip drive roots entirely (already handled by isValidProjectRoot)
+  if (DRIVE_ROOT_RE.test(root)) return warnings
+
+  // Check kit installation directory
+  const homeDir = os.homedir()
+  const kitDir = path.join(homeDir, ".config", "opencode")
+  const normalized = root.replace(/[/\\]+$/, "")
+  if (normalized === kitDir || normalized.startsWith(kitDir + path.sep)) {
+    warnings.push({
+      type: "kit-installation",
+      message: "You are running from the opencode-sdd-kit installation directory. This may cause unexpected behavior because the kit could modify its own configuration files. Do you want to continue?",
+    })
+  }
+
+  // Check shallow path (less than 3 segments after drive letter)
+  const segments = normalized.split(path.sep).filter(Boolean)
+  if (segments.length < 3) {
+    warnings.push({
+      type: "shallow-path",
+      message: "The project root is very shallow and close to the system root. This could affect system files if modifications are made. Do you want to continue?",
+    })
+  }
+
+  // Check system directories
+  const lastSegment = path.basename(normalized).toLowerCase()
+  if (SYSTEM_DIRS.includes(lastSegment)) {
+    warnings.push({
+      type: "system-directory",
+      message: "This appears to be a system directory. Modifications may affect system stability or security. Do you want to continue?",
+    })
+  }
+
+  return warnings
 }
 
 // ─────────────────────────── Project Discovery ───────────────────────────

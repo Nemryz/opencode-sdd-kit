@@ -2,6 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 import {
   configPath,
   isValidProjectRoot,
+  getProjectRootWarnings,
   SDDConfig,
   ConfigSchema,
   writeWithBackup,
@@ -42,6 +43,14 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const projectWarnings = await getProjectRootWarnings(projectRoot)
+      if (projectWarnings.length > 0) {
+        return {
+          title: "Warning",
+          output: projectWarnings.map(w => w.message).join("\n\n"),
+          metadata: { warnings: projectWarnings, requiresConfirmation: true },
+        }
+      }
       const cfg = await withLock(configPath(projectRoot), async () => {
         const innerCfg = await readConfig(projectRoot)
         if (args.defaultTechStack !== undefined) {

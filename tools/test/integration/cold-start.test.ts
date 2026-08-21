@@ -224,3 +224,65 @@ describe("parent project warning", () => {
     expect(result.title).not.toBe("Warning")
   })
 })
+
+// ── Project root warnings ──────────────────────────────────
+
+describe("project root warnings", () => {
+  let deepWorktree: string
+  let deepCtx: ReturnType<typeof mockContext>
+
+  beforeEach(async () => {
+    const parentDir = await fs.mkdtemp(path.join(os.tmpdir(), "deep-parent-"))
+    deepWorktree = path.join(parentDir, "child", "project")
+    await fs.mkdir(deepWorktree, { recursive: true })
+    deepCtx = mockContext(deepWorktree)
+    await fs.mkdir(path.join(deepWorktree, ".opencode", "spec-memory"), { recursive: true })
+  })
+
+  afterEach(async () => {
+    const parentDir = path.dirname(path.dirname(deepWorktree))
+    await fs.rm(parentDir, { recursive: true, force: true })
+  })
+
+  it("scaffold returns warning for kit installation directory", async () => {
+    const homeDir = os.homedir()
+    const kitDir = path.join(homeDir, ".config", "opencode")
+    await fs.mkdir(path.join(kitDir, ".opencode", "spec-memory"), { recursive: true })
+    const kitCtx = mockContext(kitDir)
+    const result = await scaffoldTool.execute(
+      { featureName: "Test", template: "spec" },
+      kitCtx
+    )
+    expect(result.title).toBe("Warning")
+    expect(result.metadata?.warnings).toBeDefined()
+    expect(result.metadata?.requiresConfirmation).toBe(true)
+  })
+
+  it("scaffold does not return warning for valid deep path", async () => {
+    const result = await scaffoldTool.execute(
+      { featureName: "Test", template: "spec" },
+      deepCtx
+    )
+    expect(result.title).not.toBe("Warning")
+  })
+
+  it("validate does not return warning for valid deep path", async () => {
+    const result = await validateTool.execute({}, deepCtx)
+    expect(result.title).not.toBe("Warning")
+  })
+
+  it("clean does not return warning for valid deep path", async () => {
+    const result = await cleanTool.execute({}, deepCtx)
+    expect(result.title).not.toBe("Warning")
+  })
+
+  it("audit does not return warning for valid deep path", async () => {
+    const result = await auditTool.execute({}, deepCtx)
+    expect(result.title).not.toBe("Warning")
+  })
+
+  it("status does not return warning for valid deep path", async () => {
+    const result = await statusTool.execute({}, deepCtx)
+    expect(result.title).not.toBe("Warning")
+  })
+})

@@ -2,6 +2,7 @@ import { tool, type ToolResult } from "@opencode-ai/plugin"
 import path from "node:path"
 import {
   isValidProjectRoot,
+  getProjectRootWarnings,
   corruptionWarnings,
   clearCorruptionWarnings,
 } from "./shared/types"
@@ -71,6 +72,14 @@ export default tool({
       const projectRoot = context.worktree
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const projectWarnings = await getProjectRootWarnings(projectRoot)
+      if (projectWarnings.length > 0) {
+        return {
+          title: "Warning",
+          output: projectWarnings.map(w => w.message).join("\n\n"),
+          metadata: { warnings: projectWarnings, requiresConfirmation: true },
+        }
+      }
 
       const findings: SelfHealFinding[] = []
       let auditOutput = ""
