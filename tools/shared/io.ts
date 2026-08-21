@@ -350,6 +350,7 @@ export interface CorruptionWarning {
   file: string
   message: string
   timestamp: number
+  suggestion?: string
 }
 
 export let corruptionWarnings: CorruptionWarning[] = []
@@ -358,12 +359,15 @@ export function clearCorruptionWarnings(): void {
   corruptionWarnings = []
 }
 
-export function pushCorruptionWarning(fp: string, errorMsg: string): void {
+export function pushCorruptionWarning(fp: string, errorMsg: string, suggestion?: string): void {
   const existing = corruptionWarnings.find(w => w.file === fp && w.message === errorMsg)
   if (existing) return
-  const warn: CorruptionWarning = { file: fp, message: errorMsg, timestamp: Date.now() }
+  const warn: CorruptionWarning = { file: fp, message: errorMsg, timestamp: Date.now(), suggestion }
   corruptionWarnings.push(warn)
   console.warn(`[SDD] Corruption detected in ${fp}: using defaults. ${errorMsg}`)
+  if (suggestion) {
+    console.warn(`[SDD] ${suggestion}`)
+  }
 }
 
 // ─────────────────────────── Session I/O ───────────────────────────
@@ -514,10 +518,11 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
 
 export async function readConfig(root: string): Promise<SDDConfig> {
   const fp = configPath(root)
+  const configSuggestion = "Run /config to restore your settings"
   try {
     const checksumValid = await verifyFileChecksum(fp)
     if (!checksumValid) {
-      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
+      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted", configSuggestion)
       return { ...DEFAULT_CONFIG }
     }
     
@@ -526,12 +531,12 @@ export async function readConfig(root: string): Promise<SDDConfig> {
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
     if (result.success) return result.data
-    pushCorruptionWarning(fp, result.error.message)
+    pushCorruptionWarning(fp, result.error.message, configSuggestion)
     return { ...DEFAULT_CONFIG }
   } catch (err) {
     if (!isENOENT(err)) {
       const msg = err instanceof Error ? err.message : String(err)
-      pushCorruptionWarning(fp, msg)
+      pushCorruptionWarning(fp, msg, configSuggestion)
     }
     return { ...DEFAULT_CONFIG }
   }

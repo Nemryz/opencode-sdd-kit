@@ -283,6 +283,35 @@ describe("checksum verification", () => {
     expect(result).toBeDefined()
   })
 
+  it("readConfig includes suggestion when config is corrupted", async () => {
+    const cp = configPath(worktree)
+    await fs.mkdir(path.dirname(cp), { recursive: true })
+    await fs.writeFile(cp, "{invalid json", "utf-8")
+    
+    clearCorruptionWarnings()
+    await readConfig(worktree)
+    
+    const configWarnings = corruptionWarnings.filter(w => w.file === cp)
+    expect(configWarnings.length).toBeGreaterThan(0)
+    expect(configWarnings[0].suggestion).toBe("Run /config to restore your settings")
+  })
+
+  it("pushCorruptionWarning accepts optional suggestion", async () => {
+    clearCorruptionWarnings()
+    pushCorruptionWarning("/tmp/test.json", "test error", "Test suggestion")
+    
+    expect(corruptionWarnings.length).toBe(1)
+    expect(corruptionWarnings[0].suggestion).toBe("Test suggestion")
+  })
+
+  it("pushCorruptionWarning works without suggestion", async () => {
+    clearCorruptionWarnings()
+    pushCorruptionWarning("/tmp/test2.json", "test error without suggestion")
+    
+    expect(corruptionWarnings.length).toBe(1)
+    expect(corruptionWarnings[0].suggestion).toBeUndefined()
+  })
+
   it("rotates checksum files with backups", async () => {
     const sp = sessionPath(worktree)
     await fs.mkdir(path.dirname(sp), { recursive: true })
