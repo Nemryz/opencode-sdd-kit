@@ -1,5 +1,6 @@
 import path from "node:path"
 import fs from "node:fs/promises"
+import crypto from "node:crypto"
 import {
   sessionPath,
   specJsonPath,
@@ -34,6 +35,39 @@ export function isEEXIST(err: unknown): boolean {
 
 export function isESRCH(err: unknown): boolean {
   return isErrorWithCode(err) && err.code === "ESRCH"
+}
+
+// ─────────────────────────── Checksum helpers ───────────────────────────
+
+function computeSha256(data: string): string {
+  return crypto.createHash("sha256").update(data).digest("hex")
+}
+
+async function writeChecksumFile(bakPath: string, data: string): Promise<void> {
+  const hash = computeSha256(data)
+  await fs.writeFile(`${bakPath}.sha256`, hash, "utf-8")
+}
+
+async function verifyChecksum(bakPath: string, data: string): Promise<boolean> {
+  try {
+    const stored = await fs.readFile(`${bakPath}.sha256`, "utf-8")
+    const computed = computeSha256(data)
+    return stored.trim() === computed
+  } catch {
+    return false
+  }
+}
+
+async function verifyFileChecksum(fp: string): Promise<boolean> {
+  try {
+    const checksumPath = `${fp}.sha256`
+    const stored = await fs.readFile(checksumPath, "utf-8")
+    const data = await fs.readFile(fp, "utf-8")
+    const computed = computeSha256(data)
+    return stored.trim() === computed
+  } catch {
+    return true
+  }
 }
 
 // ─────────────────────────── File Locking ───────────────────────────
@@ -159,12 +193,24 @@ export async function writeWithBackup(fp: string, data: string, root: string): P
     const timestamp = Date.now()
     const bakFile = path.join(backupDir, `${path.basename(fp)}.${timestamp}.bak`)
     await fs.mkdir(backupDir, { recursive: true })
+    
     await fs.writeFile(bakFile, existing, "utf-8")
+    await writeChecksumFile(bakFile, existing)
+    
+    const verified = await verifyChecksum(bakFile, existing)
+    if (!verified) {
+      await fs.rm(bakFile, { force: true })
+      await fs.rm(`${bakFile}.sha256`, { force: true })
+      throw new Error(`Backup verification failed for ${fp}`)
+    }
+    
     const allBaks = await fs.readdir(backupDir).catch(() => [])
-    if (allBaks.length > MAX_BACKUPS) {
-      const sorted = allBaks.sort()
-      for (const old of sorted.slice(0, allBaks.length - MAX_BACKUPS)) {
+    const bakFiles = allBaks.filter(f => f.endsWith(".bak"))
+    if (bakFiles.length > MAX_BACKUPS) {
+      const sorted = bakFiles.sort()
+      for (const old of sorted.slice(0, bakFiles.length - MAX_BACKUPS)) {
         await fs.rm(path.join(backupDir, old), { force: true })
+        await fs.rm(path.join(backupDir, `${old}.sha256`), { force: true })
       }
     }
   }
@@ -221,6 +267,83 @@ export async function findLatestValidBackup<T>(
   return null
 }
 
+// ─────────────────────────── Backup Integrity Verification ───────────────────────────
+
+export interface BackupIntegrityReport {
+  totalBackups: number
+  valid: number
+  corrupted: number
+  missingChecksum: number
+  details: Array<{
+    file: string
+    status: "valid" | "corrupted" | "missing-checksum" | "read-error"
+    error?: string
+  }>
+}
+
+export async function verifyBackupIntegrity(
+  root: string,
+  schemas: Record<string, { safeParse: (data: unknown) => { success: boolean } }>,
+): Promise<BackupIntegrityReport> {
+  const backupDir = path.join(root, ".opencode", BACKUP_DIR_NAME)
+  const report: BackupIntegrityReport = {
+    totalBackups: 0,
+    valid: 0,
+    corrupted: 0,
+    missingChecksum: 0,
+    details: [],
+  }
+
+  let files: string[]
+  try {
+    files = await fs.readdir(backupDir)
+  } catch {
+    return report
+  }
+
+  const bakFiles = files.filter(f => f.endsWith(".bak"))
+  report.totalBackups = bakFiles.length
+
+  for (const bak of bakFiles) {
+    const bakPath = path.join(backupDir, bak)
+    try {
+      const content = await fs.readFile(bakPath, "utf-8")
+      
+      const checksumValid = await verifyChecksum(bakPath, content)
+      if (!checksumValid) {
+        report.missingChecksum++
+        report.details.push({ file: bak, status: "missing-checksum" })
+        continue
+      }
+
+      const basename = bak.replace(/\.\d+\.bak$/, "")
+      const schema = schemas[basename]
+      if (schema) {
+        const parsed = JSON.parse(content)
+        if (schema.safeParse(parsed).success) {
+          report.valid++
+          report.details.push({ file: bak, status: "valid" })
+        } else {
+          report.corrupted++
+          report.details.push({ file: bak, status: "corrupted" })
+        }
+      } else {
+        report.valid++
+        report.details.push({ file: bak, status: "valid" })
+      }
+    } catch (err) {
+      report.corrupted++
+      report.details.push({
+        file: bak,
+        status: "read-error",
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  return report
+}
+
 // ─────────────────────────── Corruption Warnings ───────────────────────────
 
 export interface CorruptionWarning {
@@ -248,6 +371,17 @@ export function pushCorruptionWarning(fp: string, errorMsg: string): void {
 export async function readSession(root: string): Promise<SessionState> {
   const fp = sessionPath(root)
   try {
+    const checksumValid = await verifyFileChecksum(fp)
+    if (!checksumValid) {
+      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
+      const restored = await findLatestValidBackup<SessionState>(fp, root, SessionStateSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
+        return restored
+      }
+      return { ...DEFAULT_SESSION }
+    }
+    
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_SESSION, ...parsed }
@@ -285,6 +419,18 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
   const handle = await acquireLock(fp)
   try {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
+    
+    const written = await fs.readFile(fp, "utf-8")
+    const parsed = JSON.parse(written)
+    const verify = SessionStateSchema.safeParse(parsed)
+    if (!verify.success) {
+      throw new Error(`writeSession: post-write verification failed: ${String(verify.error)}`)
+    }
+    
+    const checksumValid = await verifyFileChecksum(fp)
+    if (!checksumValid) {
+      throw new Error(`writeSession: post-write checksum verification failed`)
+    }
   } finally {
     await releaseLock(handle)
   }
@@ -297,6 +443,17 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
   const fp = specJsonPath(featureDir)
   const root = path.dirname(path.dirname(featureDir))
   try {
+    const checksumValid = await verifyFileChecksum(fp)
+    if (!checksumValid) {
+      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
+      const restored = await findLatestValidBackup<SpecJson>(fp, root, SpecJsonSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
+        return restored
+      }
+      return null
+    }
+    
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const result = SpecJsonSchema.safeParse(parsed)
@@ -335,6 +492,18 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   const handle = await acquireLock(fp)
   try {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
+    
+    const written = await fs.readFile(fp, "utf-8")
+    const parsed = JSON.parse(written)
+    const verify = SpecJsonSchema.safeParse(parsed)
+    if (!verify.success) {
+      throw new Error(`writeSpecJson: post-write verification failed: ${String(verify.error)}`)
+    }
+    
+    const checksumValid = await verifyFileChecksum(fp)
+    if (!checksumValid) {
+      throw new Error(`writeSpecJson: post-write checksum verification failed`)
+    }
   } finally {
     await releaseLock(handle)
   }
@@ -346,6 +515,12 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
 export async function readConfig(root: string): Promise<SDDConfig> {
   const fp = configPath(root)
   try {
+    const checksumValid = await verifyFileChecksum(fp)
+    if (!checksumValid) {
+      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
+      return { ...DEFAULT_CONFIG }
+    }
+    
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_CONFIG, ...parsed }

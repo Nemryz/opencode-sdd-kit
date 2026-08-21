@@ -286,8 +286,11 @@ describe("writeWithBackup", () => {
     expect(content).toBe("after")
     const backupDir = path.join(root, ".opencode", "backups")
     const baks = await fs.readdir(backupDir)
-    expect(baks.length).toBe(1)
-    const bakContent = await fs.readFile(path.join(backupDir, baks[0]), "utf-8")
+    const bakFiles = baks.filter(f => f.endsWith(".bak"))
+    const shaFiles = baks.filter(f => f.endsWith(".sha256"))
+    expect(bakFiles.length).toBe(1)
+    expect(shaFiles.length).toBe(1)
+    const bakContent = await fs.readFile(path.join(backupDir, bakFiles[0]), "utf-8")
     expect(bakContent).toBe("before")
   })
 
@@ -315,7 +318,8 @@ describe("writeWithBackup", () => {
     }
     await writeWithBackup(fp, "new", root)
     const baks = await fs.readdir(backupDir)
-    expect(baks.length).toBeLessThanOrEqual(11)
+    const bakFiles = baks.filter(f => f.endsWith(".bak"))
+    expect(bakFiles.length).toBeLessThanOrEqual(11)
   })
 
   it("backup survives atomicWriteFile failure", async () => {
@@ -326,7 +330,8 @@ describe("writeWithBackup", () => {
     await writeWithBackup(fp, "updated", root)
     const backupDir = path.join(root, ".opencode", "backups")
     const baks = await fs.readdir(backupDir)
-    expect(baks.length).toBe(1)
+    const bakFiles = baks.filter(f => f.endsWith(".bak"))
+    expect(bakFiles.length).toBe(1)
     const bakContent = await fs.readFile(path.join(backupDir, baks[0]), "utf-8")
     expect(bakContent).toBe("original")
   })

@@ -9,12 +9,15 @@ import {
   writeSession,
   writeSpecJson,
   writeWithBackup,
+  verifyBackupIntegrity,
   sessionPath,
   specJsonPath,
+  configPath,
   corruptionWarnings,
   clearCorruptionWarnings,
   pushCorruptionWarning,
   CorruptionWarning,
+  BackupIntegrityReport,
   makeSpecJson,
   specsDirPath,
 } from "../../shared/types"
@@ -189,5 +192,195 @@ describe("auto restore from backup", () => {
     clearCorruptionWarnings()
     const result = await readSpecJson(specDir)
     expect(result).toBeNull()
+  })
+})
+
+describe("checksum verification", () => {
+  it("creates checksum file when creating backup", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    const validSession = { command: null, phase: "init" as const, featureDir: null, featureNumber: null, featureName: null, history: [], lastResult: null, nextStep: "/spec" }
+    await writeSession(worktree, validSession)
+    
+    const validSession2 = { command: null, phase: "plan" as const, featureDir: "001-auth", featureNumber: 1, featureName: "auth", history: ["/spec"], lastResult: null, nextStep: "/plan" }
+    await writeSession(worktree, validSession2)
+    
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const bakFiles = files.filter(f => f.endsWith(".bak"))
+    const shaFiles = files.filter(f => f.endsWith(".sha256"))
+    
+    expect(bakFiles.length).toBeGreaterThan(0)
+    expect(shaFiles.length).toBe(bakFiles.length)
+  })
+
+  it("detects corrupted backup via checksum", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    const validSession = { command: null, phase: "init" as const, featureDir: null, featureNumber: null, featureName: null, history: [], lastResult: null, nextStep: "/spec" }
+    await writeSession(worktree, validSession)
+    
+    const validSession2 = { command: null, phase: "plan" as const, featureDir: "001-auth", featureNumber: 1, featureName: "auth", history: ["/spec"], lastResult: null, nextStep: "/plan" }
+    await writeSession(worktree, validSession2)
+    
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const bakFile = files.find(f => f.startsWith("session.json") && f.endsWith(".bak"))
+    expect(bakFile).toBeDefined()
+    
+    const bakPath = path.join(backupDir, bakFile!)
+    await fs.writeFile(bakPath, "{corrupted}", "utf-8")
+    
+    clearCorruptionWarnings()
+    const result = await readSession(worktree)
+    expect(result.phase).toBe("plan")
+  })
+
+  it("readSession verifies checksum before parsing", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    const validSession = { command: null, phase: "init" as const, featureDir: null, featureNumber: null, featureName: null, history: [], lastResult: null, nextStep: "/spec" }
+    await writeSession(worktree, validSession)
+    
+    const shaPath = `${sp}.sha256`
+    await fs.writeFile(shaPath, "invalid_checksum", "utf-8")
+    
+    clearCorruptionWarnings()
+    const result = await readSession(worktree)
+    expect(result.phase).toBe("init")
+  })
+
+  it("readSpecJson verifies checksum before parsing", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const sjp = specJsonPath(specDir)
+    const validSpec = makeSpecJson("auth", 1)
+    await writeSpecJson(validSpec, specDir)
+    
+    const validSpec2 = makeSpecJson("auth", 1)
+    validSpec2.feature_name = "auth-updated"
+    await writeSpecJson(validSpec2, specDir)
+    
+    const shaPath = `${sjp}.sha256`
+    await fs.writeFile(shaPath, "invalid_checksum", "utf-8")
+    
+    clearCorruptionWarnings()
+    const result = await readSpecJson(specDir)
+    expect(result).not.toBeNull()
+    expect(result?.feature_name).toBe("auth")
+  })
+
+  it("readConfig verifies checksum before parsing", async () => {
+    const cp = configPath(worktree)
+    await fs.mkdir(path.dirname(cp), { recursive: true })
+    await writeSession(worktree, { command: null, phase: "init" as const, featureDir: null, featureNumber: null, featureName: null, history: [], lastResult: null, nextStep: "/spec" })
+    
+    const shaPath = `${cp}.sha256`
+    await fs.writeFile(shaPath, "invalid_checksum", "utf-8")
+    
+    clearCorruptionWarnings()
+    const result = await readConfig(worktree)
+    expect(result).toBeDefined()
+  })
+
+  it("rotates checksum files with backups", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    
+    for (let i = 0; i < 12; i++) {
+      const session = { command: null, phase: "init" as const, featureDir: null, featureNumber: null, featureName: null, history: [], lastResult: null, nextStep: "/spec" }
+      await writeSession(worktree, session)
+    }
+    
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const bakFiles = files.filter(f => f.endsWith(".bak"))
+    const shaFiles = files.filter(f => f.endsWith(".sha256"))
+    
+    expect(bakFiles.length).toBeLessThanOrEqual(10)
+    expect(shaFiles.length).toBe(bakFiles.length)
+  })
+})
+
+describe("verifyBackupIntegrity", () => {
+  it("returns correct report for valid backups", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const validSpec = makeSpecJson("auth", 1)
+    await writeSpecJson(validSpec, specDir)
+    
+    const validSpec2 = makeSpecJson("auth", 1)
+    validSpec2.feature_name = "auth-updated"
+    await writeSpecJson(validSpec2, specDir)
+    
+    const schemas = { "spec.json": { safeParse: (data: unknown) => ({ success: true, data }) } }
+    const report = await verifyBackupIntegrity(worktree, schemas)
+    
+    expect(report.totalBackups).toBeGreaterThan(0)
+    expect(report.valid).toBeGreaterThan(0)
+    expect(report.corrupted).toBe(0)
+  })
+
+  it("detects corrupted backups", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const validSpec = makeSpecJson("auth", 1)
+    await writeSpecJson(validSpec, specDir)
+    
+    const validSpec2 = makeSpecJson("auth", 1)
+    validSpec2.feature_name = "auth-updated"
+    await writeSpecJson(validSpec2, specDir)
+    
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const bakFile = files.find(f => f.startsWith("spec.json") && f.endsWith(".bak"))
+    
+    if (bakFile) {
+      const bakPath = path.join(backupDir, bakFile)
+      const shaPath = `${bakPath}.sha256`
+      
+      const originalContent = await fs.readFile(bakPath, "utf-8")
+      await fs.writeFile(bakPath, "{corrupted}", "utf-8")
+      await fs.writeFile(shaPath, require("node:crypto").createHash("sha256").update("{corrupted}").digest("hex"), "utf-8")
+      
+      const schemas = { "spec.json": { safeParse: (data: unknown) => ({ success: false }) } }
+      const report = await verifyBackupIntegrity(worktree, schemas)
+      
+      expect(report.corrupted).toBeGreaterThan(0)
+    }
+  })
+
+  it("detects missing checksums", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const validSpec = makeSpecJson("auth", 1)
+    await writeSpecJson(validSpec, specDir)
+    
+    const validSpec2 = makeSpecJson("auth", 1)
+    validSpec2.feature_name = "auth-updated"
+    await writeSpecJson(validSpec2, specDir)
+    
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const bakFile = files.find(f => f.startsWith("spec.json") && f.endsWith(".bak"))
+    
+    if (bakFile) {
+      const shaPath = path.join(backupDir, `${bakFile}.sha256`)
+      await fs.rm(shaPath, { force: true })
+      
+      const schemas = { "spec.json": { safeParse: (data: unknown) => ({ success: true, data }) } }
+      const report = await verifyBackupIntegrity(worktree, schemas)
+      
+      expect(report.missingChecksum).toBeGreaterThan(0)
+    }
+  })
+
+  it("returns empty report when no backups exist", async () => {
+    const schemas = {}
+    const report = await verifyBackupIntegrity(worktree, schemas)
+    
+    expect(report.totalBackups).toBe(0)
+    expect(report.valid).toBe(0)
+    expect(report.corrupted).toBe(0)
   })
 })
