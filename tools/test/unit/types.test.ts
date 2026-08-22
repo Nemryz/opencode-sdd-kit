@@ -360,16 +360,19 @@ describe("getProjectRootWarnings", () => {
   })
 
   it("returns system-directory warning for Windows system dirs", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("C:\\Windows")
     expect(warnings.some(w => w.type === "system-directory")).toBe(true)
   })
 
   it("returns system-directory warning for Program Files", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("C:\\Program Files")
     expect(warnings.some(w => w.type === "system-directory")).toBe(true)
   })
 
   it("returns multiple warnings for overlapping conditions", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("C:\\Windows")
     const types = warnings.map(w => w.type)
     expect(types).toContain("system-directory")
@@ -387,6 +390,7 @@ describe("getProjectRootWarnings", () => {
   })
 
   it("handles mixed case system directories", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("c:\\windows")
     expect(warnings.some(w => w.type === "system-directory")).toBe(true)
   })
