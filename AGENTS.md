@@ -192,6 +192,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-status` | Report full workflow state | none |
 | `speckit-complexity` | Assess task complexity for routing | `taskDescription`, `filesAffected`, `hasNewDependencies`, `hasBoundaryAnnotations`, `hasNeedsClarification`, `useProjectContext` |
 | `speckit-selfheal` | Run health scan, analyze findings, apply fixes with rollback | `fix` (bool, optional) |
+| `speckit-health` | Run health check, verify file integrity, restore from backups | `fix` (bool, optional) |
 
 ---
 
@@ -275,7 +276,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 
