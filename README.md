@@ -1,10 +1,10 @@
 # opencode SDD Kit
 
-Spec-Driven Development workflow for opencode, a structured methodology that guides features from their initial specification through to final implementation using sequential artifacts and phase gates. Each phase produces a document, each document unlocks the next step, and no phase can be skipped without validation.
+Spec-Driven Development workflow for opencode. A structured methodology that guides features from initial specification through final implementation using sequential artifacts and phase gates. Each phase produces a document, each document unlocks the next step, and no phase can be skipped without validation.
 
 ## Capabilities
 
-Constitution. Project governing principles such as Simplicity, Anti-Abstraction, and Integration-First testing, all written into a single markdown file and enforced by the toolchain.
+Constitution. Project governing principles such as Simplicity, Anti-Abstraction, and Integration-First testing written into a single markdown file and enforced by the toolchain.
 
 Specification. Feature specifications with prioritized user stories, Gherkin scenarios, acceptance criteria, edge cases, and measurable success metrics.
 
@@ -22,6 +22,8 @@ Express Mode. An operational shortcut that skips conversational proposals when s
 
 Status and Cleanup. Workflow state tracking with automatic session repair when directories are moved, files are deleted, or spec.json phases fall out of sync with reality.
 
+Resilience. Automatic backups with SHA-256 checksum verification, corruption detection with warning channels, and auto-restore from valid backups when state files become unreadable.
+
 ## Structure
 
 ```
@@ -29,35 +31,52 @@ Status and Cleanup. Workflow state tracking with automatic session repair when d
   AGENTS.md              Workflow orchestration and agent definitions
   commands/              CLI command handlers (10 files)
   skills/                Skill instructions (6 skills plus shared rules)
-  tools/                 TypeScript plugin tools (7 files)
+  tools/                 TypeScript plugin tools (8 files)
   templates/             Artifact templates for spec, plan, tasks, constitution
-  docs/                  Reference documentation and roadmap
+  docs/                  Reference documentation
 ```
 
-Eight tools live in the tools directory, each one a self-contained TypeScript file registered as an opencode plugin: speckit-scaffold, speckit-validate, speckit-audit, speckit-clean, speckit-status, speckit-config, speckit-complexity, and speckit-selfheal. Six skill files in the skills directory guide the agents through each phase. Shared rules for design principles, spec writing, and task generation reside in skills/rules/.
+Eight tools live in the tools directory, each one a self-contained TypeScript file registered as an opencode plugin.
+
+| Tool | Purpose |
+|------|---------|
+| speckit-scaffold | Creates feature directories and artifact files |
+| speckit-validate | Validates required SDD artifacts exist |
+| speckit-audit | Comprehensive project audit with auto-fix |
+| speckit-clean | Scans and repairs inconsistencies |
+| speckit-status | Shows workflow state across all features |
+| speckit-config | Reads and writes SDD configuration |
+| speckit-complexity | Assesses task complexity for routing |
+| speckit-selfheal | Health scan with categorized findings |
+
+Six skill files in the skills directory guide the agents through each phase. Shared rules for design principles, spec writing, and task generation reside in skills/rules/.
 
 ## Installation
 
-1. Install opencode by following the instructions at opencode.ai.
+Install opencode by following the instructions at opencode.ai.
 
-2. Clone or copy this repository into your opencode configuration directory.
+Clone this repository into your opencode configuration directory.
 
-   Quick installation method:
-   ```
-   git clone https://github.com/Nemryz/opencode-sdd-kit.git ~/.config/opencode
-   cd ~/.config/opencode && npm install
-   ```
+```
+git clone https://github.com/Nemryz/opencode-sdd-kit.git ~/.config/opencode
+cd ~/.config/opencode && npm install
+```
 
-   Alternative method that copies individual files:
-   ```
-   git clone https://github.com/Nemryz/opencode-sdd-kit.git
-   cp -r opencode-sdd-kit/* ~/.config/opencode/
-   cd ~/.config/opencode && npm install
-   ```
+Alternative installation scripts are provided for each platform.
 
-3. Restart opencode for the changes to take effect.
+Windows PowerShell.
 
-4. Run /status from within opencode to verify that everything was installed correctly.
+```
+irm https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.ps1 | iex
+```
+
+Linux or macOS.
+
+```
+curl -fsSL https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.sh | bash
+```
+
+Restart opencode for the changes to take effect. Run /status to verify that everything was installed correctly.
 
 ## Usage
 
@@ -68,13 +87,15 @@ Eight tools live in the tools directory, each one a self-contained TypeScript fi
 /tasks                          Break the plan into actionable tasks
 /review                         Check cross-artifact consistency
 /impl [task-id]                 Execute implementation tasks
-/clean [--dry-run]              Scan and repair inconsistencies
+/steering [description]         Create or update steering context
+/audit [--fix]                  Run comprehensive project audit
+/clean [--fix]                  Scan and repair inconsistencies
 /config key=value               Read or update configuration
 ```
 
 ### Workflow Walkthrough
 
-A typical session moves through the phases in order, each one producing a new artifact and updating the feature's spec.json phase.
+A typical session moves through the phases in order, each one producing a new artifact and updating the feature spec.json phase.
 
 ```
 > /status
@@ -97,25 +118,37 @@ Agent checks spec, plan, and tasks for consistency.
 Review complete, 0 issues found. Ready for /impl
 ```
 
-## Customization
+### Resilience
 
-Language preferences. Edit the Language field in AGENTS.md to change the output language used by all agent responses.
+Every write operation creates a backup of the previous state. Backups include SHA-256 checksums for integrity verification. When a state file becomes corrupted, the system automatically attempts to restore from the most recent valid backup. If restoration fails, corruption warnings appear in audit and status output so you can investigate manually.
 
-Templates. Modify the markdown files in the templates directory to adapt artifact structures to your project conventions.
+### Express Mode
 
-Tools. Extend or add new TypeScript tools in the tools directory by following the existing plugin pattern. Each tool exports a single default function that registers description, args schema, and execute handler.
+Express Mode skips the conversational proposal step in spec writing and plan engineering. Enable it with.
 
-Skills. Adjust the SKILL.md files in the skills directory to modify agent behavior for each workflow phase. Shared rules in skills/rules/ apply across multiple skills.
+```
+/config expressMode=true
+```
+
+When active, skills proceed directly to artifact generation without asking for confirmation first.
+
+### Complexity Routing
+
+The implementer evaluates each task and routes it through one of three tiers. Simple tasks go directly to implementation. Standard tasks follow the TDD cycle. Complex tasks dispatch sub-agents for parallel work. The complexity score considers file count, dependency changes, boundary annotations, and ambiguity markers.
+
+## Configuration
+
+Copy opencode.jsonc.example to opencode.jsonc and set your preferred model and permissions. Use /config within opencode to manage SDD-specific settings like default tech stack, express mode, and auto versioning.
 
 ## Test Suite
 
-The project includes 621 automated tests distributed across 27 test files, covering unit tests, integration tests, content assertions for skill files, phase gate verification for all 10 commands, concurrent lock safety, edge case handling for stale locks, status fallback with deleted directories, config tool performance with special characters, clean repair paths, discovery detection for package managers and frameworks, full e2e lifecycle validation from spec through audit, and cold-start bootstrap from an empty directory. Tests run with vitest via npm test.
+The project includes 732 automated tests distributed across 28 test files. Coverage spans unit tests, integration tests, content assertions for skill files, phase gate verification for all commands, concurrent lock safety, edge case handling, corruption recovery, and full end-to-end lifecycle validation. Tests run with vitest via npm test.
 
-Feature specs in the `specs/` directory are intentionally tracked by git to enable full versioning of the specification, plan, and tasks alongside the code. This was changed in Fase F (commit 096fab3) — previously specs/ was gitignored. The `spec.json` file in each feature tracks phase state and approvals for the workflow.
+Feature specs in the specs directory are intentionally tracked by git to enable full versioning of the specification, plan, and tasks alongside the code.
 
 ## Contributing
 
-Issues and pull requests are welcome at the GitHub repository. 
+Issues and pull requests are welcome at the GitHub repository.
 
 ## License
 
