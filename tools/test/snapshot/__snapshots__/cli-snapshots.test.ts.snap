@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Snapshot: /audit (clean) > matches snapshot for clean audit 1`] = `"Audit: 0 issue(s)"`;
+
+exports[`Snapshot: /audit (clean) > matches snapshot for clean audit 2`] = `
+"Audit: PASS | 0 error(s), 0 warning(s), 3 info
+[INF] constitution: Constitution file present
+[INF] steering: No steering directory (optional)
+[INF] features: 1 feature(s) found: 001-test-feature"
+`;
+
+exports[`Snapshot: /audit (with findings) > matches snapshot for audit with findings 1`] = `"Audit: 1 issue(s)"`;
+
+exports[`Snapshot: /audit (with findings) > matches snapshot for audit with findings 2`] = `
+"Audit: FAIL | 1 error(s), 0 warning(s), 3 info
+[INF] constitution: Constitution file present
+[INF] steering: No steering directory (optional)
+[INF] features: 1 feature(s) found: 001-test-feature
+[ERR] phase-mismatch: 001-test-feature: spec.json says ready but files missing (spec=true, plan=false, tasks=false)"
+`;
+
+exports[`Snapshot: /complexity (complex task) > matches snapshot for complex task 1`] = `"Complexity: complex"`;
+
+exports[`Snapshot: /complexity (complex task) > matches snapshot for complex task 2`] = `"complex (score: 15)"`;
+
+exports[`Snapshot: /complexity (simple task) > matches snapshot for simple task 1`] = `"Complexity: simple"`;
+
+exports[`Snapshot: /complexity (simple task) > matches snapshot for simple task 2`] = `"simple (score: 0)"`;
+
+exports[`Snapshot: /delta-status (empty) > matches snapshot for empty deltas 1`] = `"No deltas"`;
+
+exports[`Snapshot: /delta-status (empty) > matches snapshot for empty deltas 2`] = `"No deltas found for 001-test-feature. Create one with /spec-delta <description>"`;
+
+exports[`Snapshot: /delta-status (with deltas) > matches snapshot for deltas present 1`] = `"Delta Status: 001-test-feature"`;
+
+exports[`Snapshot: /delta-status (with deltas) > matches snapshot for deltas present 2`] = `
+"Deltas: 2 total, 2 active, 0 consolidated
+  [-] D001: Add OAuth support (draft, feature, medium)
+  [-] D002: Add rate limiting (draft, feature, medium)"
+`;
+
+exports[`Snapshot: /health (corrupted) > matches snapshot for corrupted state 1`] = `"Session Health: CRITICAL"`;
+
+exports[`Snapshot: /health (corrupted) > matches snapshot for corrupted state 2`] = `
+"Session Health: CRITICAL
+  session.json: healthy
+  config.json: missing
+  Features: 0/0 healthy
+  Overall: CRITICAL"
+`;
+
+exports[`Snapshot: /health (healthy) > matches snapshot for healthy state 1`] = `"Session Health: CRITICAL"`;
+
+exports[`Snapshot: /health (healthy) > matches snapshot for healthy state 2`] = `
+"Session Health: CRITICAL
+  session.json: healthy
+  config.json: missing
+  Features: 1/1 healthy
+    001-test-feature: healthy
+  Overall: CRITICAL"
+`;
+
+exports[`Snapshot: /status (clean state) > matches snapshot for clean state 1`] = `"Status: 0 feature(s)"`;
+
+exports[`Snapshot: /status (clean state) > matches snapshot for clean state 2`] = `"No features yet. Next: /spec <description>"`;
+
+exports[`Snapshot: /status (with corruption) > matches snapshot with corruption warnings 1`] = `"Status: 0 feature(s) [corruption detected]"`;
+
+exports[`Snapshot: /status (with corruption) > matches snapshot with corruption warnings 2`] = `
+"No features yet. Next: /spec <description>
+[CORRUPTION] <PATH> Unexpected token 'i', "invalid json {{{" is not valid JSON"
+`;
+
+exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 1`] = `"Phase: plan"`;
+
+exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 2`] = `"spec.json phase: plan | spec ok | plan ok | tasks ok | Next: /tasks"`;
+
+exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 1`] = `"Phase: spec"`;
+
+exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 2`] = `"spec.json phase: spec | spec ok | plan missing | tasks missing | Next: /plan <tech stack>"`;
