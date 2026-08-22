@@ -22,6 +22,7 @@ import {
   corruptionWarnings,
   clearCorruptionWarnings,
 } from "./shared/types"
+import { DeltasIndexSchema, type Delta } from "./shared/schemas"
 
 export interface AuditFinding {
   severity: "info" | "warn" | "error"
@@ -200,6 +201,40 @@ async function auditFeature(
       message: `${dirName}: has contracts/ directory`,
       file: path.join(base, "contracts"),
     })
+  }
+
+  // Delta audit
+  const deltasDir = path.join(base, "deltas")
+  const deltasIndexFp = path.join(deltasDir, "deltas.json")
+  if (await exists(deltasIndexFp)) {
+    try {
+      const raw = await fs.readFile(deltasIndexFp, "utf-8")
+      const parsed = JSON.parse(raw)
+      const result = DeltasIndexSchema.safeParse(parsed)
+      if (result.success) {
+        const activeDeltas = result.data.deltas.filter(d => d.status !== "consolidated" && d.status !== "cancelled")
+        const staleDeltas = activeDeltas.filter(d => {
+          const age = Date.now() - new Date(d.updated_at).getTime()
+          return age > 7 * 24 * 60 * 60 * 1000
+        })
+        if (activeDeltas.length > 5) {
+          findings.push({
+            severity: "warn",
+            category: "delta-sprawl",
+            message: `${dirName}: ${activeDeltas.length} active deltas (consider consolidating)`,
+            file: deltasIndexFp,
+          })
+        }
+        for (const delta of staleDeltas) {
+          findings.push({
+            severity: "info",
+            category: "stale-delta",
+            message: `${dirName}: delta ${delta.id} has been ${delta.status} for > 7 days`,
+            file: deltasIndexFp,
+          })
+        }
+      }
+    } catch { /* ignore */ }
   }
 }
 

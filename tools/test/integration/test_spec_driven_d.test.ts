@@ -24,6 +24,7 @@ import {
   corruptionWarnings,
   clearCorruptionWarnings,
   pushCorruptionWarning,
+  writeFileChecksum,
 } from "../../shared/io"
 import {
   detectPhase,
@@ -531,6 +532,7 @@ describe("26. writeConfig round-trip", () => {
     }
     const fp = configPath(root)
     await writeWithBackup(fp, JSON.stringify(config, null, 2), root)
+    await writeFileChecksum(fp)
     const readBack = await readConfig(root)
     expect(readBack.defaultTechStack).toBe("Django+PostgreSQL")
     expect(readBack.lastUsedLanguage).toBe("python")

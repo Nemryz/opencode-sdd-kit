@@ -5,30 +5,11 @@ import {
   getProjectRootWarnings,
   SDDConfig,
   ConfigSchema,
-  writeWithBackup,
-  acquireLock,
-  releaseLock,
+  writeConfigWithBackup,
+  readConfigWithRestore,
   withLock,
-  pushCorruptionWarning,
-  readConfig,
-  tryAutoCommit,
   clearCorruptionWarnings,
 } from "./shared/types"
-
-async function writeConfig(root: string, cfg: SDDConfig): Promise<void> {
-  const result = ConfigSchema.safeParse(cfg)
-  if (!result.success) {
-    throw new Error(`writeConfig: validation failed, data not written: ${String(result.error)}`)
-  }
-  const fp = configPath(root)
-  const handle = await acquireLock(fp)
-  try {
-    await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
-  } finally {
-    await releaseLock(handle)
-  }
-  await tryAutoCommit(fp, root)
-}
 
 export default tool({
   description: "Read or update SDD configuration (tech stack defaults, preferences)",
@@ -52,10 +33,10 @@ export default tool({
         }
       }
       const cfg = await withLock(configPath(projectRoot), async () => {
-        const innerCfg = await readConfig(projectRoot)
+        const innerCfg = await readConfigWithRestore(projectRoot)
         if (args.defaultTechStack !== undefined) {
           innerCfg.defaultTechStack = args.defaultTechStack ?? null
-          await writeConfig(projectRoot, innerCfg)
+          await writeConfigWithBackup(projectRoot, innerCfg)
         } else if (args.key && args.value !== undefined) {
           if (args.key === "expressMode") {
             innerCfg.expressMode = args.value === "true"
@@ -67,7 +48,7 @@ export default tool({
             innerCfg.preferences[args.key] = args.value
           }
           innerCfg.lastUsedLanguage = args.key === "language" ? args.value : innerCfg.lastUsedLanguage
-          await writeConfig(projectRoot, innerCfg)
+          await writeConfigWithBackup(projectRoot, innerCfg)
         }
         return innerCfg
       })

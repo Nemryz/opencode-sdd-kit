@@ -81,6 +81,7 @@ export default tool({
       const reports: FeatureReport[] = []
       const issues: string[] = []
       let specJsonMismatches = 0
+      let deltaWarnings = 0
 
         for (const dir of entries) {
           const base = path.join(specsDir, dir)
@@ -91,6 +92,23 @@ export default tool({
 
           if (!sj) {
             sj = await reconstructFromFrontmatter(base)
+          }
+
+          // Check for stale deltas
+          const deltasIndexFp = path.join(base, "deltas", "deltas.json")
+          if (await exists(deltasIndexFp)) {
+            try {
+              const raw = await fs.readFile(deltasIndexFp, "utf-8")
+              const parsed = JSON.parse(raw)
+              const result = (await import("./shared/schemas")).DeltasIndexSchema.safeParse(parsed)
+              if (result.success) {
+                const cancelled = result.data.deltas.filter(d => d.status === "cancelled")
+                if (cancelled.length > 0) {
+                  deltaWarnings++
+                  issues.push(`${dir}: ${cancelled.length} cancelled delta(s)`)
+                }
+              }
+            } catch { /* ignore */ }
           }
 
           let status: "ok" | "incomplete" | "orphan"
