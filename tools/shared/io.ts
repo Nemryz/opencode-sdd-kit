@@ -13,6 +13,9 @@ import {
   ConfigSchema,
   DEFAULT_SESSION,
   DEFAULT_CONFIG,
+  specsDirPath,
+  HealthReport,
+  FeatureHealth,
 } from "./schemas"
 
 // ─────────────────────────── Error helpers ───────────────────────────
@@ -731,4 +734,200 @@ export async function syncFrontmatterFromSpecJson(
       ...(extra?.last_audit ? { last_audit: extra.last_audit } : {}),
     })
   }
+}
+
+// ─────────────────────────── Config Backup I/O ───────────────────────────
+
+export async function writeConfigWithBackup(root: string, cfg: SDDConfig): Promise<void> {
+  const result = ConfigSchema.safeParse(cfg)
+  if (!result.success) {
+    throw new Error(`writeConfigWithBackup: validation failed, data not written: ${String(result.error)}`)
+  }
+  const fp = configPath(root)
+  const handle = await acquireLock(fp)
+  try {
+    await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
+    await writeFileChecksum(fp)
+  } finally {
+    await releaseLock(handle)
+  }
+  await tryAutoCommit(fp, root)
+}
+
+export async function readConfigWithRestore(root: string): Promise<SDDConfig> {
+  const fp = configPath(root)
+  const configSuggestion = "Run /config to restore your settings"
+  try {
+    const checksumValid = await verifyLiveFileChecksum(fp)
+    if (!checksumValid) {
+      pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted", configSuggestion)
+      const restored = await findLatestValidBackup<SDDConfig>(fp, root, ConfigSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
+        return restored
+      }
+      return { ...DEFAULT_CONFIG }
+    }
+
+    const data = await fs.readFile(fp, "utf-8")
+    const parsed = JSON.parse(data)
+    const merged = { ...DEFAULT_CONFIG, ...parsed }
+    const result = ConfigSchema.safeParse(merged)
+    if (result.success) return result.data
+    pushCorruptionWarning(fp, result.error.message, configSuggestion)
+    const restored = await findLatestValidBackup<SDDConfig>(fp, root, ConfigSchema)
+    if (restored) {
+      console.warn(`[SDD] Restored ${fp} from backup`)
+      return restored
+    }
+    return { ...DEFAULT_CONFIG }
+  } catch (err) {
+    if (!isENOENT(err)) {
+      const msg = err instanceof Error ? err.message : String(err)
+      pushCorruptionWarning(fp, msg, configSuggestion)
+      const restored = await findLatestValidBackup<SDDConfig>(fp, root, ConfigSchema)
+      if (restored) {
+        console.warn(`[SDD] Restored ${fp} from backup`)
+        return restored
+      }
+    }
+    return { ...DEFAULT_CONFIG }
+  }
+}
+
+// ─────────────────────────── Live File Checksum ───────────────────────────
+
+export async function writeFileChecksum(fp: string): Promise<void> {
+  try {
+    const data = await fs.readFile(fp, "utf-8")
+    const hash = computeSha256(data)
+    await fs.writeFile(`${fp}.sha256`, hash, "utf-8")
+  } catch {
+    // fail silently
+  }
+}
+
+export async function verifyLiveFileChecksum(fp: string): Promise<boolean> {
+  try {
+    const data = await fs.readFile(fp, "utf-8")
+    const stored = await fs.readFile(`${fp}.sha256`, "utf-8")
+    const computed = computeSha256(data)
+    return stored.trim() === computed
+  } catch {
+    return true
+  }
+}
+
+// ─────────────────────────── Frontmatter Checksum ───────────────────────────
+
+export async function writeFrontmatterChecksum(filePath: string): Promise<void> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8")
+    const checksum = computeBodyChecksum(content)
+    await writeFrontmatter(filePath, { checksum })
+  } catch {
+    // fail silently
+  }
+}
+
+// ─────────────────────────── Health Check ───────────────────────────
+
+export async function runHealthCheck(projectRoot: string): Promise<HealthReport> {
+  const report: HealthReport = {
+    session: { status: "healthy", file: sessionPath(projectRoot) },
+    config: { status: "healthy", file: configPath(projectRoot) },
+    features: [],
+    overall: "healthy",
+  }
+
+  // Check session.json
+  const sessionFp = sessionPath(projectRoot)
+  try {
+    const sessionValid = await verifyLiveFileChecksum(sessionFp)
+    if (!sessionValid) {
+      const restored = await findLatestValidBackup(sessionFp, projectRoot, SessionStateSchema)
+      report.session.status = restored ? "restored" : "corrupted"
+    }
+  } catch {
+    report.session.status = "missing"
+  }
+
+  // Check config.json
+  const configFp = configPath(projectRoot)
+  try {
+    const configValid = await verifyLiveFileChecksum(configFp)
+    if (!configValid) {
+      const restored = await findLatestValidBackup(configFp, projectRoot, ConfigSchema)
+      report.config.status = restored ? "restored" : "corrupted"
+    }
+  } catch {
+    report.config.status = "missing"
+  }
+
+  // Check features
+  const sDir = specsDirPath(projectRoot)
+  try {
+    const entries = await fs.readdir(sDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const base = path.join(sDir, entry.name)
+        const featureHealth: FeatureHealth = {
+          dir: entry.name,
+          spec_json: "healthy",
+          backups: { total: 0, valid: 0, corrupted: 0 },
+        }
+
+        // Check spec.json
+        const sjFp = specJsonPath(base)
+        try {
+          const sjValid = await verifyLiveFileChecksum(sjFp)
+          if (!sjValid) {
+            const restored = await findLatestValidBackup(sjFp, projectRoot, SpecJsonSchema)
+            featureHealth.spec_json = restored ? "restored" : "corrupted"
+          }
+        } catch {
+          featureHealth.spec_json = "missing"
+        }
+
+        // Check backups
+        const backupDir = path.join(projectRoot, ".opencode", BACKUP_DIR_NAME)
+        try {
+          const bakFiles = await fs.readdir(backupDir)
+          const featureBaks = bakFiles.filter(f => f.includes(entry.name) && f.endsWith(".bak"))
+          featureHealth.backups.total = featureBaks.length
+          for (const bak of featureBaks) {
+            const bakPath = path.join(backupDir, bak)
+            try {
+              const content = await fs.readFile(bakPath, "utf-8")
+              const valid = await verifyChecksum(bakPath, content)
+              if (valid) featureHealth.backups.valid++
+              else featureHealth.backups.corrupted++
+            } catch {
+              featureHealth.backups.corrupted++
+            }
+          }
+        } catch {
+          // no backup dir
+        }
+
+        report.features.push(featureHealth)
+      }
+    }
+  } catch {
+    // no specs dir
+  }
+
+  // Determine overall status
+  const hasCorrupted = report.session.status === "corrupted" || report.config.status === "corrupted"
+    || report.features.some(f => f.spec_json === "corrupted")
+  const hasRestored = report.session.status === "restored" || report.config.status === "restored"
+    || report.features.some(f => f.spec_json === "restored")
+  const hasMissing = report.session.status === "missing" || report.config.status === "missing"
+    || report.features.some(f => f.spec_json === "missing")
+
+  if (hasCorrupted || hasMissing) report.overall = "critical"
+  else if (hasRestored) report.overall = "degraded"
+  else report.overall = "healthy"
+
+  return report
 }
