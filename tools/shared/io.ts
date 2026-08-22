@@ -426,6 +426,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
   const handle = await acquireLock(fp)
   try {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
+    await writeFileChecksum(fp)
     
     const written = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(written)
@@ -499,6 +500,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   const handle = await acquireLock(fp)
   try {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
+    await writeFileChecksum(fp)
     
     const written = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(written)
@@ -809,6 +811,11 @@ export async function writeFileChecksum(fp: string): Promise<void> {
 
 export async function verifyLiveFileChecksum(fp: string): Promise<boolean> {
   try {
+    await fs.access(fp)
+  } catch {
+    return false
+  }
+  try {
     const data = await fs.readFile(fp, "utf-8")
     const stored = await fs.readFile(`${fp}.sha256`, "utf-8")
     const computed = computeSha256(data)
@@ -843,10 +850,10 @@ export async function runHealthCheck(projectRoot: string): Promise<HealthReport>
   // Check session.json
   const sessionFp = sessionPath(projectRoot)
   try {
+    await fs.access(sessionFp)
     const sessionValid = await verifyLiveFileChecksum(sessionFp)
     if (!sessionValid) {
-      const restored = await findLatestValidBackup(sessionFp, projectRoot, SessionStateSchema)
-      report.session.status = restored ? "restored" : "corrupted"
+      report.session.status = "corrupted"
     }
   } catch {
     report.session.status = "missing"
@@ -855,10 +862,10 @@ export async function runHealthCheck(projectRoot: string): Promise<HealthReport>
   // Check config.json
   const configFp = configPath(projectRoot)
   try {
+    await fs.access(configFp)
     const configValid = await verifyLiveFileChecksum(configFp)
     if (!configValid) {
-      const restored = await findLatestValidBackup(configFp, projectRoot, ConfigSchema)
-      report.config.status = restored ? "restored" : "corrupted"
+      report.config.status = "corrupted"
     }
   } catch {
     report.config.status = "missing"
@@ -880,10 +887,10 @@ export async function runHealthCheck(projectRoot: string): Promise<HealthReport>
         // Check spec.json
         const sjFp = specJsonPath(base)
         try {
+          await fs.access(sjFp)
           const sjValid = await verifyLiveFileChecksum(sjFp)
           if (!sjValid) {
-            const restored = await findLatestValidBackup(sjFp, projectRoot, SpecJsonSchema)
-            featureHealth.spec_json = restored ? "restored" : "corrupted"
+            featureHealth.spec_json = "corrupted"
           }
         } catch {
           featureHealth.spec_json = "missing"
