@@ -21,6 +21,7 @@ mkdir -p "${CONFIG_DIR}"
 cp "${TMP_DIR}/opencode-sdd-kit/AGENTS.md" "${CONFIG_DIR}/AGENTS.md"
 cp "${TMP_DIR}/opencode-sdd-kit/opencode.jsonc" "${CONFIG_DIR}/opencode.jsonc" 2>/dev/null || true
 cp "${TMP_DIR}/opencode-sdd-kit/package.json" "${CONFIG_DIR}/package.json"
+cp "${TMP_DIR}/opencode-sdd-kit/package-lock.json" "${CONFIG_DIR}/package-lock.json" 2>/dev/null || true
 
 cp -r "${TMP_DIR}/opencode-sdd-kit/agents" "${CONFIG_DIR}/"
 cp -r "${TMP_DIR}/opencode-sdd-kit/commands" "${CONFIG_DIR}/"

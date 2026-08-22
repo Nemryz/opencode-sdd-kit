@@ -18,6 +18,7 @@ New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
 Copy-Item -Force "$TmpDir\opencode-sdd-kit\AGENTS.md" "$ConfigDir\AGENTS.md"
 Copy-Item -Force "$TmpDir\opencode-sdd-kit\opencode.jsonc" "$ConfigDir\opencode.jsonc" -ErrorAction SilentlyContinue
 Copy-Item -Force "$TmpDir\opencode-sdd-kit\package.json" "$ConfigDir\package.json"
+Copy-Item -Force "$TmpDir\opencode-sdd-kit\package-lock.json" "$ConfigDir\package-lock.json" -ErrorAction SilentlyContinue
 
 Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\agents" "$ConfigDir"
 Copy-Item -Recurse -Force "$TmpDir\opencode-sdd-kit\commands" "$ConfigDir"
