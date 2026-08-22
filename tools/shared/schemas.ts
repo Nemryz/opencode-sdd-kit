@@ -67,6 +67,7 @@ export const SpecJsonSchema = z.object({
     tasks: ApprovalStateSchema,
   }),
   ready_for_implementation: z.boolean(),
+  active_delta: z.string().nullable().optional(),
 })
 
 export const SessionStateSchema = z.object({
@@ -157,3 +158,67 @@ export const FrontmatterSchema = z.object({
 
 export type AuditMetadata = z.infer<typeof AuditMetadataSchema>
 export type FrontmatterData = z.infer<typeof FrontmatterSchema>
+
+// ─────────────────────────── Delta Schemas ───────────────────────────
+
+export const DeltaStatusSchema = z.enum(["draft", "planned", "ready", "implementing", "consolidated", "cancelled"])
+export const DeltaTypeSchema = z.enum(["feature", "fix", "refactor"])
+export const DeltaImpactSchema = z.enum(["low", "medium", "high"])
+
+export const DeltaSchema = z.object({
+  id: z.string(),
+  type: DeltaTypeSchema,
+  title: z.string(),
+  status: DeltaStatusSchema,
+  impact: DeltaImpactSchema,
+  parent_feature: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  consolidated_at: z.string().optional(),
+})
+
+export const DeltasIndexSchema = z.object({
+  feature: z.string(),
+  deltas: z.array(DeltaSchema),
+})
+
+export const DeltaFrontmatterSchema = z.object({
+  delta_id: z.string(),
+  type: DeltaTypeSchema,
+  status: DeltaStatusSchema,
+  impact: DeltaImpactSchema,
+  parent_feature: z.string(),
+  parent_spec_hash: z.string().optional(),
+})
+
+export type DeltaStatus = z.infer<typeof DeltaStatusSchema>
+export type DeltaType = z.infer<typeof DeltaTypeSchema>
+export type DeltaImpact = z.infer<typeof DeltaImpactSchema>
+export type Delta = z.infer<typeof DeltaSchema>
+export type DeltasIndex = z.infer<typeof DeltasIndexSchema>
+export type DeltaFrontmatterData = z.infer<typeof DeltaFrontmatterSchema>
+
+// ─────────────────────────── Health Check Schema ───────────────────────────
+
+export const HealthStatusSchema = z.enum(["healthy", "corrupted", "restored", "missing"])
+
+export const FeatureHealthSchema = z.object({
+  dir: z.string(),
+  spec_json: HealthStatusSchema,
+  backups: z.object({
+    total: z.number(),
+    valid: z.number(),
+    corrupted: z.number(),
+  }),
+})
+
+export const HealthReportSchema = z.object({
+  session: z.object({ status: HealthStatusSchema, file: z.string() }),
+  config: z.object({ status: HealthStatusSchema, file: z.string() }),
+  features: z.array(FeatureHealthSchema),
+  overall: z.enum(["healthy", "degraded", "critical"]),
+})
+
+export type HealthStatus = z.infer<typeof HealthStatusSchema>
+export type FeatureHealth = z.infer<typeof FeatureHealthSchema>
+export type HealthReport = z.infer<typeof HealthReportSchema>

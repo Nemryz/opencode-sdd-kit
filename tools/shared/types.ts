@@ -1,7 +1,7 @@
 import path from "node:path"
 import os from "node:os"
 import fs from "node:fs/promises"
-import { PATHS, SpecJson, SessionState, specsDirPath } from "./schemas"
+import { PATHS, SpecJson, SessionState, specsDirPath, DeltasIndex, Delta } from "./schemas"
 import { isENOENT } from "./io"
 
 // Re-export everything from schemas and io for backward compatibility
@@ -330,6 +330,41 @@ export function makeSpecJson(featureName: string, featureNumber: number): SpecJs
       tasks: { generated: false, approved: false },
     },
     ready_for_implementation: false,
+  }
+}
+
+// ─────────────────────────── Delta Utilities ───────────────────────────
+
+export function makeDeltaIndex(featureDirName: string): DeltasIndex {
+  return {
+    feature: featureDirName,
+    deltas: [],
+  }
+}
+
+export function getNextDeltaId(deltas: Delta[]): string {
+  if (deltas.length === 0) return "D001"
+  const maxNum = Math.max(...deltas.map(d => parseInt(d.id.replace("D", ""), 10)))
+  return `D${String(maxNum + 1).padStart(3, "0")}`
+}
+
+export function makeDelta(
+  id: string,
+  type: import("./schemas").DeltaType,
+  title: string,
+  impact: import("./schemas").DeltaImpact,
+  parentFeature: string,
+): Delta {
+  const now = new Date().toISOString()
+  return {
+    id,
+    type,
+    title,
+    status: "draft",
+    impact,
+    parent_feature: parentFeature,
+    created_at: now,
+    updated_at: now,
   }
 }
 
