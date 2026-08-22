@@ -11,6 +11,10 @@ import {
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   readFrontmatter,
+  writeFrontmatter,
+  writeFrontmatterChecksum,
+  computeBodyChecksum,
+  syncFrontmatterFromSpecJson,
   specsDirPath,
   withLock,
   clearCorruptionWarnings,
@@ -184,26 +188,114 @@ async function handleImplDelta(projectRoot: string, featureDir: string, targetDi
   const index = await readDeltasIndex(featureDir)
   const delta = index.deltas.find(d => d.id === deltaId)
   if (!delta) return { title: "Error", output: `Delta ${deltaId} not found` }
-  if (delta.status !== "ready") return { title: "Error", output: `Delta ${deltaId} status is ${delta.status}, expected ready` }
 
-  const specFp = path.join(featureDir, "spec.md")
-  const specHash = await computeFileHash(specFp)
+  if (delta.status === "ready") {
+    delta.status = "implementing"
+    delta.updated_at = new Date().toISOString()
+    await writeDeltasIndex(index, featureDir)
 
-  delta.status = "implementing"
-  delta.updated_at = new Date().toISOString()
-  await writeDeltasIndex(index, featureDir)
+    const sj = await readSpecJson(featureDir)
+    if (sj) {
+      sj.active_delta = deltaId
+      await writeSpecJson(sj, featureDir)
+    }
 
-  const sj = await readSpecJson(featureDir)
-  if (sj) {
-    sj.active_delta = deltaId
-    await writeSpecJson(sj, featureDir)
+    return {
+      title: `Delta ${deltaId} implementing`,
+      output: `Delta ${deltaId} is now implementing. Complete implementation, then run /impl-delta ${deltaId} again to consolidate.`,
+      metadata: { deltaId },
+    }
   }
 
-  return {
-    title: `Delta ${deltaId} implementing`,
-    output: `Delta ${deltaId} is now implementing. Complete implementation, then run /impl-delta ${deltaId} again to consolidate.`,
-    metadata: { deltaId },
+  if (delta.status === "implementing") {
+    const deltaDir = deltasDir(featureDir)
+    const deltaPlanPath = path.join(deltaDir, `${deltaId}-plan.md`)
+    const deltaTasksPath = path.join(deltaDir, `${deltaId}-tasks.md`)
+    const deltaSpecPath = path.join(deltaDir, `${deltaId}-${deltaSlug(delta.title)}.md`)
+
+    const specFp = path.join(featureDir, "spec.md")
+    const planFp = path.join(featureDir, "plan.md")
+    const tasksFp = path.join(featureDir, "tasks.md")
+
+    const deltaPlanContent = await fs.readFile(deltaPlanPath, "utf-8").catch(() => "")
+    const deltaTasksContent = await fs.readFile(deltaTasksPath, "utf-8").catch(() => "")
+    const deltaSpecContent = await fs.readFile(deltaSpecPath, "utf-8").catch(() => "")
+
+    if (deltaPlanContent) {
+      const existingPlan = await fs.readFile(planFp, "utf-8").catch(() => "")
+      const deltaBody = extractBody(deltaPlanContent)
+      if (deltaBody) {
+        const merged = existingPlan.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
+        await fs.writeFile(planFp, merged, "utf-8")
+      }
+    }
+
+    if (deltaTasksContent) {
+      const existingTasks = await fs.readFile(tasksFp, "utf-8").catch(() => "")
+      const deltaBody = extractBody(deltaTasksContent)
+      if (deltaBody) {
+        const merged = existingTasks.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
+        await fs.writeFile(tasksFp, merged, "utf-8")
+      }
+    }
+
+    if (deltaSpecContent) {
+      const existingSpec = await fs.readFile(specFp, "utf-8").catch(() => "")
+      const deltaBody = extractBody(deltaSpecContent)
+      if (deltaBody) {
+        const merged = existingSpec.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
+        await fs.writeFile(specFp, merged, "utf-8")
+      }
+    }
+
+    const sj = await readSpecJson(featureDir)
+    if (sj) {
+      sj.active_delta = null
+      await writeSpecJson(sj, featureDir)
+      await syncFrontmatterFromSpecJson(featureDir, sj)
+    }
+
+    await writeFrontmatterChecksum(specFp)
+    await writeFrontmatterChecksum(planFp)
+    await writeFrontmatterChecksum(tasksFp)
+
+    delta.status = "consolidated"
+    delta.consolidated_at = new Date().toISOString()
+    delta.updated_at = new Date().toISOString()
+    await writeDeltasIndex(index, featureDir)
+
+    return {
+      title: `Delta ${deltaId} consolidated`,
+      output: `Delta ${deltaId} merged into spec.md, plan.md, tasks.md. Frontmatter checksums updated. ${deltaId} marked consolidated.`,
+      metadata: { deltaId },
+    }
   }
+
+  return { title: "Error", output: `Delta ${deltaId} status is ${delta.status}, expected ready or implementing` }
+}
+
+function extractBody(mdContent: string): string {
+  const lines = mdContent.split("\n")
+  const bodyLines: string[] = []
+  let pastFrontmatter = false
+  let pastTitle = false
+  for (const line of lines) {
+    if (!pastFrontmatter) {
+      if (line.trim() === "---") {
+        pastFrontmatter = true
+      }
+      continue
+    }
+    if (!pastTitle) {
+      if (line.startsWith("# ")) {
+        pastTitle = true
+        continue
+      }
+      continue
+    }
+    bodyLines.push(line)
+  }
+  return bodyLines.join("\n").trim()
 }
 
 async function handleDeltaStatus(projectRoot: string, featureDir: string, targetDir: string) {

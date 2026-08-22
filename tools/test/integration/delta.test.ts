@@ -286,3 +286,95 @@ describe("9. Complete roundtrip", () => {
     expect(index.deltas[0].status).toBe("implementing")
   })
 })
+
+describe("10. Consolidation merges delta into main files", () => {
+  it("merges plan and tasks content into main files", async () => {
+    const featureDir = await getFeatureDir()
+    const planFp = path.join(featureDir, "plan.md")
+    const tasksFp = path.join(featureDir, "tasks.md")
+    await fs.writeFile(planFp, "# Plan\n\nBase plan content.\n", "utf-8")
+    await fs.writeFile(tasksFp, "# Tasks\n\nBase tasks content.\n", "utf-8")
+
+    await deltaTool.execute({ command: "spec-delta", description: "Add OAuth support" }, ctx)
+    await deltaTool.execute({ command: "plan-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "tasks-delta", deltaId: "D001" }, ctx)
+
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+
+    const planAfter = await fs.readFile(planFp, "utf-8")
+    const tasksAfter = await fs.readFile(tasksFp, "utf-8")
+    expect(planAfter).toContain("Base plan content")
+    expect(planAfter).toContain("Delta D001")
+    expect(tasksAfter).toContain("Base tasks content")
+    expect(tasksAfter).toContain("Delta D001")
+  })
+})
+
+describe("11. Consolidation marks delta as consolidated", () => {
+  it("updates deltas.json status to consolidated", async () => {
+    const featureDir = await getFeatureDir()
+    const planFp = path.join(featureDir, "plan.md")
+    const tasksFp = path.join(featureDir, "tasks.md")
+    await fs.writeFile(planFp, "# Plan\n\nContent.\n", "utf-8")
+    await fs.writeFile(tasksFp, "# Tasks\n\nContent.\n", "utf-8")
+
+    await deltaTool.execute({ command: "spec-delta", description: "Add OAuth support" }, ctx)
+    await deltaTool.execute({ command: "plan-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "tasks-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+
+    const indexRaw = await fs.readFile(path.join(featureDir, "deltas", "deltas.json"), "utf-8")
+    const index = JSON.parse(indexRaw)
+    expect(index.deltas[0].status).toBe("consolidated")
+    expect(index.deltas[0].consolidated_at).toBeDefined()
+  })
+})
+
+describe("12. Consolidation clears active_delta in spec.json", () => {
+  it("sets active_delta to null after consolidation", async () => {
+    const featureDir = await getFeatureDir()
+    const planFp = path.join(featureDir, "plan.md")
+    const tasksFp = path.join(featureDir, "tasks.md")
+    await fs.writeFile(planFp, "# Plan\n\nContent.\n", "utf-8")
+    await fs.writeFile(tasksFp, "# Tasks\n\nContent.\n", "utf-8")
+
+    await deltaTool.execute({ command: "spec-delta", description: "Add OAuth support" }, ctx)
+    let sj = await readSpecJson(featureDir)
+    expect(sj?.active_delta).toBe("D001")
+
+    await deltaTool.execute({ command: "plan-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "tasks-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+
+    sj = await readSpecJson(featureDir)
+    expect(sj?.active_delta).toBeNull()
+  })
+})
+
+describe("13. Consolidation updates frontmatter checksums", () => {
+  it("recalculates body checksums after merge", async () => {
+    const featureDir = await getFeatureDir()
+    const planFp = path.join(featureDir, "plan.md")
+    const tasksFp = path.join(featureDir, "tasks.md")
+    await fs.writeFile(planFp, "# Plan\n\nContent.\n", "utf-8")
+    await fs.writeFile(tasksFp, "# Tasks\n\nContent.\n", "utf-8")
+
+    await deltaTool.execute({ command: "spec-delta", description: "Add OAuth support" }, ctx)
+    await deltaTool.execute({ command: "plan-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "tasks-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+    await deltaTool.execute({ command: "impl-delta", deltaId: "D001" }, ctx)
+
+    const specFp = path.join(featureDir, "spec.md")
+    const specFm = await readFrontmatter(specFp)
+    const planFm = await readFrontmatter(planFp)
+    const tasksFm = await readFrontmatter(tasksFp)
+
+    expect(specFm?.checksum).toBeDefined()
+    expect(planFm?.checksum).toBeDefined()
+    expect(tasksFm?.checksum).toBeDefined()
+  })
+})
