@@ -136,6 +136,12 @@ export function parsePhase(s: string): Phase {
 
 // ─────────────────────────── Frontmatter Schema ───────────────────────────
 
+export const AuditMetadataSchema = z.object({
+  date: z.string(),
+  findings: z.number(),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+})
+
 export const FrontmatterSchema = z.object({
   feature_name: z.string().optional(),
   feature_number: z.number().optional(),
@@ -145,6 +151,9 @@ export const FrontmatterSchema = z.object({
   status: z.enum(["generated", "validated", "approved"]).optional(),
   checksum: z.string().optional(),
   boundaries: z.array(z.string()).optional(),
+  depends_on: z.array(z.string()).optional(),
+  last_audit: AuditMetadataSchema.optional(),
 })
 
+export type AuditMetadata = z.infer<typeof AuditMetadataSchema>
 export type FrontmatterData = z.infer<typeof FrontmatterSchema>

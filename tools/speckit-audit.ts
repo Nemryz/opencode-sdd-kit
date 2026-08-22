@@ -10,6 +10,7 @@ import {
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   reconstructFromFrontmatter,
+  syncFrontmatterFromSpecJson,
   constitutionPath,
   specsDirPath,
   steeringDirPath,
@@ -323,6 +324,7 @@ export default tool({
 
       if (args.fix && report.findings.length > 0) {
         let fixedCount = 0
+        const fixedBases: string[] = []
         for (const finding of report.findings) {
           if (finding.severity === "error" && finding.category === "phase-mismatch") {
             const sjPath = finding.file
@@ -337,6 +339,8 @@ export default tool({
                 if (sjPrev && sjPrev.phase !== newPhase) {
                   sjPrev.phase = parsePhase(newPhase)
                   await writeSpecJson(sjPrev, base)
+                  await syncFrontmatterFromSpecJson(base, sjPrev)
+                  fixedBases.push(base)
                   finding.message += " (auto-fixed)"
                   fixedCount++
                 }
@@ -351,6 +355,8 @@ export default tool({
                 if (sjPrev && sjPrev.ready_for_implementation) {
                   sjPrev.ready_for_implementation = false
                   await writeSpecJson(sjPrev, base)
+                  await syncFrontmatterFromSpecJson(base, sjPrev)
+                  fixedBases.push(base)
                   finding.message += " (auto-fixed)"
                   fixedCount++
                 }
@@ -378,6 +384,8 @@ export default tool({
                   }
                   if (changed) {
                     await writeSpecJson(sjPrev, base)
+                    await syncFrontmatterFromSpecJson(base, sjPrev)
+                    fixedBases.push(base)
                     finding.message += " (auto-fixed)"
                     fixedCount++
                   }
@@ -387,6 +395,15 @@ export default tool({
           }
         }
         if (fixedCount > 0) {
+          const auditMeta: import("./shared/schemas").AuditMetadata = {
+            date: new Date().toISOString(),
+            findings: fixedCount,
+            severity: report.summary.error > 0 ? "high" : report.summary.warn > 0 ? "medium" : "low",
+          }
+          for (const base of fixedBases) {
+            const sj = await readSpecJson(base)
+            if (sj) await syncFrontmatterFromSpecJson(base, sj, { last_audit: auditMeta })
+          }
           report.summary.error -= fixedCount
           if (report.summary.error < 0) report.summary.error = 0
           report.passed = report.summary.error === 0

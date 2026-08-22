@@ -596,6 +596,28 @@ export async function readFrontmatter(filePath: string): Promise<FrontmatterData
     }
     return result.data
   } catch {
+    try {
+      const content = await fs.readFile(filePath, "utf-8")
+      const match = content.match(/^---\n([\s\S]*?)\n---/)
+      if (match) {
+        const lines = match[1].split("\n")
+        const recovered: Record<string, unknown> = {}
+        for (const line of lines) {
+          const kvMatch = line.match(/^(\w+):\s*(.+)$/)
+          if (kvMatch) {
+            const [, key, rawVal] = kvMatch
+            const val = rawVal.trim()
+            if (key === "boundaries" || key === "depends_on") continue
+            if (val === "true") recovered[key] = true
+            else if (val === "false") recovered[key] = false
+            else if (/^\d+$/.test(val)) recovered[key] = parseInt(val, 10)
+            else recovered[key] = val.replace(/^["']|["']$/g, "")
+          }
+        }
+        const result = FrontmatterSchema.safeParse(recovered)
+        if (result.success) return result.data
+      }
+    } catch { /* ignore */ }
     return null
   }
 }
@@ -610,7 +632,8 @@ export async function writeFrontmatter(filePath: string, data: FrontmatterData):
 
 export function computeBodyChecksum(content: string): string {
   const parsed = matter(content)
-  return computeSha256(parsed.content)
+  const normalized = parsed.content.replace(/\r\n/g, "\n").trim()
+  return computeSha256(normalized)
 }
 
 export async function verifyBodyIntegrity(filePath: string): Promise<boolean> {
@@ -662,7 +685,11 @@ export async function reconstructFromFrontmatter(featureDir: string): Promise<Sp
   }
 }
 
-export async function syncFrontmatterFromSpecJson(featureDir: string, sj: SpecJson): Promise<void> {
+export async function syncFrontmatterFromSpecJson(
+  featureDir: string,
+  sj: SpecJson,
+  extra?: { last_audit?: import("./schemas").AuditMetadata },
+): Promise<void> {
   const specPath = path.join(featureDir, "spec.md")
   const planPath = path.join(featureDir, "plan.md")
   const tasksPath = path.join(featureDir, "tasks.md")
@@ -681,6 +708,7 @@ export async function syncFrontmatterFromSpecJson(featureDir: string, sj: SpecJs
       updated_at: sj.updated_at,
       phase: sj.phase,
       status: sj.approvals.spec.approved ? "approved" : sj.approvals.spec.generated ? "validated" : "generated",
+      ...(extra?.last_audit ? { last_audit: extra.last_audit } : {}),
     })
   }
 
@@ -690,6 +718,7 @@ export async function syncFrontmatterFromSpecJson(featureDir: string, sj: SpecJs
       ...existing,
       phase: sj.phase === "plan" || sj.phase === "tasks" || sj.phase === "ready" || sj.phase === "impl" || sj.phase === "complete" ? "plan" : sj.phase,
       status: sj.approvals.plan.approved ? "approved" : sj.approvals.plan.generated ? "validated" : "generated",
+      ...(extra?.last_audit ? { last_audit: extra.last_audit } : {}),
     })
   }
 
@@ -699,6 +728,7 @@ export async function syncFrontmatterFromSpecJson(featureDir: string, sj: SpecJs
       ...existing,
       phase: sj.phase === "tasks" || sj.phase === "ready" || sj.phase === "impl" || sj.phase === "complete" ? "tasks" : sj.phase,
       status: sj.approvals.tasks.approved ? "approved" : sj.approvals.tasks.generated ? "validated" : "generated",
+      ...(extra?.last_audit ? { last_audit: extra.last_audit } : {}),
     })
   }
 }

@@ -224,4 +224,57 @@ describe("syncFrontmatterFromSpecJson", () => {
     const specExists = await fs.access(path.join(tmpDir, "spec.md")).then(() => true).catch(() => false)
     expect(specExists).toBe(false)
   })
+
+  it("writes last_audit when provided", async () => {
+    await fs.writeFile(path.join(tmpDir, "spec.md"), "# Hello\n", "utf-8")
+    const sj = makeSpecJson("test", 1)
+    const auditMeta = { date: "2026-01-01T00:00:00.000Z", findings: 2, severity: "high" as const }
+    await syncFrontmatterFromSpecJson(tmpDir, sj, { last_audit: auditMeta })
+    const result = await readFrontmatter(path.join(tmpDir, "spec.md"))
+    expect(result?.last_audit).toEqual(auditMeta)
+  })
+})
+
+describe("readFrontmatter gray-matter fallback", () => {
+  it("recovers from broken YAML with regex fallback", async () => {
+    const fp = path.join(tmpDir, "broken-yaml.md")
+    const content = '---\nfeature_name: test\nboundaries: [ComponentA\n---\n# Hello\n'
+    await fs.writeFile(fp, content, "utf-8")
+    const result = await readFrontmatter(fp)
+    expect(result).not.toBeNull()
+    expect(result?.feature_name).toBe("test")
+  })
+
+  it("returns null when file has no frontmatter delimiters", async () => {
+    const fp = path.join(tmpDir, "no-delimiters.md")
+    await fs.writeFile(fp, "# Hello\n\nJust content\n", "utf-8")
+    const result = await readFrontmatter(fp)
+    expect(result).toBeNull()
+  })
+})
+
+describe("computeBodyChecksum normalization", () => {
+  it("produces same checksum for LF and CRLF", async () => {
+    const lf = "---\nfeature_name: test\n---\n# Hello\n"
+    const crlf = "---\nfeature_name: test\n---\n# Hello\r\n"
+    const c1 = computeBodyChecksum(lf)
+    const c2 = computeBodyChecksum(crlf)
+    expect(c1).toBe(c2)
+  })
+
+  it("produces same checksum with trailing whitespace", async () => {
+    const clean = "---\nfeature_name: test\n---\n# Hello\n"
+    const withTrailing = "---\nfeature_name: test\n---\n# Hello  \n  \n"
+    const c1 = computeBodyChecksum(clean)
+    const c2 = computeBodyChecksum(withTrailing)
+    expect(c1).toBe(c2)
+  })
+
+  it("produces same checksum with leading blank lines", async () => {
+    const clean = "---\nfeature_name: test\n---\n# Hello\n"
+    const withLeading = "---\nfeature_name: test\n---\n\n\n# Hello\n"
+    const c1 = computeBodyChecksum(clean)
+    const c2 = computeBodyChecksum(withLeading)
+    expect(c1).toBe(c2)
+  })
 })

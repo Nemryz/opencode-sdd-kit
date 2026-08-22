@@ -15,6 +15,7 @@ import {
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   reconstructFromFrontmatter,
+  syncFrontmatterFromSpecJson,
   constitutionPath,
   specsDirPath,
   specJsonPath,
@@ -183,6 +184,7 @@ export default tool({
         // ── Phase 3: Apply all spec.json changes ──
         for (const change of specChanges) {
           await writeSpecJson(change.sj, change.base)
+          await syncFrontmatterFromSpecJson(change.base, change.sj)
         }
 
         // ── Phase 4: Collect session.json changes ──
