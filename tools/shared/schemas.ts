@@ -133,3 +133,18 @@ export function parsePhase(s: string): Phase {
   if (s === "init") return "spec"
   return isPhase(s) ? s : "spec"
 }
+
+// ─────────────────────────── Frontmatter Schema ───────────────────────────
+
+export const FrontmatterSchema = z.object({
+  feature_name: z.string().optional(),
+  feature_number: z.number().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+  phase: z.enum(["spec", "plan", "tasks", "ready", "impl", "complete"]).optional(),
+  status: z.enum(["generated", "validated", "approved"]).optional(),
+  checksum: z.string().optional(),
+  boundaries: z.array(z.string()).optional(),
+})
+
+export type FrontmatterData = z.infer<typeof FrontmatterSchema>

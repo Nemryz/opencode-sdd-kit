@@ -10,6 +10,7 @@ import {
   isValidProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
+  reconstructFromFrontmatter,
   SpecJson,
   SessionState,
   PHASE_NEXT_STEP,
@@ -70,7 +71,12 @@ export default tool({
           const specJsonFile = specJsonPath(base)
           const specJsonExists = await exists(specJsonFile)
           specJson = await readSpecJson(base)
-          if (specJson) {
+          if (!specJson && !specJsonExists) {
+            specJson = await reconstructFromFrontmatter(base)
+            if (specJson) {
+              specJsonPhase = specJson.phase
+            }
+          } else if (specJson) {
             specJsonPhase = specJson.phase
             const filesOk = specOk && planOk && tasksOk
             if (specJson.phase === "ready" && !filesOk) {

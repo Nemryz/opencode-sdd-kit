@@ -9,6 +9,7 @@ import {
   isValidProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
+  reconstructFromFrontmatter,
   constitutionPath,
   specsDirPath,
   steeringDirPath,
@@ -48,16 +49,27 @@ async function auditFeature(
   const researchOk = await exists(path.join(base, "research.md"))
   const contractsOk = await exists(path.join(base, "contracts"))
 
-  const sj = await readSpecJson(base)
+  let sj = await readSpecJson(base)
 
   if (!sj) {
-    findings.push({
-      severity: "warn",
-      category: "spec-json",
-      message: `No spec.json found for ${dirName}`,
-      file: path.join(base, "spec.json"),
-    })
-    return
+    const sjFromFm = await reconstructFromFrontmatter(base)
+    if (sjFromFm) {
+      findings.push({
+        severity: "info",
+        category: "frontmatter-recovery",
+        message: `${dirName}: spec.json missing, recovered from frontmatter (phase=${sjFromFm.phase})`,
+        file: path.join(base, "spec.json"),
+      })
+      sj = sjFromFm
+    } else {
+      findings.push({
+        severity: "warn",
+        category: "spec-json",
+        message: `No spec.json found for ${dirName}`,
+        file: path.join(base, "spec.json"),
+      })
+      return
+    }
   }
 
   if (sj.phase !== "complete" && sj.phase !== "impl") {

@@ -9,6 +9,7 @@ import {
   getFeatureDirs,
   isValidProjectRoot,
   getProjectRootWarnings,
+  reconstructFromFrontmatter,
   PHASE_NEXT_STEP,
   SessionState,
   constitutionPath,
@@ -51,12 +52,16 @@ export default tool({
 
         for (const dir of dirs) {
           const base = path.join(specsDirPath(projectRoot), dir)
-          const sj = await readSpecJson(base)
+          let sj = await readSpecJson(base)
           const [specOk, planOk, tasksOk] = await Promise.all([
             exists(path.join(base, "spec.md")),
             exists(path.join(base, "plan.md")),
             exists(path.join(base, "tasks.md")),
           ])
+
+          if (!sj) {
+            sj = await reconstructFromFrontmatter(base)
+          }
 
           let phase: SessionState["phase"]
           if (sj) {

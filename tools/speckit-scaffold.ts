@@ -21,6 +21,7 @@ import {
   detectParentProjectWithoutSession,
   withLock,
   clearCorruptionWarnings,
+  writeFrontmatter,
   PATHS,
 } from "./shared/types"
 
@@ -400,6 +401,17 @@ export default tool({
         .replace(/NNN/g, String(featureNumber).padStart(3, "0"))
 
       await fs.writeFile(filePath, content, "utf-8")
+
+      if (MARKER_TEMPLATES.has(args.template)) {
+        const fmData: import("./shared/schemas").FrontmatterData = {
+          feature_name: args.featureName,
+          feature_number: featureNumber,
+          created_at: new Date().toISOString(),
+          phase: args.template as import("./shared/schemas").Phase,
+          status: "generated",
+        }
+        await writeFrontmatter(filePath, fmData)
+      }
 
       await withLock(specJsonPath(featurePath), async () => {
         let sj = await readSpecJson(featurePath)

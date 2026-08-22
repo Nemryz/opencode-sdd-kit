@@ -14,6 +14,7 @@ import {
   isValidProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
+  reconstructFromFrontmatter,
   constitutionPath,
   specsDirPath,
   specJsonPath,
@@ -80,58 +81,62 @@ export default tool({
       const issues: string[] = []
       let specJsonMismatches = 0
 
-      for (const dir of entries) {
-        const base = path.join(specsDir, dir)
-        const specOk = await exists(path.join(base, "spec.md"))
-        const planOk = await exists(path.join(base, "plan.md"))
-        const tasksOk = await exists(path.join(base, "tasks.md"))
-        const sj = await readSpecJson(base)
+        for (const dir of entries) {
+          const base = path.join(specsDir, dir)
+          const specOk = await exists(path.join(base, "spec.md"))
+          const planOk = await exists(path.join(base, "plan.md"))
+          const tasksOk = await exists(path.join(base, "tasks.md"))
+          let sj = await readSpecJson(base)
 
-        let status: "ok" | "incomplete" | "orphan"
-        if (specOk && planOk && tasksOk) {
-          status = "ok"
-        } else if (!specOk && !planOk && !tasksOk) {
-          status = "orphan"
-        } else {
-          status = "incomplete"
-        }
-
-        const report: FeatureReport = {
-          dir,
-          nnn: parseNNN(dir),
-          spec: specOk,
-          plan: planOk,
-          tasks: tasksOk,
-          status,
-        }
-        reports.push(report)
-
-        if (status === "incomplete") {
-          const missing: string[] = []
-          if (!specOk) missing.push("spec")
-          if (!planOk) missing.push("plan")
-          if (!tasksOk) missing.push("tasks")
-          if (missing.length > 0) {
-            issues.push(`${dir}: missing ${missing.join(", ")}`)
+          if (!sj) {
+            sj = await reconstructFromFrontmatter(base)
           }
-        } else if (status === "orphan") {
-          issues.push(`${dir}: empty directory (no artifacts)`)
-        }
 
-        if (sj) {
-          const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
-          const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
-          const isCompleteNotDowngraded = sj.phase === "complete" && filesPhase === "ready"
-          const isImplNotDowngraded = sj.phase === "impl" && filesPhase === "ready"
-          if (sj.phase !== filesPhase && !isTasksNotApproved && !isCompleteNotDowngraded && !isImplNotDowngraded) {
-            issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
-            specJsonMismatches++
+          let status: "ok" | "incomplete" | "orphan"
+          if (specOk && planOk && tasksOk) {
+            status = "ok"
+          } else if (!specOk && !planOk && !tasksOk) {
+            status = "orphan"
+          } else {
+            status = "incomplete"
           }
-          if (sj.ready_for_implementation && filesPhase !== "ready") {
-            issues.push(`${dir}: marked ready_for_implementation but files show phase "${filesPhase}"`)
+
+          const report: FeatureReport = {
+            dir,
+            nnn: parseNNN(dir),
+            spec: specOk,
+            plan: planOk,
+            tasks: tasksOk,
+            status,
+          }
+          reports.push(report)
+
+          if (status === "incomplete") {
+            const missing: string[] = []
+            if (!specOk) missing.push("spec")
+            if (!planOk) missing.push("plan")
+            if (!tasksOk) missing.push("tasks")
+            if (missing.length > 0) {
+              issues.push(`${dir}: missing ${missing.join(", ")}`)
+            }
+          } else if (status === "orphan") {
+            issues.push(`${dir}: empty directory (no artifacts)`)
+          }
+
+          if (sj) {
+            const filesPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+            const isTasksNotApproved = sj.phase === "tasks" && filesPhase === "ready" && !sj.approvals.tasks.approved
+            const isCompleteNotDowngraded = sj.phase === "complete" && filesPhase === "ready"
+            const isImplNotDowngraded = sj.phase === "impl" && filesPhase === "ready"
+            if (sj.phase !== filesPhase && !isTasksNotApproved && !isCompleteNotDowngraded && !isImplNotDowngraded) {
+              issues.push(`${dir}: spec.json phase "${sj.phase}" ≠ reality "${filesPhase}"`)
+              specJsonMismatches++
+            }
+            if (sj.ready_for_implementation && filesPhase !== "ready") {
+              issues.push(`${dir}: marked ready_for_implementation but files show phase "${filesPhase}"`)
+            }
           }
         }
-      }
 
       if (args.fix) {
         // ── Phase 1: Collect spec.json changes ──
