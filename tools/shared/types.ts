@@ -91,9 +91,11 @@ export async function getProjectRootWarnings(root: string): Promise<ProjectRootW
     })
   }
 
-  // Check shallow path (less than 3 segments after drive letter)
+  // Check shallow path (platform-aware threshold)
+  const platform = os.platform()
   const segments = normalized.split(path.sep).filter(Boolean)
-  if (segments.length < 3) {
+  const shallowThreshold = platform === "win32" ? 3 : platform === "darwin" ? 2 : 0
+  if (shallowThreshold > 0 && segments.length < shallowThreshold) {
     warnings.push({
       type: "shallow-path",
       message: "The project root is very shallow and close to the system root. This could affect system files if modifications are made. Do you want to continue?",

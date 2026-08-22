@@ -353,7 +353,8 @@ describe("getProjectRootWarnings", () => {
     expect(warnings.some(w => w.type === "kit-installation")).toBe(true)
   })
 
-  it("returns shallow-path warning for paths with less than 3 segments", async () => {
+  it("returns shallow-path warning for shallow Windows paths", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("C:\\Users")
     expect(warnings.some(w => w.type === "shallow-path")).toBe(true)
   })
@@ -379,7 +380,8 @@ describe("getProjectRootWarnings", () => {
     expect(warnings).toHaveLength(0)
   })
 
-  it("handles trailing path separator", async () => {
+  it("handles trailing path separator on Windows", async () => {
+    if (os.platform() !== "win32") return
     const warnings = await getProjectRootWarnings("C:\\Users\\")
     expect(warnings.some(w => w.type === "shallow-path")).toBe(true)
   })
@@ -394,6 +396,24 @@ describe("getProjectRootWarnings", () => {
     const nestedKitDir = path.join(homeDir, ".config", "opencode", "something", "else")
     const warnings = await getProjectRootWarnings(nestedKitDir)
     expect(warnings.some(w => w.type === "kit-installation")).toBe(true)
+  })
+
+  it("does not trigger shallow-path on Linux for /tmp/sdd paths", async () => {
+    if (os.platform() !== "linux") return
+    const warnings = await getProjectRootWarnings("/tmp/sdd-manual-test")
+    expect(warnings.some(w => w.type === "shallow-path")).toBe(false)
+  })
+
+  it("does not trigger shallow-path on macOS for /Users/name paths", async () => {
+    if (os.platform() !== "darwin") return
+    const warnings = await getProjectRootWarnings("/Users/testuser/projects")
+    expect(warnings.some(w => w.type === "shallow-path")).toBe(false)
+  })
+
+  it("triggers shallow-path on macOS for /Users paths", async () => {
+    if (os.platform() !== "darwin") return
+    const warnings = await getProjectRootWarnings("/Users")
+    expect(warnings.some(w => w.type === "shallow-path")).toBe(true)
   })
 })
 
