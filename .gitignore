@@ -2,5 +2,9 @@ node_modules/
 .opencode/spec-memory/session.json
 .opencode/spec-memory/config.json
 .opencode/backups/
+opencode.jsonc
+*.bak
+*.tmp
 *.log
+.env
 .DS_Store
