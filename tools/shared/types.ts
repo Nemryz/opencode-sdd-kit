@@ -16,8 +16,9 @@ export async function isValidProjectRoot(root: string): Promise<boolean> {
   if (DRIVE_ROOT_RE.test(root)) return false
   try {
     const specMemoryDir = path.join(root, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
-    await fs.access(specMemoryDir)
-    return true
+    const stat = await fs.lstat(specMemoryDir)
+    if (stat.isSymbolicLink()) return false
+    return stat.isDirectory()
   } catch {
     return false
   }
