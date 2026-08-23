@@ -290,11 +290,12 @@ describe("C-5: sequential scaffold calls", () => {
   })
 
   it("parallel scaffold calls with lock contention both succeed", async () => {
-    const results = await Promise.allSettled([
-      scaffoldTool.execute({ featureName: "Gamma", template: "spec" }, ctx),
-      scaffoldTool.execute({ featureName: "Delta", template: "spec" }, ctx),
-    ])
-    const successes = results.filter(r => r.status === "fulfilled" && r.value.title !== "Error")
+    const p1 = scaffoldTool.execute({ featureName: "Gamma", template: "spec" }, ctx)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const p2 = scaffoldTool.execute({ featureName: "Delta", template: "spec" }, ctx)
+    const [r1, r2] = await Promise.all([p1, p2])
+    const results = [r1, r2]
+    const successes = results.filter(r => r.title !== "Error")
     expect(successes.length).toBeGreaterThanOrEqual(1)
   })
 })

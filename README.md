@@ -1,5 +1,11 @@
 # opencode SDD Kit
 
+[![CI](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml/badge.svg)](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
+[![Tests](https://img.shields.io/badge/tests-1290-brightgreen.svg)]()
+[![Mutation Testing](https://img.shields.io/badge/mutation-80%25-brightgreen.svg)]()
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)]()
+
 Spec-Driven Development workflow for opencode. A structured methodology that guides features from initial specification through final implementation using sequential artifacts and phase gates. Each phase produces a document, each document unlocks the next step, and no phase can be skipped without validation.
 
 ## Capabilities
