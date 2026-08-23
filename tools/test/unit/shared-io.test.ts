@@ -145,19 +145,19 @@ describe("readSpecJson", () => {
 
   it("returns null for invalid JSON", async () => {
     const root = await worktree()
-    const fp = specJsonPath(root)
-    await fs.mkdir(path.dirname(fp), { recursive: true })
-    await fs.writeFile(fp, "not json", "utf-8")
-    const result = await readSpecJson(root)
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "spec.json"), "not json", "utf-8")
+    const result = await readSpecJson(featureDir)
     expect(result).toBeNull()
   })
 
   it("returns null for valid JSON but invalid schema", async () => {
     const root = await worktree()
-    const fp = specJsonPath(root)
-    await fs.mkdir(path.dirname(fp), { recursive: true })
-    await fs.writeFile(fp, JSON.stringify({ bad: true }), "utf-8")
-    const result = await readSpecJson(root)
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "spec.json"), JSON.stringify({ bad: true }), "utf-8")
+    const result = await readSpecJson(featureDir)
     expect(result).toBeNull()
   })
 })
