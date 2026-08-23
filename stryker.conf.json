@@ -1,0 +1,39 @@
+{
+  "packageManager": "npm",
+  "reporters": ["html", "clear-text", "progress", "json"],
+  "testRunner": "vitest",
+  "vitest": {
+    "related": false
+  },
+  "coverageAnalysis": "perTest",
+  "tsconfigFile": "tsconfig.json",
+  "mutate": [
+    "tools/shared/io.ts",
+    "tools/shared/schemas.ts",
+    "tools/shared/types.ts",
+    "tools/speckit-audit.ts",
+    "tools/speckit-clean.ts",
+    "tools/speckit-delta.ts",
+    "tools/speckit-health.ts",
+    "tools/speckit-validate.ts",
+    "tools/speckit-scaffold.ts"
+  ],
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
+  "timeoutMS": 60000,
+  "concurrency": 1,
+  "checkers": ["typescript"],
+  "ignorePatterns": [
+    "node_modules",
+    "reports",
+    "stryker.conf.json",
+    "stryker.config.ts",
+    ".opencode",
+    "specs",
+    "templates",
+    "docs"
+  ]
+}
