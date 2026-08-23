@@ -40,7 +40,7 @@ jobs:
       - name: Create release archive
         run: |
           tar czf speckit-sdd-${{ github.ref_name }}.tar.gz \
-            AGENTS.md install.sh install.ps1 opencode.jsonc package.json \
+            AGENTS.md install.sh install.ps1 opencode.jsonc.example package.json \
             README.md LICENSE .github/ \
             agents/ commands/ templates/ skills/ tools/ docs/
 
