@@ -324,7 +324,7 @@ describe("Concurrency: Health check + write", () => {
     const reader = (async () => {
       const results: SessionState[] = []
       for (let i = 0; i < 3; i++) {
-        await new Promise(resolve => setTimeout(resolve, 20))
+        await new Promise(resolve => setTimeout(resolve, 50))
         const session = await readSession(tmpDir)
         results.push(session)
       }

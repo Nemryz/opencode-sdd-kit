@@ -27,7 +27,10 @@ afterEach(async () => {
 })
 
 function normalizeOutput(output: string): string {
-  return output.replace(/[A-Z]:\\[^\s]+/g, "<PATH>").replace(/\/tmp\/[^\s]+/g, "<PATH>")
+  return output
+    .replace(/[A-Z]:\\[^\s]+/g, "<PATH>")
+    .replace(/\/tmp\/[^\s]+/g, "<PATH>")
+    .replace(/\/var\/folders\/[^\s]+/g, "<PATH>")
 }
 
 function makeSession(overrides?: Partial<SessionState>): SessionState {
