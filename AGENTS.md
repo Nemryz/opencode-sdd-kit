@@ -196,6 +196,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-delta` | Create incremental delta specs for existing features | `command`, `description`, `deltaId`, `featureDir` |
 | `speckit-perf` | Show performance statistics for all tools | `subcommand` (optional: "top N", "reset") |
 | `speckit-cache` | Manage smart cache for performance optimization | `subcommand` (optional: "status", "clear"), `tool` (optional: tool name for clear) |
+| `speckit-guard` | Manage file protection guard for critical SDD artifacts | `subcommand` (optional: "on", "off", "status", "add", "remove", "log", "debug"), `file` (for add/remove), `logOption` (optional: "all"), `debugOption` (optional: "on", "off") |
 
 ---
 
@@ -279,7 +280,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-cache`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-cache`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 

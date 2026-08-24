@@ -41,8 +41,9 @@ type PerfData = {
 }
 
 const CACHE_TTL = 5 * 60 * 1000
+const GUARD_CONFIG_TTL = 60 * 1000
 const MAX_ENTRIES = 100
-const CACHEABLE_TOOLS = ["speckit-audit", "speckit-validate", "speckit-status"]
+const CACHEABLE_TOOLS = ["speckit-audit", "speckit-validate", "speckit-status", "speckit-guard"]
 
 export async function hashFile(filePath: string): Promise<string> {
   try {
@@ -108,6 +109,41 @@ export function calculateCacheStats(hits: number, misses: number, timeSaved: num
     totalCalls,
     timeSavedSeconds: (timeSaved / 1000).toFixed(1),
   }
+}
+
+type GuardConfigCache = {
+  config: any
+  lastUpdated: string
+}
+
+export async function getCachedGuardConfig(worktree: string): Promise<any> {
+  const cachePath = path.join(worktree, ".opencode", "cache", "guard-config.json")
+  try {
+    const content = await fs.readFile(cachePath, "utf-8")
+    const cached: GuardConfigCache = JSON.parse(content)
+    if (Date.now() - new Date(cached.lastUpdated).getTime() < GUARD_CONFIG_TTL) {
+      return cached.config
+    }
+  } catch {}
+  return null
+}
+
+export async function setCachedGuardConfig(worktree: string, config: any): Promise<void> {
+  const cacheDir = path.join(worktree, ".opencode", "cache")
+  await fs.mkdir(cacheDir, { recursive: true })
+  const cachePath = path.join(cacheDir, "guard-config.json")
+  const cached: GuardConfigCache = {
+    config,
+    lastUpdated: new Date().toISOString(),
+  }
+  await fs.writeFile(cachePath, JSON.stringify(cached, null, 2))
+}
+
+export async function invalidateGuardCache(worktree: string): Promise<void> {
+  const cachePath = path.join(worktree, ".opencode", "cache", "guard-config.json")
+  try {
+    await fs.unlink(cachePath)
+  } catch {}
 }
 
 const cachePlugin: Plugin = async (input) => {
