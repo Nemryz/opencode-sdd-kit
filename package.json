@@ -7,13 +7,15 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preversion": "git diff --quiet && git diff --cached --quiet",
-    "version:patch": "npm version patch --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\"",
-    "version:minor": "npm version minor --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\"",
-    "version:major": "npm version major --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\"",
-    "version:custom": "node -e \"process.stdout.write('Enter version: ');process.stdin.setEncoding('utf8');process.stdin.on('data',(d)=>{const v=d.trim();if(v){try{require('child_process').execSync('npm version '+v+' --no-git-tag-version',{stdio:'inherit'})}catch(e){console.error('Invalid version:',v)}}process.exit(0)})\"",
-    "release:patch": "npm run version:patch && git tag -a v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push origin master && git push origin v$(node -p \"require('./package.json').version\")",
-    "release:minor": "npm run version:minor && git tag -a v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push origin master && git push origin v$(node -p \"require('./package.json').version\")",
-    "release:major": "npm run version:major && git tag -a v$(node -p \"require('./package.json').version\") -m \"Release v$(node -p \"require('./package.json').version\")\" && git push origin master && git push origin v$(node -p \"require('./package.json').version\")"
+    "get-version": "node -p \"require('./package.json').version\"",
+    "version:patch": "npm version patch --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
+    "version:minor": "npm version minor --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
+    "version:major": "npm version major --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
+    "tag": "node -e \"const v=require('./package.json').version;const{execSync}=require('child_process');execSync('git tag -a v'+v+' -m Release v'+v,{stdio:'inherit'})\"",
+    "push": "git push origin master && git push origin --tags",
+    "release:patch": "npm run version:patch && npm run tag && npm run push",
+    "release:minor": "npm run version:minor && npm run tag && npm run push",
+    "release:major": "npm run version:major && npm run tag && npm run push"
   },
   "dependencies": {
     "@opencode-ai/plugin": "1.17.8",
