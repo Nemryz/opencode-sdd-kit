@@ -2,133 +2,361 @@
 
 [![CI](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml/badge.svg)](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
-[![Tests](https://img.shields.io/badge/tests-1290-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1552-brightgreen.svg)]()
 [![Mutation Testing](https://img.shields.io/badge/mutation-80%25-brightgreen.svg)]()
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)]()
 
-Spec-Driven Development workflow for opencode. A structured methodology that guides features from initial specification through final implementation using sequential artifacts and phase gates. Each phase produces a document, each document unlocks the next step, and no phase can be skipped without validation.
+Spec-Driven Development workflow for opencode. This toolkit implements a structured methodology that guides software features from initial specification through final implementation. Each phase produces a specific document, each document validates the prerequisites for the next step, and no phase can be bypassed without proper validation.
+
+The system operates through sequential artifacts, phase gates, and automated quality checks. Features progress through specification, planning, task decomposition, and implementation. Every transition requires explicit approval, and the toolkit enforces these transitions through its validation layer.
+
+## What Is This
+
+opencode SDD Kit is a comprehensive development framework built as a collection of TypeScript tools, runtime plugins, and agent orchestration rules. It transforms the opencode CLI into a complete specification-driven development environment.
+
+The toolkit manages the entire lifecycle of a software feature, from the moment you describe what you want to build, through the planning and task breakdown phases, until the implementation is complete and tested. Along the way, it maintains state, creates backups, validates consistency, and ensures that nothing falls through the cracks.
+
+Unlike traditional development approaches where documentation and implementation diverge, this system keeps them synchronized. The specification becomes the source of truth, the plan becomes the technical blueprint, and the tasks become the execution roadmap. Every artifact references the others, and the toolkit validates these cross-references continuously.
+
+## Core Principles
+
+The toolkit enforces three fundamental principles through its constitution system. These principles are not optional guidelines, they are enforced constraints that shape every decision throughout the development process.
+
+### Simplicity
+
+Maximum three top-level projects. No future-proofing abstractions. When facing a choice between a simple solution and a sophisticated one, always select the simpler option. Build what is needed now, not what might be needed later. This constraint prevents the accumulation of unused code and ensures that every component serves a clear, immediate purpose.
+
+### Anti-Abstraction
+
+Utilize frameworks directly. No repository patterns, service locators, or wrapper layers unless the framework explicitly requires them. Direct ORM usage. Direct framework API calls. This principle eliminates unnecessary translation layers and ensures that the code remains transparent and debuggable.
+
+### Integration-First Testing
+
+Test against real dependencies, databases, APIs, filesystems. Utilize testcontainers or equivalent solutions. No mocking of external services. Every user story requires at minimum one integration test covering the happy path. This ensures that tests validate actual behavior rather than simulated interactions.
 
 ## Capabilities
 
-Constitution. Project governing principles such as Simplicity, Anti-Abstraction, and Integration-First testing written into a single markdown file and enforced by the toolchain.
+The toolkit provides a complete set of capabilities that cover every aspect of the specification-driven development workflow.
 
-Specification. Feature specifications with prioritized user stories, Gherkin scenarios, acceptance criteria, edge cases, and measurable success metrics.
+**Constitution.** Project governing principles such as Simplicity, Anti-Abstraction, and Integration-First testing, written into a single markdown file and enforced by the toolchain. The constitution serves as the foundational document that guides all subsequent decisions.
 
-Planning. Technology stack decisions backed by documented rationale, alternative comparisons, risk analysis, component boundaries, and architecture descriptions.
+**Specification.** Feature specifications with prioritized user stories, Gherkin scenarios, acceptance criteria, edge cases, and measurable success metrics. Each specification defines what the feature should do and how its success will be measured.
 
-Task Decomposition. Ordered tasks organized into phases with ASCII dependency maps, parallelization markers, boundary annotations, and explicit deliverable states.
+**Planning.** Technology stack decisions backed by documented rationale, alternative comparisons, risk analysis, component boundaries, and architecture descriptions. The planning phase ensures that technical decisions are deliberate and justified.
 
-Review. Cross-artifact consistency checks that compare spec, plan, and tasks against each other, producing severity-rated findings with ownership classification.
+**Task Decomposition.** Ordered tasks organized into phases with ASCII dependency maps, parallelization markers, boundary annotations, and explicit deliverable states. This phase breaks complex implementations into manageable, sequential steps.
 
-Implementation. Phase-by-phase execution with integrated testing, sub-agent dispatch for complex tasks, and three routing tiers (simple, standard, complex) based on complexity scoring.
+**Review.** Cross-artifact consistency checks that compare specification, plan, and tasks against each other, producing severity-rated findings with ownership classification. The review ensures that all artifacts remain aligned throughout the development process.
 
-Discovery. Automatic project context detection including package manager identification, framework recognition, config file scanning, and dependency analysis.
+**Implementation.** Sequential phase execution with integrated testing, agent delegation for complex tasks, and three routing tiers, simple, standard, complex, based on complexity scoring. This phase executes the plan while maintaining quality through continuous validation.
 
-Express Mode. An operational shortcut that skips conversational proposals when speed is preferred, controlled by a configuration toggle.
+**Discovery.** Automatic project context detection including package manager identification, framework recognition, configuration file scanning, and dependency analysis. This capability allows the toolkit to adapt to your existing project structure without manual configuration.
 
-Status and Cleanup. Workflow state tracking with automatic session repair when directories are moved, files are deleted, or spec.json phases fall out of sync with reality.
+**Express Mode.** An operational shortcut that skips conversational proposals when speed is preferred, controlled by a configuration toggle. This mode accelerates the workflow when you want direct artifact generation without confirmation dialogs.
 
-Resilience. Automatic backups with SHA-256 checksum verification, corruption detection with warning channels, and auto-restore from valid backups when state files become unreadable.
+**Status and Cleanup.** Workflow state tracking with automatic session repair when directories are moved, files are deleted, or specification phases fall out of sync with reality. This capability ensures that the system remains consistent even when external changes occur.
 
-Mutation Testing. Continuous quality assurance through Stryker mutation testing, ensuring test suites catch real code changes and maintain high mutation scores across all tools.
+**Resilience.** Automatic backups with SHA-256 checksum verification, corruption detection with warning channels, and automatic restoration from valid backups when state files become unreadable. This layer protects your work against data corruption and accidental deletion.
+
+**Mutation Testing.** Continuous quality assurance through Stryker mutation testing, ensuring test suites catch real code changes and maintain high mutation scores across all source modules. This capability validates that the test suite itself is effective.
 
 ## Architecture
 
-The system follows a plugin-based architecture where each tool operates as a self-contained TypeScript module registered through the opencode plugin interface. Tools communicate via shared state files (session.json, spec.json, config.json) and coordinate through the orchestration layer defined in AGENTS.md.
+The system follows a plugin-based architecture where each tool operates as a self-contained TypeScript module registered through the opencode plugin interface. Tools communicate via shared state files and coordinate through the orchestration layer defined in AGENTS.md.
 
 ```
-+-------------------------------------------------------------+
-|                    opencode Runtime                         |
-+-------------------------------------------------------------+
-|  AGENTS.md (Workflow Orchestration)                         |
-+-------------------------------------------------------------+
-|  Skills Layer (9 skills)                                    |
-|  + speckit-constitution                                     |
-|  + speckit-spec-writer                                      |
-|  + speckit-plan-engineer                                    |
-|  + speckit-task-decomposer                                  |
-|  + speckit-implementer                                      |
-|  + speckit-reviewer                                         |
-|  + rules/ (3 shared rule sets)                             |
-+-------------------------------------------------------------+
-|  Tools Layer (10 TypeScript modules)                        |
-|  + speckit-scaffold                                         |
-|  + speckit-validate                                         |
-|  + speckit-audit                                            |
-|  + speckit-clean                                            |
-|  + speckit-status                                           |
-|  + speckit-config                                           |
-|  + speckit-complexity                                       |
-|  + speckit-selfheal                                         |
-|  + shared/ (io.ts, schemas.ts, types.ts)                   |
-+-------------------------------------------------------------+
-|  State Layer                                                |
-|  + session.json (workflow state)                            |
-|  + spec.json (feature metadata)                             |
-|  + config.json (SDD configuration)                         |
-|  + backups/ (with SHA-256 checksums)                       |
-+-------------------------------------------------------------+
++---------------------------------------------------------------------+
+|                       opencode Runtime                               |
++---------------------------------------------------------------------+
+|  AGENTS.md (Workflow Orchestration)                                  |
++---------------------------------------------------------------------+
+|  Skills Layer (6 skills + 3 shared rules)                            |
+|  + speckit-constitution                                              |
+|  + speckit-spec-writer                                               |
+|  + speckit-plan-engineer                                             |
+|  + speckit-task-decomposer                                           |
+|  + speckit-implementer                                               |
+|  + speckit-reviewer                                                  |
+|  + rules/ (design principles, spec standards, task guidelines)       |
++---------------------------------------------------------------------+
+|  Tools Layer (13 TypeScript modules)                                 |
+|  + speckit-scaffold                                                  |
+|  + speckit-validate                                                  |
+|  + speckit-audit                                                     |
+|  + speckit-clean                                                     |
+|  + speckit-status                                                    |
+|  + speckit-config                                                    |
+|  + speckit-complexity                                                |
+|  + speckit-selfheal                                                  |
+|  + speckit-delta                                                     |
+|  + speckit-perf                                                      |
+|  + speckit-health                                                    |
+|  + speckit-guard                                                     |
+|  + speckit-cache                                                     |
+|  + shared/ (io.ts, schemas.ts, types.ts)                            |
++---------------------------------------------------------------------+
+|  Plugins Layer (3 runtime plugins)                                   |
+|  + speckit-perfmon (performance monitoring)                          |
+|  + speckit-cache (smart caching)                                     |
+|  + speckit-guard (permission protection)                             |
++---------------------------------------------------------------------+
+|  State Layer                                                         |
+|  + session.json (workflow state)                                     |
+|  + spec.json (feature metadata)                                      |
+|  + config.json (SDD configuration)                                   |
+|  + guard.json (permission rules)                                     |
+|  + perf.json (performance statistics)                                |
+|  + cache.json (cached data)                                          |
+|  + backups/ (with SHA-256 checksums)                                 |
++---------------------------------------------------------------------+
 ```
 
-## Structure
+### Architecture Layers Explained
+
+**Skills Layer.** Contains the instruction files that guide AI agents through each phase of the workflow. Each skill file defines the exact steps an agent must follow, the artifacts it must produce, and the validation rules it must enforce. The three shared rule sets establish common standards that apply across multiple skills.
+
+**Tools Layer.** Houses the TypeScript modules that implement the actual functionality. Each tool is a self-contained module that can be invoked independently through the opencode command system. The shared directory provides common I/O operations, Zod schemas for validation, and type definitions used across all tools.
+
+**Plugins Layer.** Contains runtime plugins that intercept system events and add functionality transparently. Unlike tools, which require explicit invocation, plugins operate automatically in the background, monitoring performance, caching data, and protecting files without user intervention.
+
+**State Layer.** Maintains all persistent data including workflow state, feature metadata, configuration settings, and backup files. This layer ensures continuity across sessions and provides the foundation for the resilience mechanisms.
+
+## Directory Structure
+
+The toolkit organizes its components into a clear directory hierarchy that separates concerns and facilitates maintenance.
 
 ```
 ~/.config/opencode/
   AGENTS.md              Workflow orchestration and agent definitions
   commands/              CLI command handlers (10 files)
-  skills/                Skill instructions (9 skills plus shared rules)
-  tools/                 TypeScript plugin tools (10 files)
+  skills/                Skill instructions (6 skills plus shared rules)
+  tools/                 TypeScript tool modules (13 files)
   tools/shared/          Shared modules (io.ts, schemas.ts, types.ts)
-  tools/test/            Test suite (45 test files)
+  tools/plugins/         Runtime plugins (3 files)
+  tools/test/            Test suite (60 test files)
   templates/             Artifact templates (12 templates)
   docs/                  Reference documentation
 ```
 
-Ten tools live in the tools directory, each one a self-contained TypeScript file registered as an opencode plugin. Three shared modules provide common I/O operations, Zod schemas, and type definitions.
+### Directory Descriptions
+
+**AGENTS.md** serves as the central orchestration document that defines agent roles, workflow phases, quality gates, and command references. Every skill and tool references this document for coordination.
+
+**commands/** contains the CLI command handlers that process user input and route requests to the appropriate tools. These handlers parse arguments, validate inputs, and manage the interaction between the user and the toolkit.
+
+**skills/** holds the instruction files that guide AI agents through each workflow phase. Each skill file provides step-by-step instructions, artifact templates, and validation rules. The rules subdirectory contains shared standards that apply across multiple skills.
+
+**tools/** contains the TypeScript modules that implement the toolkit's functionality. Each tool operates independently but shares common utilities through the tools/shared directory.
+
+**tools/shared/** provides the foundation modules used by all tools, including file I/O operations with backup and checksum support, Zod schemas for data validation, and TypeScript type definitions.
+
+**tools/plugins/** houses the runtime plugins that extend the toolkit's functionality through event interception and automatic processing.
+
+**tools/test/** contains the complete test suite organized into unit, integration, and mutation test categories.
+
+**templates/** provides the artifact templates used when creating new specifications, plans, tasks, and other documents. These templates ensure consistency across all generated artifacts.
+
+**docs/** contains reference documentation, guides, and supplementary materials that explain the toolkit's architecture and usage patterns.
+
+## Tools Reference
+
+The toolkit includes thirteen specialized tools, each designed for a specific purpose within the workflow. All tools follow consistent patterns for input validation, error handling, and state management.
 
 | Tool | Purpose |
 |------|---------|
-| speckit-scaffold | Creates feature directories and artifact files |
-| speckit-validate | Validates required SDD artifacts exist |
-| speckit-audit | Comprehensive project audit with auto-fix |
-| speckit-clean | Scans and repairs inconsistencies |
-| speckit-status | Shows workflow state across all features |
-| speckit-config | Reads and writes SDD configuration |
-| speckit-complexity | Assesses task complexity for routing |
-| speckit-selfheal | Health scan with categorized findings |
-| speckit-delta | Manages incremental spec deltas |
-| speckit-health | Health monitoring with auto-repair |
+| speckit-scaffold | Creates feature directories and artifact files from templates |
+| speckit-validate | Validates that required SDD artifacts exist and determines workflow phase |
+| speckit-audit | Comprehensive project audit with auto-fix capabilities and corruption detection |
+| speckit-clean | Scans all features for inconsistencies and repairs session state |
+| speckit-status | Shows workflow state across all features with corruption warnings |
+| speckit-config | Reads and writes SDD configuration with validation |
+| speckit-complexity | Assesses task complexity for routing through the three-tier system |
+| speckit-selfheal | Health scan with categorized findings and automatic repair |
+| speckit-delta | Manages incremental specification deltas for existing features |
+| speckit-health | Health monitoring with auto-repair and backup restoration |
+| speckit-perf | Performance statistics collection and analysis |
+| speckit-guard | File protection management with permission tiers |
+| speckit-cache | Smart caching layer with TTL and invalidation |
 
-Nine skill files in the skills directory guide the agents through each phase. Three shared rule sets in skills/rules/ define design principles, spec writing standards, and task generation guidelines.
+### Shared Modules
+
+Three shared modules provide common functionality used across all tools:
+
+**io.ts** handles all file operations including atomic writes, backup creation, checksum generation and verification, corruption detection, and automatic restoration from valid backups. This module ensures data integrity throughout the system.
+
+**schemas.ts** defines Zod schemas for all state files including session.json, spec.json, config.json, and their associated sub-structures. These schemas validate data at both read and write times, catching errors before they corrupt state.
+
+**types.ts** provides TypeScript type definitions, re-exports from schemas, phase detection utilities, project root validation, and helper functions for creating default data structures.
+
+## Skills Reference
+
+Six skills guide AI agents through the specification-driven development workflow. Each skill corresponds to a specific phase and produces the artifacts required for that phase.
+
+| Skill | Phase | Function |
+|-------|-------|----------|
+| speckit-constitution | Init | Creates or updates project governing principles |
+| speckit-spec-writer | Spec | Translates requirements into structured specifications |
+| speckit-plan-engineer | Plan | Maps specifications to technology decisions |
+| speckit-task-decomposer | Tasks | Breaks plans into ordered, actionable tasks |
+| speckit-implementer | Impl | Executes tasks in dependency order |
+| speckit-reviewer | Review | Validates cross-artifact consistency |
+
+### Shared Rule Sets
+
+Three shared rule sets in the skills/rules directory establish standards that apply across multiple skills:
+
+**Design Principles** defines the Simplicity, Anti-Abstraction, and Integration-First testing principles that guide all architectural decisions.
+
+**Spec Standards** establishes the format, structure, and content requirements for feature specifications including user stories, acceptance criteria, and success metrics.
+
+**Task Guidelines** defines the task decomposition format, dependency notation, parallelization markers, and boundary annotation conventions.
+
+## Plugins
+
+The toolkit extends its functionality through runtime plugins that intercept system events and perform automatic processing. Unlike tools, which require explicit invocation through commands, plugins operate transparently in the background, enhancing the development experience without interrupting your workflow.
+
+### What Are Plugins
+
+Plugins are TypeScript modules that register event handlers with the opencode runtime. They intercept specific system events such as tool execution, permission requests, and command processing. When an event occurs, the plugin's handler function executes, allowing it to monitor, modify, or prevent the event.
+
+The fundamental difference between plugins and tools lies in their invocation pattern. Tools require explicit user commands like `/audit` or `/validate`. Plugins activate automatically whenever their registered events occur. A performance monitoring plugin tracks every tool execution without being asked. A caching plugin intercepts data requests transparently. A protection plugin blocks unauthorized file modifications proactively.
+
+This distinction enables plugins to provide system-wide functionality that operates consistently across all tools and workflows. You do not need to remember to invoke them, they simply work.
+
+### How Plugins Work
+
+The opencode runtime provides several hook points where plugins can intercept events:
+
+**tool.execute.before** fires before any tool execution. Plugins can use this to prepare caches, log performance metrics, or validate permissions.
+
+**tool.execute.after** fires after a tool completes. Plugins can use this to record timing data, update caches, or perform post-execution validation.
+
+**permission.ask** fires when a tool requests permission for a restricted operation. Plugins can use this to implement protection rules, require approvals, or deny dangerous actions.
+
+**event** fires for various system events. Plugins can use this to respond to configuration changes, session updates, or other system state transitions.
+
+**command.execute.before** fires before a command is processed. Plugins can use this to validate inputs, modify arguments, or prevent command execution.
+
+When multiple plugins register for the same hook, they execute in registration order. Each plugin receives the same event data and can modify the processing pipeline. This chain of handlers allows plugins to compose and layer functionality.
+
+### Available Plugins
+
+The toolkit includes three production-ready plugins that address common development needs:
+
+| Plugin | Hooks | Purpose | Configuration |
+|--------|-------|---------|---------------|
+| speckit-perfmon | tool.execute.before, tool.execute.after | Performance monitoring and statistics | perf.json |
+| speckit-cache | tool.execute.before, tool.execute.after | Smart data caching with TTL | cache.json |
+| speckit-guard | permission.ask | File protection with permission tiers | guard.json |
+
+### Plugin Configuration
+
+Plugins register through the opencode.jsonc configuration file. Copy the template to create your local configuration:
+
+```
+cp opencode.jsonc.example opencode.jsonc
+```
+
+The plugins section defines which plugins are active and their initialization parameters:
+
+```json
+{
+  "plugins": {
+    "tools/plugins/speckit-perfmon": {},
+    "tools/plugins/speckit-cache": {},
+    "tools/plugins/speckit-guard": {}
+  }
+}
+```
+
+To disable a plugin, remove its entry from the plugins section or prefix the path with a comment marker. The toolkit continues functioning normally with any combination of plugins enabled or disabled.
+
+Each plugin maintains its own configuration file in the .opencode directory. These files store runtime state, accumulated statistics, and user-defined rules. The plugins manage these files automatically, but you can edit them directly if needed.
+
+### Creating Your Own Plugin
+
+Building a custom plugin requires understanding the hook system and following the established patterns. Here is a step-by-step guide:
+
+**Step 1: Create the plugin file.** Place your plugin in the tools/plugins directory following the naming convention `speckit-yourplugin.ts`.
+
+**Step 2: Define the plugin interface.** Export an object with an `id` string and a `server` function that receives the context and returns hook handlers:
+
+```typescript
+import type { Plugin } from "opencode"
+
+const yourPlugin: Plugin = {
+  id: "speckit-yourplugin",
+  server: async (ctx) => {
+    return {
+      "tool.execute.before": async (event) => {
+        // Execute before tool runs
+      },
+      "tool.execute.after": async (event) => {
+        // Execute after tool completes
+      }
+    }
+  }
+}
+
+export default yourPlugin
+```
+
+**Step 3: Register the plugin.** Add your plugin to the plugins section in opencode.jsonc:
+
+```json
+{
+  "plugins": {
+    "tools/plugins/speckit-yourplugin": {}
+  }
+}
+```
+
+**Step 4: Test your plugin.** Create unit tests for individual hook handlers and integration tests that verify the plugin interacts correctly with the opencode runtime.
+
+### Plugin Testing
+
+Each plugin undergoes three levels of testing to ensure reliability and correctness:
+
+**Unit Tests** verify individual hook handlers in isolation. They create mock event data and validate that the handler produces expected side effects, cache updates, permission decisions, or performance records.
+
+**Integration Tests** verify that plugins interact correctly with the opencode runtime and other toolkit components. They simulate complete tool execution cycles and validate that plugins intercept events at the correct points in the processing pipeline.
+
+**Mutation Tests** verify that the test suite effectively catches code changes. Stryker introduces small modifications to plugin logic and validates that tests detect and fail on each mutation. This ensures that the tests provide meaningful coverage rather than superficial assertions.
 
 ## Installation
 
-Install opencode by following the instructions at opencode.ai.
+The toolkit requires opencode to be installed first. Follow the instructions at opencode.ai to set up the base CLI.
 
-Clone this repository into your opencode configuration directory.
+### Standard Installation
+
+Clone this repository into your opencode configuration directory:
 
 ```
 git clone https://github.com/Nemryz/opencode-sdd-kit.git ~/.config/opencode
 cd ~/.config/opencode && npm install
 ```
 
-Alternative installation scripts are provided for each platform.
+### Platform-Specific Scripts
 
-Windows PowerShell.
+**Windows PowerShell:**
 
 ```
 irm https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.ps1 | iex
 ```
 
-Linux or macOS.
+**Linux or macOS:**
 
 ```
 curl -fsSL https://raw.githubusercontent.com/Nemryz/opencode-sdd-kit/main/install.sh | bash
 ```
 
-Restart opencode for the changes to take effect. Run /status to verify that everything was installed correctly.
+### Verification
 
-## Usage
+Restart opencode for the changes to take effect. Run `/status` to verify that everything was installed correctly. The command should display the current workflow state without errors.
+
+## Quick Start
+
+After installation, the toolkit is ready to use. The following commands provide the essential workflow:
 
 ```
 /status                         Show current workflow state
@@ -145,7 +373,7 @@ Restart opencode for the changes to take effect. Run /status to verify that ever
 
 ### Workflow Walkthrough
 
-A typical session moves through the phases in order, each one producing a new artifact and updating the feature spec.json phase.
+A typical session progresses through the phases in order, each one producing a new artifact and updating the feature specification phase.
 
 ```
 > /status
@@ -164,83 +392,204 @@ Agent creates specs/001-task-management/tasks.md.
 tasks.md created. Ready: /impl or /review
 
 > /review
-Agent checks spec, plan, and tasks for consistency.
+Agent checks specification, plan, and tasks for consistency.
 Review complete, 0 issues found. Ready for /impl
 ```
 
-### Resilience
+Each step validates the prerequisites before proceeding. The system prevents you from jumping ahead without completing the required artifacts, ensuring that every feature follows the complete development lifecycle.
 
-Every write operation creates a backup of the previous state. Backups include SHA-256 checksums for integrity verification. When a state file becomes corrupted, the system automatically attempts to restore from the most recent valid backup. If restoration fails, corruption warnings appear in audit and status output so you can investigate manually.
+## Workflow Deep Dive
 
-The resilience layer operates through three mechanisms:
+Understanding how the workflow phases connect and validate each other provides insight into the system's reliability and consistency guarantees.
 
-Automatic Backups. Before any write to session.json, spec.json, or config.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Old backups are trimmed to a maximum of ten per file.
+### Phase Transitions
 
-Checksum Verification. Each backup receives a SHA-256 checksum stored in a companion .sha256 file. When restoration is triggered, the system verifies the checksum matches before attempting to restore.
+The workflow progresses through seven distinct phases, each with specific entry requirements and exit conditions:
 
-Corruption Detection. Read operations validate JSON structure and Zod schema compliance. Invalid data triggers console warnings with a [SDD] prefix and accumulates in a global warning channel that feeds into audit and status output.
+**Init** represents the starting state before any features exist. The toolkit detects this phase and suggests creating a constitution and first specification.
+
+**Spec** indicates that a feature specification exists but has not been approved. The agent creates the specification document with user stories, acceptance criteria, and success metrics.
+
+**Plan** indicates that the specification exists and has been approved, but the implementation plan has not been created. The agent produces a technology stack selection with documented rationale.
+
+**Tasks** indicates that both specification and plan exist and have been approved, but the task breakdown has not been created. The agent decomposes the plan into ordered, actionable tasks.
+
+**Ready** indicates that all three artifacts exist and have been approved, the feature is ready for implementation. The system validates that all prerequisites are satisfied before transitioning to this phase.
+
+**Impl** indicates that implementation has begun. The agent executes tasks in dependency order, running tests after each phase and delegating complex tasks to sub-agents.
+
+**Complete** indicates that all tasks have been implemented and tested. The feature has progressed through the entire lifecycle.
 
 ### Express Mode
 
-Express Mode skips the conversational proposal step in spec writing and plan engineering. Enable it with.
+Express Mode provides an acceleration path for experienced users who want to skip conversational proposals. When enabled, skills proceed directly to artifact generation without asking for confirmation first.
+
+Enable Express Mode through configuration:
 
 ```
 /config expressMode=true
 ```
 
-When active, skills proceed directly to artifact generation without asking for confirmation first.
+When active, the spec-writer, plan-engineer, and task-decomposer skills generate their artifacts immediately upon invocation. This mode trades interaction for speed, producing complete documents in a single step.
+
+Express Mode does not bypass validation. The generated artifacts still conform to all schema requirements, structural rules, and quality gates. It simply eliminates the intermediate conversation steps.
 
 ### Complexity Routing
 
-The implementer evaluates each task and routes it through one of three tiers. Simple tasks go directly to implementation. Standard tasks follow the TDD cycle. Complex tasks dispatch sub-agents for parallel work. The complexity score considers file count, dependency changes, boundary annotations, and ambiguity markers.
+The implementer evaluates each task and routes it through one of three tiers based on complexity scoring:
+
+**Simple tasks** proceed directly to implementation. These tasks affect fewer than three files, introduce no new dependencies, and contain no boundary annotations or ambiguity markers. The agent implements them immediately without additional ceremony.
+
+**Standard tasks** follow the Test-Driven Development cycle. These tasks affect three to eight files, may introduce new dependencies, and require careful validation. The agent writes tests first, then implements the functionality to make those tests pass.
+
+**Complex tasks** dispatch sub-agents for parallel work. These tasks affect more than eight files, introduce new dependencies, contain multiple boundary annotations, or include `[NEEDS CLARIFICATION]` markers. The agent delegates these tasks to specialized sub-agents that work in parallel and coordinate their results.
+
+The complexity score considers four factors: file count, dependency changes, boundary annotations, and ambiguity markers. Each factor contributes to the overall score, and the routing thresholds ensure that tasks receive the appropriate level of attention and ceremony.
+
+## State Management
+
+The toolkit maintains state through several interconnected files that track workflow progress, feature metadata, and system configuration. Understanding how these files work together is essential for troubleshooting and customization.
+
+### State Files
+
+**session.json** tracks the current workflow state including active phase, working feature, command history, and session metadata. This file persists across tool invocations and enables the toolkit to resume exactly where you left off.
+
+**spec.json** stores feature-specific metadata including phase, approval status, generated artifact flags, and delta tracking information. Each feature directory contains its own spec.json file that records the complete lifecycle of that feature.
+
+**config.json** maintains SDD-specific configuration settings including default technology stack, express mode preference, auto versioning toggle, and user preferences. This file persists your choices across sessions.
+
+**guard.json** stores permission rules for file protection including always-protected files, post-approval files, phase-based restrictions, denial logs, and protection statistics. This file accumulates rules as you approve files through the guard tool.
+
+**perf.json** records performance statistics for all tool executions including call counts, execution times, percentile calculations, and historical trends. This file enables the performance monitoring plugin to track system health over time.
+
+**cache.json** maintains cached data with time-to-live tracking, hit/miss statistics, and automatic invalidation metadata. This file accelerates repeated operations by avoiding redundant computation.
+
+### Resilience Layer
+
+The resilience layer operates through three interconnected mechanisms that protect your work against data corruption and accidental deletion.
+
+**Automatic Backups.** Before any write to session.json, spec.json, or config.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Old backups are trimmed to a maximum of ten per file, ensuring that recent history is preserved without consuming excessive storage.
+
+**Checksum Verification.** Each backup receives a SHA-256 checksum stored in a companion .sha256 file. When restoration is triggered, the system verifies the checksum matches before attempting to restore. This prevents restoring from corrupted backups that might cause additional problems.
+
+**Corruption Detection.** Read operations validate JSON structure and Zod schema compliance. Invalid data triggers console warnings with a `[SDD]` prefix and accumulates in a global warning channel that feeds into audit and status output. This early detection system alerts you to problems before they cascade into data loss.
+
+### Session Recovery
+
+When the system detects inconsistencies between state files and the actual filesystem, it attempts automatic repair. If a session references a feature directory that no longer exists, the system clears the reference and resets to a neutral state. If a specification phase falls out of sync with the actual artifacts, the system recalculates the correct phase based on file presence.
+
+This recovery process operates transparently during status checks and validation operations. You see the repaired state in the output, and the system logs the repair for audit purposes. Manual intervention is only required when the system cannot determine the correct state automatically.
 
 ## Configuration
 
-Copy opencode.jsonc.example to opencode.jsonc and set your preferred model and permissions. Use /config within opencode to manage SDD-specific settings like default tech stack, express mode, and auto versioning.
+The toolkit provides several configuration options that control its behavior. These settings persist across sessions and can be modified through the `/config` command or by editing the configuration file directly.
 
-Key configuration options:
+### Configuration Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | defaultTechStack | none | Preferred technology stack for /plan |
 | expressMode | false | Skip conversational proposals |
 | autoVersioning | true | Automatic version tracking |
+| lastUsedLanguage | none | Previously used programming language |
+| preferences | {} | User-defined key-value pairs |
+
+### Configuration File
+
+The configuration file lives at .opencode/config.json and follows the Zod schema defined in the toolkit. The `/config` command reads and writes this file with full validation.
+
+To read the current configuration:
+
+```
+/config
+```
+
+To update a specific setting:
+
+```
+/config defaultTechStack=Node.js+PostgreSQL
+/config expressMode=true
+```
+
+### opencode.jsonc Configuration
+
+The opencode.jsonc file controls the opencode runtime itself, including model selection, permission rules, and plugin registration. Copy the template to create your local configuration:
+
+```
+cp opencode.jsonc.example opencode.jsonc
+```
+
+This file defines which models to use for different agent roles, which plugins to activate, and what permissions to grant. Refer to the opencode documentation for the complete configuration reference.
 
 ## Test Suite
 
-The project includes 1290 automated tests distributed across 45 test files. The test suite covers multiple quality dimensions:
+The project includes 1552 automated tests distributed across 60 test files. The test suite covers multiple quality dimensions, each designed to validate a specific aspect of the system's correctness and reliability.
 
-Unit Tests. Individual function testing for all shared modules (io.ts, schemas.ts, types.ts) and tool-specific logic.
+### Unit Tests
 
-Integration Tests. End-to-end workflow testing that validates complete feature lifecycle from spec creation through implementation.
+Unit tests verify individual functions and modules in isolation. They create temporary directories, exercise specific functions with controlled inputs, and validate outputs against expected results. These tests catch logic errors in shared utilities, schema validation, type definitions, and tool-specific operations.
 
-Content Assertion Tests. Verification that skill files, templates, and documentation maintain required structure and content.
+Unit tests execute quickly and provide immediate feedback during development. They form the foundation of the test pyramid, catching the majority of regressions before they reach integration testing.
 
-Phase Gate Tests. Validation that all commands enforce phase prerequisites and produce correct artifacts.
+### Integration Tests
 
-Concurrency Tests. Multi-threaded testing of file locking mechanisms and concurrent access patterns.
+Integration tests validate complete workflows from start to finish. They exercise the full lifecycle of features including creation, validation, auditing, cleaning, and status reporting. These tests verify that tools interact correctly with each other and with the filesystem.
 
-Edge Case Tests. Boundary condition testing including empty inputs, invalid paths, missing directories, and malformed data.
+Integration tests create realistic scenarios that mirror actual usage patterns. They detect problems that unit tests cannot catch, such as incorrect file paths, missing prerequisites, and state synchronization issues between tools.
 
-Corruption Recovery Tests. Validation of backup creation, checksum verification, and automatic restoration when state files become corrupted.
+### Content Assertion Tests
 
-Property Based Tests. Generative testing using fast-check to discover edge cases through random input generation.
+Content assertion tests verify that skill files, templates, and documentation maintain required structure and content. They check that frontmatter contains required fields, that templates include expected placeholders, and that documentation covers all necessary topics.
 
-Fuzzing Tests. Random input injection to identify unexpected failure modes and crash conditions.
+These tests prevent structural drift that could break agent instructions or produce malformed artifacts. They ensure that the human-authored content remains consistent with the machine-processed expectations.
 
-Chaos Tests. Fault injection testing to validate system behavior under adverse conditions.
+### Phase Gate Tests
 
-Mutation Tests. Stryker mutation testing that verifies test suites catch real code changes across all 9 source modules.
+Phase gate tests validate that all commands enforce phase prerequisites and produce correct artifacts. They verify that `/plan` fails when no specification exists, that `/tasks` fails when no plan exists, and that `/impl` fails when prerequisites are incomplete.
 
-Run the complete test suite with npm test. Run type checking with npm run typecheck.
+These tests enforce the workflow's sequential nature, ensuring that users cannot bypass required steps. They validate both positive paths, correct execution with valid prerequisites, and negative paths, appropriate rejection without prerequisites.
 
-Feature specs in the specs directory are intentionally tracked by git to enable full versioning of the specification, plan, and tasks alongside the code.
+### Concurrency Tests
+
+Concurrency tests validate file locking mechanisms and concurrent access patterns. They simulate multiple processes attempting to read and write state files simultaneously, verifying that locks prevent corruption and that operations complete reliably.
+
+These tests address real-world scenarios where multiple terminal sessions or background processes might access the toolkit simultaneously. They validate that the locking implementation provides adequate protection without causing deadlocks or excessive contention.
+
+### Edge Case Tests
+
+Edge case tests exercise boundary conditions including empty inputs, invalid paths, missing directories, and malformed data. They verify that the toolkit handles gracefully the situations that occur rarely but cause significant problems when they do.
+
+These tests validate error handling paths, ensuring that the toolkit produces informative error messages rather than crashes. They check that validation catches invalid inputs before they corrupt state, and that recovery mechanisms function correctly.
+
+### Corruption Recovery Tests
+
+Corruption recovery tests validate backup creation, checksum verification, and automatic restoration when state files become corrupted. They intentionally corrupt files and verify that the system detects the corruption, creates appropriate warnings, and restores from valid backups.
+
+These tests provide confidence that the resilience layer actually protects against data loss. They validate the complete corruption detection pipeline from initial read through warning generation to successful restoration.
+
+### Property-Based Tests
+
+Property-based tests utilize fast-check to discover edge cases through random input generation. Instead of testing specific inputs, they generate thousands of random values and verify that certain properties hold true for all of them.
+
+These tests find bugs that manual test case design might miss. They exercise code paths with unexpected input combinations, extreme values, and malformed data that would be tedious to enumerate manually.
+
+### Fuzzing Tests
+
+Fuzzing tests inject random inputs to identify unexpected failure modes and crash conditions. They feed tools with completely random strings, numbers, paths, and data structures, validating that the toolkit handles all inputs without crashing.
+
+These tests complement property-based testing by focusing on resilience rather than correctness. They verify that the toolkit degrades gracefully with invalid input rather than failing catastrophically.
+
+### Chaos Tests
+
+Chaos tests inject faults to validate system behavior under adverse conditions. They simulate file deletions during operations, permission denials, disk full conditions, and other failure scenarios. These tests verify that the toolkit's error handling and recovery mechanisms function correctly when things go wrong.
+
+Chaos testing builds confidence in the system's resilience by exercising failure paths that normal testing cannot reach. They validate that the toolkit maintains data integrity even when external conditions become hostile.
 
 ## Mutation Testing
 
-The project uses Stryker mutation testing to measure test suite effectiveness. Mutation testing introduces small code changes (mutants) and verifies that tests catch them. A high mutation score indicates that tests are sensitive to real code changes.
+The project utilizes Stryker mutation testing to measure test suite effectiveness. Mutation testing introduces small code changes, called mutants, and verifies that tests catch them. A high mutation score indicates that tests are sensitive to real code changes and provide meaningful coverage.
 
-Source modules under mutation testing:
+### Source Modules Under Mutation Testing
 
 | Module | Purpose |
 |--------|---------|
@@ -251,24 +600,63 @@ Source modules under mutation testing:
 | speckit-validate | Artifact existence validation |
 | speckit-audit | Project audit with auto-fix capabilities |
 | speckit-clean | Inconsistency detection and repair |
-| speckit-delta | Incremental spec delta management |
+| speckit-delta | Incremental specification delta management |
 | speckit-health | Health monitoring with auto-repair |
+| speckit-complexity | Task complexity assessment |
+| speckit-config | Configuration management |
+| speckit-selfheal | Health scan and automatic repair |
+| speckit-status | Workflow state reporting |
+| speckit-guard | Permission management |
+| speckit-cache | Caching layer |
+| speckit-perf | Performance statistics |
+| plugins/speckit-perfmon | Performance monitoring plugin |
+| plugins/speckit-cache | Caching plugin |
+| plugins/speckit-guard | Permission protection plugin |
 
-Target thresholds: high >= 80%, low >= 60%. Run mutation testing with npx stryker run.
+### Thresholds
+
+Target thresholds ensure minimum quality standards:
+
+- High threshold: 80% (modules below this require immediate attention)
+- Low threshold: 60% (modules below this indicate systemic issues)
+
+Run mutation testing with:
+
+```
+npx stryker run
+```
+
+The Stryker configuration in stryker.conf.json specifies which modules to mutate, which test files to execute, and what thresholds to enforce.
 
 ## Contributing
 
-Contributions are welcome. Please follow these guidelines:
+Contributions are welcome. The project maintains high standards for code quality, testing, and documentation to ensure reliability across all components.
 
-Code Style. Use TypeScript with strict mode enabled. No semicolons, no colons in comments, minimal periods. Commas only for list separation.
+### Code Style
 
-Testing. All new features require integration tests. Run npm test and npm run typecheck before committing.
+Utilize TypeScript with strict mode enabled. No semicolons, no colons in comments, minimal periods. Use commas only for list separation. Follow the existing patterns in the codebase for naming conventions, import organization, and function structure.
 
-Commit Messages. Use conventional commit format (feat:, fix:, docs:, test:). Keep messages concise and descriptive.
+### Testing Requirements
 
-Architecture. Tools must be self-contained. Shared logic belongs in tools/shared/. Avoid circular dependencies.
+All new features require integration tests that validate the complete workflow. Run `npm test` and `npm run typecheck` before committing. The test suite must pass completely with no warnings or skipped tests.
 
-Documentation. Update README.md when adding features or changing behavior. Keep examples current.
+### Commit Messages
+
+Use conventional commit format with clear, descriptive prefixes:
+
+- `feat:` for new features
+- `fix:` for bug corrections
+- `docs:` for documentation changes
+- `test:` for test additions or modifications
+- `chore:` for maintenance tasks
+
+### Architecture Guidelines
+
+Tools must be self-contained. Shared logic belongs in tools/shared/. Avoid circular dependencies between modules. Each tool should be independently testable and deployable.
+
+### Documentation
+
+Update README.md when adding features or changing behavior. Keep examples current and ensure that all configuration options are documented. The documentation should reflect the actual state of the codebase.
 
 Issues and pull requests are welcome at the GitHub repository.
 
