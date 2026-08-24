@@ -194,6 +194,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-selfheal` | Run health scan, analyze findings, apply fixes with rollback | `fix` (bool, optional) |
 | `speckit-health` | Run health check, verify file integrity, restore from backups | `fix` (bool, optional) |
 | `speckit-delta` | Create incremental delta specs for existing features | `command`, `description`, `deltaId`, `featureDir` |
+| `speckit-perf` | Show performance statistics for all tools | `subcommand` (optional: "top N", "reset") |
 
 ---
 
@@ -277,7 +278,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 
