@@ -16,14 +16,24 @@
     "tools/speckit-delta.ts",
     "tools/speckit-health.ts",
     "tools/speckit-validate.ts",
-    "tools/speckit-scaffold.ts"
+    "tools/speckit-scaffold.ts",
+    "tools/speckit-complexity.ts",
+    "tools/speckit-config.ts",
+    "tools/speckit-selfheal.ts",
+    "tools/speckit-status.ts",
+    "tools/speckit-guard.ts",
+    "tools/speckit-cache.ts",
+    "tools/speckit-perf.ts",
+    "tools/plugins/speckit-perfmon.ts",
+    "tools/plugins/speckit-cache.ts",
+    "tools/plugins/speckit-guard.ts"
   ],
   "thresholds": {
     "high": 80,
     "low": 60,
     "break": null
   },
-  "timeoutMS": 60000,
+  "timeoutMS": 120000,
   "concurrency": 1,
   "checkers": ["typescript"],
   "ignorePatterns": [

@@ -210,15 +210,15 @@ const cachePlugin: Plugin = async (input) => {
 
     "tool.execute.after": async (toolInput, toolOutput) => {
       if (!CACHEABLE_TOOLS.includes(toolInput.tool)) return
-      if (toolOutput.args._cached) return
+      if ((toolOutput as any)._cached) return
 
       const fileHashes = await getFileHashes(input.worktree)
-      const key = generateCacheKey(toolInput.tool, toolOutput.args, fileHashes)
+      const key = generateCacheKey(toolInput.tool, toolInput.args, fileHashes)
 
       const entry: CacheEntry = {
         key,
         tool: toolInput.tool,
-        args: toolOutput.args,
+        args: toolInput.args,
         created: new Date().toISOString(),
         expires: new Date(Date.now() + CACHE_TTL).toISOString(),
         fileHashes,
@@ -233,7 +233,7 @@ const cachePlugin: Plugin = async (input) => {
 
       const index = await readCacheIndex()
       index.entries = index.entries.filter(e => e.key !== key)
-      index.entries.push({ ...entry, result: undefined as any })
+      index.entries.push({ key: entry.key, tool: entry.tool, args: entry.args, created: entry.created, expires: entry.expires, fileHashes: entry.fileHashes })
 
       if (index.entries.length > MAX_ENTRIES) {
         index.entries = index.entries.slice(-MAX_ENTRIES)
