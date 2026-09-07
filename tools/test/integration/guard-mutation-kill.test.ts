@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
+
+vi.mock("../../shared/types", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../shared/types")>()
+  return {
+    ...actual,
+    getProjectRootWarnings: vi.fn(async () => []),
+  }
+})
+
 import {
   isProtectedFile,
   isProtectedAfterApproval,
@@ -13,10 +22,12 @@ import {
 } from "../../plugins/speckit-guard"
 import guardPlugin from "../../plugins/speckit-guard"
 import guardTool from "../../speckit-guard"
+import * as sharedTypes from "../../shared/types"
 
 let tmpDir: string
 
 beforeEach(async () => {
+  vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([])
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "guard-kill-"))
   const opencodeDir = path.join(tmpDir, ".opencode")
   const specMemoryDir = path.join(opencodeDir, "spec-memory")
@@ -885,6 +896,277 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
     it("server returns permission.ask hook", async () => {
       const server = await guardPlugin.server({ worktree: tmpDir } as any)
       expect(typeof server["permission.ask"]).toBe("function")
+    })
+  })
+
+  describe("formatOutput - empty line separators", () => {
+    it("output starts with Guard Status header", async () => {
+      await writeGuardConfig({ ...DEFAULT_CONFIG, enabled: true, debug: false })
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("Guard Status: ENABLED | Debug: OFF")
+    })
+
+    it("output has newline between Protected Files section end and Protected After Approval", async () => {
+      const result = await runTool({ subcommand: "status" })
+      const lines = result.output!.split("\n")
+      const protectedFilesEnd = lines.findIndex(l => l.trim() === "")
+      const afterApprovalIdx = lines.findIndex(l => l.includes("Protected After Approval:"))
+      expect(afterApprovalIdx).toBeGreaterThan(protectedFilesEnd)
+    })
+
+    it("output has newline between Protected After Approval section and Protected By Phase", async () => {
+      const result = await runTool({ subcommand: "status" })
+      const lines = result.output!.split("\n")
+      const afterApprovalIdx = lines.findIndex(l => l.includes("Protected After Approval:"))
+      const byPhaseIdx = lines.findIndex(l => l.includes("Protected By Phase:"))
+      expect(byPhaseIdx).toBeGreaterThan(afterApprovalIdx)
+    })
+
+    it("output has newline between Protected By Phase section and Statistics", async () => {
+      const result = await runTool({ subcommand: "status" })
+      const lines = result.output!.split("\n")
+      const byPhaseIdx = lines.findIndex(l => l.includes("Protected By Phase:"))
+      const statsIdx = lines.findIndex(l => l.includes("Statistics:"))
+      expect(statsIdx).toBeGreaterThan(byPhaseIdx)
+    })
+
+    it("output has newline between Statistics section and Recent Denials", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp: new Date().toISOString(), file: "test.md", reason: "reason" }],
+      })
+      const result = await runTool({ subcommand: "status" })
+      const lines = result.output!.split("\n")
+      const statsIdx = lines.findIndex(l => l.includes("Statistics:"))
+      const denialsIdx = lines.findIndex(l => l.includes("Recent Denials"))
+      expect(denialsIdx).toBeGreaterThan(statsIdx)
+    })
+  })
+
+  describe("formatOutput - protectedAfterApproval loop rendering", () => {
+    it("shows spec.json with after clause", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("spec.json (after spec approval)")
+    })
+
+    it("shows plan.md with after clause", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("plan.md (after plan approval)")
+    })
+
+    it("shows tasks.md with after clause", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("tasks.md (after tasks approval)")
+    })
+
+    it("shows spec.md with after clause", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("spec.md (after spec approval)")
+    })
+
+    it("regex correctly strips file extension for after clause", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toMatch(/spec\.json \(after spec approval\)/)
+    })
+  })
+
+  describe("formatOutput - date formatting", () => {
+    it("status denial timestamp matches YYYY-MM-DD HH:MM format", async () => {
+      const timestamp = "2026-03-15T14:45:30.000Z"
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp, file: "test.md", reason: "reason" }],
+      })
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("[2026-03-15 14:45]")
+      expect(result.output).not.toContain("2026-03-15T14:45")
+    })
+
+    it("status denial timestamp does not include seconds", async () => {
+      const timestamp = "2026-01-01T00:00:59.999Z"
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp, file: "test.md", reason: "reason" }],
+      })
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("[2026-01-01 00:00]")
+      expect(result.output).not.toContain("00:00:59")
+    })
+  })
+
+  describe("formatOutput - join separator", () => {
+    it("output contains newline separators between lines", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("\n")
+    })
+
+    it("output has multiple distinct lines", async () => {
+      const result = await runTool({ subcommand: "status" })
+      const lines = result.output!.split("\n")
+      expect(lines.length).toBeGreaterThan(5)
+    })
+  })
+
+  describe("remove - filter callback verification", () => {
+    it("onConfirm removes only the specified file and keeps others", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        protectedFiles: ["file1.md", "file2.md", "file3.md"],
+      })
+      const result = await runTool({ subcommand: "remove", file: "file2.md" })
+      await result.metadata?.onConfirm()
+      const config = await readGuardConfig()
+      expect(config.protectedFiles).not.toContain("file2.md")
+      expect(config.protectedFiles).toContain("file1.md")
+      expect(config.protectedFiles).toContain("file3.md")
+    })
+
+    it("onConfirm with empty file list results in empty array", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        protectedFiles: ["only.md"],
+      })
+      const result = await runTool({ subcommand: "remove", file: "only.md" })
+      await result.metadata?.onConfirm()
+      const config = await readGuardConfig()
+      expect(config.protectedFiles).not.toContain("only.md")
+      expect(config.protectedFiles.length).toBe(0)
+    })
+  })
+
+  describe("log subcommand - format verification", () => {
+    it("log shows denial with date format [YYYY-MM-DD HH:MM]", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp: "2026-06-01T09:15:00.000Z", file: "spec.json", reason: "test" }],
+      })
+      const result = await runTool({ subcommand: "log" })
+      expect(result.output).toContain("[2026-06-01 09:15]")
+      expect(result.output).toContain("spec.json")
+      expect(result.output).toContain("test")
+    })
+
+    it("log shows denial count in header", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [
+          { timestamp: "2026-06-01T09:15:00.000Z", file: "a.md", reason: "r1" },
+          { timestamp: "2026-06-02T10:00:00.000Z", file: "b.md", reason: "r2" },
+        ],
+      })
+      const result = await runTool({ subcommand: "log" })
+      expect(result.output).toContain("Recent Denials (2)")
+    })
+
+    it("log with all option shows denial count", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp: new Date().toISOString(), file: "x.md", reason: "y" }],
+      })
+      const result = await runTool({ subcommand: "log", logOption: "all" })
+      expect(result.output).toContain("1 denials")
+    })
+
+    it("log format matches [date] file - reason pattern", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp: "2026-07-04T12:00:00.000Z", file: "plan.md", reason: "reason text" }],
+      })
+      const result = await runTool({ subcommand: "log" })
+      expect(result.output).toMatch(/\[2026-07-04 12:00\] plan\.md - reason text/)
+    })
+
+    it("log output contains newline separators", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        denials: [{ timestamp: new Date().toISOString(), file: "a.md", reason: "r" }],
+      })
+      const result = await runTool({ subcommand: "log" })
+      expect(result.output).toContain("\n")
+    })
+  })
+
+  describe("default subcommand", () => {
+    it("returns status when no subcommand provided", async () => {
+      await writeGuardConfig({ ...DEFAULT_CONFIG, enabled: true })
+      const result = await runTool({})
+      expect(result.title).toBe("Guard Status")
+      expect(result.output).toContain("Guard Status:")
+    })
+
+    it("returns status when subcommand is empty", async () => {
+      await writeGuardConfig({ ...DEFAULT_CONFIG, enabled: false })
+      const result = await runTool({ subcommand: "" })
+      expect(result.title).toBe("Guard Status")
+      expect(result.output).toContain("DISABLED")
+    })
+  })
+
+  describe("projectWarnings block", () => {
+    beforeEach(() => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([])
+    })
+
+    it("returns normal status when no warnings", async () => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([])
+      const result = await runTool({ subcommand: "status" })
+      expect(result.title).toBe("Guard Status")
+    })
+
+    it("returns Warning title when warnings exist", async () => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([
+        { type: "kit-installation", message: "Running from kit directory" },
+      ])
+      const result = await runTool({ subcommand: "status" })
+      expect(result.title).toBe("Warning")
+      expect(result.output).toContain("Running from kit directory")
+    })
+
+    it("returns requiresConfirmation in metadata when warnings exist", async () => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([
+        { type: "shallow-path", message: "Path is shallow" },
+      ])
+      const result = await runTool({ subcommand: "status" })
+      expect(result.metadata?.requiresConfirmation).toBe(true)
+    })
+
+    it("returns warnings array in metadata", async () => {
+      const warnings = [
+        { type: "kit-installation" as const, message: "msg1" },
+        { type: "shallow-path" as const, message: "msg2" },
+      ]
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue(warnings)
+      const result = await runTool({ subcommand: "status" })
+      expect(result.metadata?.warnings).toEqual(warnings)
+    })
+
+    it("joins multiple warning messages with double newlines", async () => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([
+        { type: "kit-installation", message: "Warning one" },
+        { type: "shallow-path", message: "Warning two" },
+      ])
+      const result = await runTool({ subcommand: "status" })
+      expect(result.output).toContain("Warning one\n\nWarning two")
+    })
+  })
+
+  describe("error catch block", () => {
+    beforeEach(() => {
+      vi.mocked(sharedTypes.getProjectRootWarnings).mockResolvedValue([])
+    })
+
+    it("falls back to defaults when config file is corrupt", async () => {
+      const configPath = path.join(tmpDir, ".opencode", "guard.json")
+      await fs.writeFile(configPath, "not valid json {{{")
+      const result = await runTool({ subcommand: "status" })
+      expect(result.title).toBe("Guard Status")
+      expect(result.output).toContain("ENABLED")
+    })
+
+    it("falls back to defaults when config file does not exist", async () => {
+      const result = await runTool({ subcommand: "status" })
+      expect(result.title).toBe("Guard Status")
+      expect(result.output).toContain("ENABLED")
     })
   })
 })
