@@ -24,7 +24,7 @@ interface SelfHealFinding {
   originalCategory: string
 }
 
-function categorize(category: string, severity: string): { category: SelfHealFinding["category"]; severity: SelfHealFinding["severity"] } {
+export function categorize(category: string, severity: string): { category: SelfHealFinding["category"]; severity: SelfHealFinding["severity"] } {
   const bugCategories = ["phase-mismatch", "ready-violation", "spec-json"]
   const hardeningCategories = ["approval-order", "spec-clarity", "tasks-boundary", "steering"]
   const docCategories = ["optional-artifact", "constitution", "features"]

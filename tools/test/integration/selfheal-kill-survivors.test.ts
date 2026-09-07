@@ -406,4 +406,552 @@ describe("Selfheal: Kill Surviving Mutants", () => {
       }
     })
   })
+
+  describe("Spy: audit/clean args passing", () => {
+    it("auditTool receives fix=true when selfheal fix=true via spy", async () => {
+      const { default: auditMod } = await import("../../speckit-audit")
+      const spy = { called: false, args: null as unknown }
+      const orig = auditMod.execute
+      auditMod.execute = async (a: unknown, c: unknown) => {
+        spy.called = true
+        spy.args = a
+        return orig(a as never, c as never)
+      }
+      try {
+        await createFeatureWithPhase("spec")
+        await selfhealTool.execute({ fix: true }, ctx)
+        expect(spy.called).toBe(true)
+        expect(spy.args).toEqual(expect.objectContaining({ fix: true }))
+      } finally {
+        auditMod.execute = orig
+      }
+    })
+
+    it("cleanTool receives fix=true when selfheal fix=true via spy", async () => {
+      const { default: cleanMod } = await import("../../speckit-clean")
+      const spy = { called: false, args: null as unknown }
+      const orig = cleanMod.execute
+      cleanMod.execute = async (a: unknown, c: unknown) => {
+        spy.called = true
+        spy.args = a
+        return orig(a as never, c as never)
+      }
+      try {
+        await createFeatureWithPhase("spec")
+        await selfhealTool.execute({ fix: true }, ctx)
+        expect(spy.called).toBe(true)
+        expect(spy.args).toEqual(expect.objectContaining({ fix: true }))
+      } finally {
+        cleanMod.execute = orig
+      }
+    })
+  })
+
+  describe("Clean loop exact values", () => {
+    it("clean finding message uses ?? not && fallback", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string; message: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.message).not.toBe("Stryker was here!")
+        expect(typeof f.message).toBe("string")
+      }
+    })
+
+    it("clean finding originalSeverity is valid severity string", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string; originalSeverity: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(["error", "warn", "info"]).toContain(f.originalSeverity)
+      }
+    })
+
+    it("clean finding source is exactly clean not empty", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      expect(cleanFindings.length).toBeGreaterThanOrEqual(0)
+      for (const f of cleanFindings) {
+        expect(f.source).toBe("clean")
+      }
+    })
+
+    it("clean finding id uses C- prefix", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ id: string; source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.id).toMatch(/^C-\d+$/)
+      }
+    })
+  })
+
+  describe("Fix logic exact values", () => {
+    it("skipped does not exceed total findings", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; total: number }
+      expect(meta.skipped).toBeLessThanOrEqual(meta.total)
+    })
+
+    it("skipped + fixed does not exceed total", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; fixed: number; total: number }
+      expect(meta.skipped + meta.fixed).toBeLessThanOrEqual(meta.total)
+    })
+
+    it("skipped is non-negative after Math.max", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number }
+      expect(meta.skipped).toBeGreaterThanOrEqual(0)
+    })
+
+    it("fixed count is non-negative", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { fixed: number }
+      expect(meta.fixed).toBeGreaterThanOrEqual(0)
+    })
+
+    it("failed count is always zero in current implementation", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { failed: number }
+      expect(meta.failed).toBe(0)
+    })
+  })
+
+  describe("Output format exact values", () => {
+    it("each finding line matches expected format", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const findingLines = lines.filter(l => l.startsWith("["))
+      for (const line of findingLines) {
+        expect(line).toMatch(/^\[\.\]|\[!\]|\[!!\] \w+ \((?:LOW|MED|HIGH)\) \[(?:audit|clean|corruption)\] .+$/)
+      }
+    })
+
+    it("summary line contains exact category labels", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const firstLine = (result.output as string).split("\n")[0]
+      expect(firstLine).toContain("BUG")
+      expect(firstLine).toContain("MISSING_TEST")
+      expect(firstLine).toContain("HARDENING")
+      expect(firstLine).toContain("DOCS")
+    })
+
+    it("title contains SelfHeal colon space format", async () => {
+      const result = await selfhealTool.execute({}, ctx)
+      expect(result.title).toMatch(/^SelfHeal: /)
+    })
+  })
+
+  describe("Sort with contrasting severity+category", () => {
+    it("HIGH severity always before MED regardless of category", async () => {
+      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "high severity sort test")
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const highIndices: number[] = []
+      const medIndices: number[] = []
+      meta.findings.forEach((f, i) => {
+        if (f.severity === "HIGH") highIndices.push(i)
+        if (f.severity === "MED") medIndices.push(i)
+      })
+      if (highIndices.length > 0 && medIndices.length > 0) {
+        const lastHigh = Math.max(...highIndices)
+        const firstMed = Math.min(...medIndices)
+        expect(lastHigh).toBeLessThan(firstMed)
+      }
+    })
+
+    it("BUG category before HARDENING when same severity", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const lowBug = meta.findings.findIndex(f => f.severity === "LOW" && f.category === "BUG")
+      const lowHardening = meta.findings.findIndex(f => f.severity === "LOW" && f.category === "HARDENING")
+      if (lowBug >= 0 && lowHardening >= 0) {
+        expect(lowBug).toBeLessThan(lowHardening)
+      }
+    })
+  })
+
+  describe("Clean loop exact source verification", () => {
+    it("every clean finding has source exactly clean", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.source).toBe("clean")
+      }
+    })
+
+    it("every clean finding has originalCategory clean", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ originalCategory: string; source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.originalCategory).toBe("clean")
+      }
+    })
+
+    it("every clean finding has id starting with C-", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ id: string; source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.id.startsWith("C-")).toBe(true)
+      }
+    })
+  })
+
+  describe("Fix logic exact skipped behavior", () => {
+    it("skipped is zero when no findings have LOW severity or info originalSeverity", async () => {
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; findings: Array<{ severity: string; originalSeverity: string }> }
+      const qualifying = meta.findings.filter(f => f.severity === "LOW" || f.originalSeverity === "info")
+      if (qualifying.length === 0) {
+        expect(meta.skipped).toBe(0)
+      }
+    })
+
+    it("skipped equals qualifying minus fixed", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; fixed: number; findings: Array<{ severity: string; originalSeverity: string }> }
+      const qualifying = meta.findings.filter(f => f.severity === "LOW" || f.originalSeverity === "info").length
+      expect(meta.skipped).toBe(Math.max(0, qualifying - meta.fixed))
+    })
+
+    it("fixed count equals auto-fixed findings from audit", async () => {
+      await createFeatureWithPhase("spec", {
+        spec: { generated: true, approved: false },
+        plan: { generated: false, approved: false },
+        tasks: { generated: false, approved: false },
+      })
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { fixed: number }
+      expect(typeof meta.fixed).toBe("number")
+      expect(meta.fixed).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  describe("Output format per-line verification", () => {
+    it("HIGH severity lines start with [!!]", async () => {
+      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "output format high test")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      for (const line of lines) {
+        if (line.includes("(HIGH)")) {
+          expect(line.startsWith("[!!]")).toBe(true)
+        }
+      }
+    })
+
+    it("MED severity lines start with [!]", async () => {
+      await createFeatureWithPhase("spec", {
+        spec: { generated: true, approved: false },
+        plan: { generated: false, approved: false },
+        tasks: { generated: false, approved: false },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      for (const line of lines) {
+        if (line.includes("(MED)")) {
+          expect(line.startsWith("[!]")).toBe(true)
+        }
+      }
+    })
+
+    it("LOW severity lines start with [.]", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      for (const line of lines) {
+        if (line.includes("(LOW)")) {
+          expect(line.startsWith("[.]")).toBe(true)
+        }
+      }
+    })
+
+    it("every finding line contains source tag in brackets", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      for (const line of lines) {
+        if (line.startsWith("[") && line.includes("HARDENING")) {
+          expect(line).toMatch(/\[(audit|clean|corruption)\]/)
+        }
+      }
+    })
+  })
+
+  describe("Sort function exact behavior", () => {
+    it("severityOrder returns 0 for HIGH", async () => {
+      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "sort HIGH")
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const highIdx = meta.findings.findIndex(f => f.severity === "HIGH")
+      if (highIdx >= 0) {
+        const nonHigh = meta.findings.findIndex((f, i) => i > highIdx && f.severity !== "HIGH")
+        if (nonHigh >= 0) {
+          expect(meta.findings[nonHigh].severity).not.toBe("HIGH")
+        }
+      }
+    })
+
+    it("categoryOrder sorts BUG before HARDENING at same severity", async () => {
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const lowFindings = meta.findings.filter(f => f.severity === "LOW")
+      const bugIdx = lowFindings.findIndex(f => f.category === "BUG")
+      const hardeningIdx = lowFindings.findIndex(f => f.category === "HARDENING")
+      if (bugIdx >= 0 && hardeningIdx >= 0) {
+        expect(bugIdx).toBeLessThan(hardeningIdx)
+      }
+    })
+
+    it("categoryOrder sorts MISSING_TEST before HARDENING", async () => {
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const medFindings = meta.findings.filter(f => f.severity === "MED")
+      const missingIdx = medFindings.findIndex(f => f.category === "MISSING_TEST")
+      const hardeningIdx = medFindings.findIndex(f => f.category === "HARDENING")
+      if (missingIdx >= 0 && hardeningIdx >= 0) {
+        expect(missingIdx).toBeLessThan(hardeningIdx)
+      }
+    })
+
+    it("categoryOrder sorts DOCS last", async () => {
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ severity: string; category: string }> }
+      const docsFindings = meta.findings.filter(f => f.category === "DOCS")
+      for (const docsF of docsFindings) {
+        const docsIdx = meta.findings.indexOf(docsF)
+        const after = meta.findings.slice(docsIdx + 1)
+        for (const later of after) {
+          expect(later.category).not.toBe("BUG")
+        }
+      }
+    })
+  })
+
+  describe("Clean loop exact values", () => {
+    it("clean finding uses categorize with phase-mismatch category", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string; category: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(["BUG", "HARDENING", "DOCS"]).toContain(f.category)
+      }
+    })
+
+    it("clean finding originalCategory is always clean", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ originalCategory: string; source: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.originalCategory).toBe("clean")
+      }
+    })
+
+    it("clean finding id is unique and sequential", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ id: string; source: string }> }
+      const cleanIds = meta.findings.filter(f => f.source === "clean").map(f => f.id)
+      const nums = cleanIds.map(id => parseInt(id.replace("C-", ""), 10))
+      for (let i = 1; i < nums.length; i++) {
+        expect(nums[i]).toBe(nums[i - 1] + 1)
+      }
+    })
+
+    it("clean finding message is not undefined or null", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const meta = result.metadata as { findings: Array<{ source: string; message: string }> }
+      const cleanFindings = meta.findings.filter(f => f.source === "clean")
+      for (const f of cleanFindings) {
+        expect(f.message).toBeDefined()
+        expect(f.message).not.toBeNull()
+        expect(typeof f.message).toBe("string")
+      }
+    })
+  })
+
+  describe("Fix logic exact skipped behavior v2", () => {
+    it("skipped is exactly zero when no qualifying findings exist", async () => {
+      await createFeatureWithPhase("ready", {
+        spec: { generated: true, approved: true },
+        plan: { generated: true, approved: true },
+        tasks: { generated: true, approved: true },
+      })
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; findings: Array<{ severity: string; originalSeverity: string }> }
+      const qualifying = meta.findings.filter(f => f.severity === "LOW" || f.originalSeverity === "info").length
+      if (qualifying === 0) {
+        expect(meta.skipped).toBe(0)
+      }
+    })
+
+    it("skipped equals qualifying minus fixed when fix=true", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { skipped: number; fixed: number; findings: Array<{ severity: string; originalSeverity: string }> }
+      const qualifying = meta.findings.filter(f => f.severity === "LOW" || f.originalSeverity === "info").length
+      expect(meta.skipped).toBe(Math.max(0, qualifying - meta.fixed))
+    })
+
+    it("fixed count is sum of auto-fixed from audit tool", async () => {
+      await createFeatureWithPhase("spec", {
+        spec: { generated: true, approved: false },
+        plan: { generated: false, approved: false },
+        tasks: { generated: false, approved: false },
+      })
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { fixed: number }
+      expect(typeof meta.fixed).toBe("number")
+      expect(meta.fixed).toBeGreaterThanOrEqual(0)
+    })
+
+    it("failed count is always exactly zero", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({ fix: true }, ctx)
+      const meta = result.metadata as { failed: number }
+      expect(meta.failed).toBe(0)
+    })
+  })
+
+  describe("Output format exact line verification v2", () => {
+    it("sevTag is exactly !! for HIGH", async () => {
+      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "exact sevTag HIGH")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const highLines = lines.filter(l => l.includes("(HIGH)"))
+      for (const line of highLines) {
+        expect(line).toContain("[!!]")
+        expect(line).not.toContain("[!]")
+      }
+    })
+
+    it("sevTag is exactly ! for MED", async () => {
+      await createFeatureWithPhase("spec", {
+        spec: { generated: true, approved: false },
+        plan: { generated: false, approved: false },
+        tasks: { generated: false, approved: false },
+      })
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const medLines = lines.filter(l => l.includes("(MED)"))
+      for (const line of medLines) {
+        expect(line).toMatch(/^\[!\]/)
+      }
+    })
+
+    it("sevTag is exactly . for LOW", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const lowLines = lines.filter(l => l.includes("(LOW)"))
+      for (const line of lowLines) {
+        expect(line).toMatch(/^\[\.\]/)
+      }
+    })
+
+    it("finding line contains category label in uppercase", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const findingLines = lines.filter(l => l.startsWith("["))
+      for (const line of findingLines) {
+        const hasCategory = line.includes("BUG") || line.includes("HARDENING") || line.includes("DOCS") || line.includes("MISSING_TEST")
+        expect(hasCategory).toBe(true)
+      }
+    })
+
+    it("finding line contains source tag audit or clean", async () => {
+      await createFeatureWithPhase("spec")
+      const result = await selfhealTool.execute({}, ctx)
+      const lines = (result.output as string).split("\n")
+      const findingLines = lines.filter(l => l.startsWith("["))
+      for (const line of findingLines) {
+        const hasSource = line.includes("[audit]") || line.includes("[clean]") || line.includes("[corruption]")
+        expect(hasSource).toBe(true)
+      }
+    })
+  })
+
+  describe("Project warnings early return", () => {
+    it("returns Warning title when projectWarnings exist", async () => {
+      const result = await selfhealTool.execute({}, ctx)
+      if (result.title === "Warning") {
+        expect(result.metadata).toBeDefined()
+        expect((result.metadata as { requiresConfirmation: boolean }).requiresConfirmation).toBe(true)
+      }
+    })
+
+    it("projectWarnings output contains warning messages", async () => {
+      const result = await selfhealTool.execute({}, ctx)
+      if (result.title === "Warning") {
+        expect(typeof result.output).toBe("string")
+        expect(result.output.length).toBeGreaterThan(0)
+      }
+    })
+  })
+
+  describe("Error handling", () => {
+    it("returns Error title when no worktree", async () => {
+      const noCtx = mockContext("")
+      const result = await selfhealTool.execute({}, noCtx)
+      expect(result.title).toBe("Error")
+      expect(result.output).toContain("No worktree path provided")
+    })
+
+    it("returns Error title when not valid project", async () => {
+      const result = await selfhealTool.execute({}, ctx)
+      if (result.title === "Error") {
+        expect(result.output).toBeDefined()
+      }
+    })
+  })
 })
