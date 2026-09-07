@@ -28,7 +28,6 @@ function categorize(category: string, severity: string): { category: SelfHealFin
   const bugCategories = ["phase-mismatch", "ready-violation", "spec-json"]
   const hardeningCategories = ["approval-order", "spec-clarity", "tasks-boundary", "steering"]
   const docCategories = ["optional-artifact", "constitution", "features"]
-  const testCategories: string[] = []
 
   const sevMap: Record<string, SelfHealFinding["severity"]> = {
     error: "HIGH",
@@ -44,12 +43,6 @@ function categorize(category: string, severity: string): { category: SelfHealFin
   }
   if (docCategories.includes(category)) {
     return { category: "DOCS", severity: "LOW" }
-  }
-  if (testCategories.includes(category)) {
-    return { category: "MISSING_TEST", severity: sevMap[severity] ?? "LOW" }
-  }
-  if (category === "corruption") {
-    return { category: "BUG", severity: "HIGH" }
   }
   return { category: "HARDENING", severity: sevMap[severity] ?? "LOW" }
 }

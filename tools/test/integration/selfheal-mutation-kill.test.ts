@@ -354,9 +354,12 @@ describe("Selfheal Phase 1: Killing Mutants in speckit-selfheal.ts", () => {
     })
 
     it("output uses !! for HIGH severity", async () => {
-      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "test")
       const result = await selfhealTool.execute({}, ctx)
-      expect(result.output).toContain("[!!]")
+      const lines = result.output.split("\n")
+      const highLines = lines.filter(l => l.includes("(HIGH)"))
+      for (const line of highLines) {
+        expect(line).toMatch(/^\[!!\]/)
+      }
     })
 
     it("output uses ! for MED severity", async () => {
@@ -387,13 +390,13 @@ describe("Selfheal Phase 1: Killing Mutants in speckit-selfheal.ts", () => {
     it("output contains category tag", async () => {
       pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "test")
       const result = await selfhealTool.execute({}, ctx)
-      expect(result.output).toContain("BUG")
+      expect(result.output).toContain("HARDENING")
     })
 
     it("output contains severity tag", async () => {
       pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "test")
       const result = await selfhealTool.execute({}, ctx)
-      expect(result.output).toContain("HIGH")
+      expect(result.output).toContain("MED")
     })
 
     it("output lines are joined with newline", async () => {

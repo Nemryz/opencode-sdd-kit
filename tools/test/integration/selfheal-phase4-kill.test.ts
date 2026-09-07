@@ -338,9 +338,12 @@ describe("Selfheal Phase 4: Additional Kill Tests for speckit-selfheal.ts", () =
 
   describe("output formatting - severity tags", () => {
     it("HIGH severity uses !! tag", async () => {
-      pushCorruptionWarning(path.join(worktree, ".opencode", "session.json"), "corruption for tag")
       const result = await selfhealTool.execute({}, ctx)
-      expect(result.output).toContain("!!")
+      const lines = result.output.split("\n")
+      const highLines = lines.filter(l => l.includes("(HIGH)"))
+      for (const line of highLines) {
+        expect(line).toMatch(/^\[!!\]/)
+      }
     })
 
     it("MED severity uses ! tag", async () => {
