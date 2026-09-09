@@ -32,6 +32,7 @@ import {
   syncFrontmatterFromSpecJson,
   writeFrontmatter,
   readFrontmatter,
+  tryAutoCommit,
   computeBodyChecksum,
   runHealthCheck,
   writeConfigWithBackup,
@@ -1179,5 +1180,349 @@ describe("Kill: releaseLock with force", () => {
     await releaseLock(handle)
     const exists = await fs.access(handle.lockDir).then(() => true, () => false)
     expect(exists).toBe(false)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// 17. tryAutoCommit — onlyLastUsedLanguageChanged logic (Lines 558-584)
+// ═══════════════════════════════════════════════════════════════
+describe("Kill: tryAutoCommit commit/revert behavior", () => {
+  function gitInit(root: string): void {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process")
+    execSync("git init", { cwd: root, stdio: "ignore" })
+    execSync("git config user.email \"test@test.com\"", { cwd: root, stdio: "ignore" })
+    execSync("git config user.name \"Test\"", { cwd: root, stdio: "ignore" })
+  }
+
+  function gitCommitAll(root: string, msg: string): void {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process")
+    execSync("git add .", { cwd: root, stdio: "ignore" })
+    execSync(`git commit -m "${msg}"`, { cwd: root, stdio: "ignore" })
+  }
+
+  function gitLogCount(root: string): number {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process")
+    const log = execSync("git log --oneline", { cwd: root, encoding: "utf-8" })
+    return log.trim().split("\n").filter(Boolean).length
+  }
+
+  async function setupAutoVersioning(root: string): Promise<string> {
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await writeSession(root, { ...DEFAULT_SESSION })
+    const cfp = configPath(root)
+    await fs.mkdir(path.dirname(cfp), { recursive: true })
+    await fs.writeFile(cfp, JSON.stringify({ ...DEFAULT_CONFIG, autoVersioning: true }), "utf-8")
+    await writeFileChecksum(cfp)
+    return fp
+  }
+
+  it("commits when diff has non-lastUsedLanguage changes", async () => {
+    const root = await worktree()
+    gitInit(root)
+    const fp = await setupAutoVersioning(root)
+    gitCommitAll(root, "init")
+    const before = gitLogCount(root)
+
+    // Write session with phase change (creates a diff with "phase", not just "lastUsedLanguage")
+    await writeSession(root, { ...DEFAULT_SESSION, phase: "spec" as const })
+    await tryAutoCommit(fp, root)
+
+    const after = gitLogCount(root)
+    expect(after).toBe(before + 1)
+  })
+
+  it("does not commit when git index has no changes", async () => {
+    const root = await worktree()
+    gitInit(root)
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await writeSession(root, { ...DEFAULT_SESSION })
+    const cfp = configPath(root)
+    await fs.mkdir(path.dirname(cfp), { recursive: true })
+    await fs.writeFile(cfp, JSON.stringify({ ...DEFAULT_CONFIG, autoVersioning: true }), "utf-8")
+    await writeFileChecksum(cfp)
+    gitCommitAll(root, "init")
+    const before = gitLogCount(root)
+
+    // Don't modify any file — diff should be empty
+    await tryAutoCommit(fp, root)
+
+    const after = gitLogCount(root)
+    expect(after).toBe(before)
+  })
+
+  it("does not commit when autoVersioning is false", async () => {
+    const root = await worktree()
+    gitInit(root)
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await writeSession(root, { ...DEFAULT_SESSION })
+    const cfp = configPath(root)
+    await fs.mkdir(path.dirname(cfp), { recursive: true })
+    await fs.writeFile(cfp, JSON.stringify({ ...DEFAULT_CONFIG, autoVersioning: false }), "utf-8")
+    await writeFileChecksum(cfp)
+    gitCommitAll(root, "init")
+    const before = gitLogCount(root)
+
+    await writeSession(root, { ...DEFAULT_SESSION, phase: "spec" as const })
+    await tryAutoCommit(fp, root)
+
+    const after = gitLogCount(root)
+    expect(after).toBe(before)
+  })
+
+  it("skips commit when git dir does not exist", async () => {
+    const root = await worktree()
+    // No git init
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await writeSession(root, { ...DEFAULT_SESSION })
+    // Should not throw even without .git
+    await expect(tryAutoCommit(fp, root)).resolves.toBeUndefined()
+  })
+
+  it("commits with correct message for session.json", async () => {
+    const root = await worktree()
+    gitInit(root)
+    const fp = await setupAutoVersioning(root)
+    gitCommitAll(root, "init")
+
+    await writeSession(root, { ...DEFAULT_SESSION, phase: "spec" as const })
+    await tryAutoCommit(fp, root)
+
+    const { execSync } = require("node:child_process") as typeof import("node:child_process")
+    const msg = execSync("git log -1 --pretty=%B", { cwd: root, encoding: "utf-8" }).trim()
+    expect(msg).toBe("auto: update session state")
+  })
+
+  it("commits with default message for unknown file", async () => {
+    const root = await worktree()
+    gitInit(root)
+    const fp = sessionPath(root)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    await writeSession(root, { ...DEFAULT_SESSION })
+    const cfp = configPath(root)
+    await fs.mkdir(path.dirname(cfp), { recursive: true })
+    await fs.writeFile(cfp, JSON.stringify({ ...DEFAULT_CONFIG, autoVersioning: true }), "utf-8")
+    await writeFileChecksum(cfp)
+    gitCommitAll(root, "init")
+
+    // Create a non-standard file and write to it
+    const customFp = path.join(root, ".opencode", "custom-state.json")
+    await fs.writeFile(customFp, "{}", "utf-8")
+    await writeFileChecksum(customFp)
+    await fs.writeFile(customFp, '{"key":"value"}', "utf-8")
+    await tryAutoCommit(customFp, root)
+
+    const { execSync } = require("node:child_process") as typeof import("node:child_process")
+    const msg = execSync("git log -1 --pretty=%B", { cwd: root, encoding: "utf-8" }).trim()
+    expect(msg).toBe("auto: update custom-state.json")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// 18. readFrontmatter fallback regex edge cases (Lines 606-619)
+// ═══════════════════════════════════════════════════════════════
+describe("Kill: readFrontmatter fallback regex edge cases", () => {
+  async function triggerFallback(root: string, lines: string[]): Promise<ReturnType<typeof readFrontmatter>> {
+    const fp = path.join(root, "test.md")
+    const content = "---\n" + lines.join("\n") + "\n[[[\n---\n\nBody here"
+    await fs.writeFile(fp, content, "utf-8")
+    return readFrontmatter(fp)
+  }
+
+  it("skips bare key without colon-space separator", async () => {
+    const root = await worktree()
+    const fm = await triggerFallback(root, ["feature_name:test", "feature_number: 1"])
+    // "feature_name:test" has no space after colon, regex /^(\w+):\s*(.+)$/ requires \s*
+    // but "test" is the value, so it should match since \s* matches zero spaces
+    expect(fm?.feature_name).toBe("test")
+  })
+
+  it("parses value with multiple colons correctly", async () => {
+    const root = await worktree()
+    const fm = await triggerFallback(root, ['feature_name: "test:with:colons"', "feature_number: 1"])
+    expect(fm?.feature_name).toBe("test:with:colons")
+  })
+
+  it("skips lines that are just keys with no value after colon", async () => {
+    const root = await worktree()
+    const fm = await triggerFallback(root, ["feature_name: test", "emptykey:", "feature_number: 1"])
+    // "emptykey:" — regex /^(\w+):\s*(.+)$/ requires at least one char after colon
+    expect(fm).not.toBeNull()
+    expect(fm?.feature_name).toBe("test")
+    expect(fm?.feature_number).toBe(1)
+  })
+
+  it("parses complex unquoted value with spaces", async () => {
+    const root = await worktree()
+    const fm = await triggerFallback(root, ["feature_name: hello world foo", "feature_number: 1"])
+    expect(fm?.feature_name).toBe("hello world foo")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// 19. syncFrontmatterFromSpecJson — plan/tasks status fields
+// ═══════════════════════════════════════════════════════════════
+describe("Kill: syncFrontmatterFromSpecJson plan/tasks status", () => {
+  async function setupFeature(root: string, featureName: string) {
+    const featureDir = path.join(root, "specs", `001-${featureName}`)
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), { feature_name: featureName, feature_number: 1, phase: "spec" })
+    await writeMd(path.join(featureDir, "plan.md"), { feature_name: featureName, phase: "plan" })
+    await writeMd(path.join(featureDir, "tasks.md"), { feature_name: featureName, phase: "tasks" })
+    return featureDir
+  }
+
+  it("sets plan status to approved when plan approved", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.approvals.plan.approved = true
+    sj.approvals.plan.generated = true
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "plan.md"))
+    expect(fm?.status).toBe("approved")
+  })
+
+  it("sets plan status to validated when generated but not approved", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.approvals.plan.generated = true
+    sj.approvals.plan.approved = false
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "plan.md"))
+    expect(fm?.status).toBe("validated")
+  })
+
+  it("sets plan status to generated when not generated", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.approvals.plan.generated = false
+    sj.approvals.plan.approved = false
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "plan.md"))
+    expect(fm?.status).toBe("generated")
+  })
+
+  it("sets tasks status to approved when tasks approved", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.approvals.tasks.approved = true
+    sj.approvals.tasks.generated = true
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "tasks.md"))
+    expect(fm?.status).toBe("approved")
+  })
+
+  it("sets tasks status to generated when not generated", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.approvals.tasks.generated = false
+    sj.approvals.tasks.approved = false
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "tasks.md"))
+    expect(fm?.status).toBe("generated")
+  })
+
+  it("sets tasks phase as 'tasks' when sj.phase is ready", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.phase = "ready"
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "tasks.md"))
+    expect(fm?.phase).toBe("tasks")
+  })
+
+  it("sets plan phase as 'plan' when sj.phase is ready", async () => {
+    const root = await worktree()
+    const featureDir = await setupFeature(root, "test")
+    const sj = makeSpecJson("test", 1)
+    sj.phase = "ready"
+    await syncFrontmatterFromSpecJson(featureDir, sj)
+    const fm = await readFrontmatter(path.join(featureDir, "plan.md"))
+    expect(fm?.phase).toBe("plan")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// 20. reconstructFromFrontmatter — spec phase override
+// ═══════════════════════════════════════════════════════════════
+describe("Kill: reconstructFromFrontmatter spec phase override", () => {
+  it("spec.phase overrides to ready when all three files exist", async () => {
+    const root = await worktree()
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), { feature_name: "test", feature_number: 1, phase: "ready" })
+    await writeMd(path.join(featureDir, "plan.md"), { feature_name: "test", phase: "plan" })
+    await writeMd(path.join(featureDir, "tasks.md"), { feature_name: "test", phase: "tasks" })
+    const result = await reconstructFromFrontmatter(featureDir)
+    expect(result).not.toBeNull()
+    expect(result!.phase).toBe("ready")
+    expect(result!.ready_for_implementation).toBe(true)
+  })
+
+  it("spec.phase overrides combined logic to plan", async () => {
+    const root = await worktree()
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), { feature_name: "test", feature_number: 1, phase: "plan" })
+    await writeMd(path.join(featureDir, "plan.md"), { feature_name: "test", phase: "plan" })
+    await writeMd(path.join(featureDir, "tasks.md"), { feature_name: "test", phase: "tasks" })
+    const result = await reconstructFromFrontmatter(featureDir)
+    expect(result).not.toBeNull()
+    // spec.phase="plan" overrides the combined logic which would set "tasks" (tasksOk=true)
+    expect(result!.phase).toBe("plan")
+    expect(result!.ready_for_implementation).toBe(false)
+  })
+
+  it("spec.phase overrides combined logic to spec", async () => {
+    const root = await worktree()
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), { feature_name: "test", feature_number: 1, phase: "spec" })
+    await writeMd(path.join(featureDir, "plan.md"), { feature_name: "test", phase: "plan" })
+    await writeMd(path.join(featureDir, "tasks.md"), { feature_name: "test", phase: "tasks" })
+    const result = await reconstructFromFrontmatter(featureDir)
+    expect(result).not.toBeNull()
+    // spec.phase="spec" overrides the combined logic
+    expect(result!.phase).toBe("spec")
+    expect(result!.ready_for_implementation).toBe(false)
+  })
+
+  it("spec.phase=impl overrides ready logic", async () => {
+    const root = await worktree()
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), { feature_name: "test", feature_number: 1, phase: "impl" })
+    await writeMd(path.join(featureDir, "plan.md"), { feature_name: "test", phase: "plan" })
+    await writeMd(path.join(featureDir, "tasks.md"), { feature_name: "test", phase: "tasks" })
+    const result = await reconstructFromFrontmatter(featureDir)
+    expect(result).not.toBeNull()
+    expect(result!.phase).toBe("impl")
+    expect(result!.ready_for_implementation).toBe(false)
+  })
+
+  it("sets created_at and updated_at from spec frontmatter", async () => {
+    const root = await worktree()
+    const featureDir = path.join(root, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await writeMd(path.join(featureDir, "spec.md"), {
+      feature_name: "test",
+      feature_number: 1,
+      phase: "spec",
+      created_at: "2026-01-15T10:00:00.000Z",
+      updated_at: "2026-01-20T12:00:00.000Z",
+    })
+    const result = await reconstructFromFrontmatter(featureDir)
+    expect(result).not.toBeNull()
+    expect(result!.created_at).toBe("2026-01-15T10:00:00.000Z")
+    expect(result!.updated_at).toBe("2026-01-20T12:00:00.000Z")
   })
 })
