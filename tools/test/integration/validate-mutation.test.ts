@@ -4,7 +4,7 @@ import path from "node:path"
 import validateTool from "../../speckit-validate"
 import scaffoldTool from "../../speckit-scaffold"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
-import { specsDirPath, specJsonPath, sessionPath, writeSession, writeSpecJson, readSpecJson, makeSpecJson, clearCorruptionWarnings } from "../../shared/types"
+import { specsDirPath, specJsonPath, sessionPath, writeSession, readSession, writeSpecJson, readSpecJson, makeSpecJson, clearCorruptionWarnings } from "../../shared/types"
 
 let worktree: string
 let ctx: ReturnType<typeof mockContext>
@@ -308,6 +308,74 @@ describe("Validate Module - Mutation Score Improvement", () => {
 
       const result = await validateTool.execute({ featureDir: "001-test" }, ctx)
       expect(result.title).toBeDefined()
+    })
+  })
+
+  describe("Kill surviving mutants", () => {
+    it("reports WARN when phase=tasks but tasks.md missing", async () => {
+      const specDir = path.join(specsDirPath(worktree), "001-test")
+      await fs.mkdir(specDir, { recursive: true })
+      await fs.writeFile(path.join(specDir, "spec.md"), "# Test Spec")
+      await fs.writeFile(path.join(specDir, "plan.md"), "# Test Plan")
+      await writeSpecJson(makeValidSpec({ phase: "tasks" }), specDir)
+      const result = await validateTool.execute({ featureDir: "001-test" }, ctx)
+      expect(result.output).toContain("WARN")
+    })
+
+    it("reports constitution missing when no constitution exists", async () => {
+      const noConstitutionWorktree = await createTempWorktree()
+      const noConstitutionCtx = mockContext(noConstitutionWorktree)
+      try {
+        const result = await validateTool.execute({}, noConstitutionCtx)
+        expect(result.output).toContain("constitution missing")
+      } finally {
+        await destroyTempWorktree(noConstitutionWorktree)
+      }
+    })
+
+    it("reports no features when specs directory is empty", async () => {
+      const result = await validateTool.execute({}, ctx)
+      expect(result.output).toContain("no features")
+    })
+
+    it("sets session command with / prefix", async () => {
+      const specDir = path.join(specsDirPath(worktree), "001-test")
+      await fs.mkdir(specDir, { recursive: true })
+      await fs.writeFile(path.join(specDir, "spec.md"), "# Test Spec")
+      await writeSpecJson(makeValidSpec({ phase: "spec" }), specDir)
+      await validateTool.execute({ featureDir: "001-test", command: "plan" }, ctx)
+      const s = await readSession(worktree)
+      expect(s.command).toBe("/plan")
+    })
+
+    it("pushes /review to history when no command", async () => {
+      const specDir = path.join(specsDirPath(worktree), "001-test")
+      await fs.mkdir(specDir, { recursive: true })
+      await fs.writeFile(path.join(specDir, "spec.md"), "# Test Spec")
+      await writeSpecJson(makeValidSpec({ phase: "spec" }), specDir)
+      await validateTool.execute({ featureDir: "001-test" }, ctx)
+      const s = await readSession(worktree)
+      expect(s.history).toContain("/review")
+    })
+
+    it("truncates history to 20 entries when exceeding limit", async () => {
+      const specDir = path.join(specsDirPath(worktree), "001-test")
+      await fs.mkdir(specDir, { recursive: true })
+      await fs.writeFile(path.join(specDir, "spec.md"), "# Test Spec")
+      await writeSpecJson(makeValidSpec({ phase: "spec" }), specDir)
+      await writeSession(worktree, {
+        phase: "spec",
+        featureDir: "001-test",
+        featureNumber: 1,
+        featureName: "Test Feature",
+        command: null,
+        nextStep: null,
+        lastResult: null,
+        history: Array(19).fill("/test"),
+      })
+      await validateTool.execute({ featureDir: "001-test" }, ctx)
+      const s = await readSession(worktree)
+      expect(s.history.length).toBeLessThanOrEqual(20)
     })
   })
 })
