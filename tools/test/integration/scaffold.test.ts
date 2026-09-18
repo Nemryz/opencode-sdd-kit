@@ -151,12 +151,12 @@ describe("scaffold spec", () => {
     expect(sj?.ready_for_implementation).toBe(false)
   })
 
-  it("returns nextCommand /plan", async () => {
+  it("returns nextCommand /approve spec", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Auth", template: "spec" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/plan")
+    expect(result.metadata?.nextCommand).toContain("/approve spec")
   })
 })
 
@@ -174,20 +174,20 @@ describe("scaffold plan", () => {
     expect(content).toContain("Content pending skill generation")
   })
 
-  it("sets spec.json phase to plan with approvals", async () => {
+  it("sets spec.json phase to plan without auto-approving the spec", async () => {
     await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
     const sj = await readSpecJson(path.join(worktree, "specs", "001-auth"))
     expect(sj?.phase).toBe("plan")
-    expect(sj?.approvals.spec.approved).toBe(true)
+    expect(sj?.approvals.spec.approved).toBe(false)
     expect(sj?.approvals.plan.generated).toBe(true)
   })
 
-  it("returns nextCommand /tasks", async () => {
+  it("returns nextCommand /approve plan", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Auth", template: "plan" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/tasks")
+    expect(result.metadata?.nextCommand).toContain("/approve plan")
   })
 })
 
@@ -204,20 +204,20 @@ describe("scaffold tasks", () => {
     expect(content).toContain("Content pending skill generation")
   })
 
-  it("sets spec.json phase to tasks with approvals", async () => {
+  it("sets spec.json phase to tasks without auto-approving the plan", async () => {
     await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
     const sj = await readSpecJson(path.join(worktree, "specs", "001-auth"))
     expect(sj?.phase).toBe("tasks")
-    expect(sj?.approvals.plan.approved).toBe(true)
+    expect(sj?.approvals.plan.approved).toBe(false)
     expect(sj?.approvals.tasks.generated).toBe(true)
   })
 
-  it("returns nextCommand /impl", async () => {
+  it("returns nextCommand /approve tasks", async () => {
     const result = await scaffoldTool.execute(
       { featureName: "Auth", template: "tasks" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/impl")
+    expect(result.metadata?.nextCommand).toContain("/approve tasks")
   })
 })
 
@@ -249,9 +249,9 @@ describe("spec to plan to tasks lifecycle", () => {
     const sj = await readSpecJson(path.join(worktree, "specs", "001-auth"))
     expect(sj?.phase).toBe("tasks")
     expect(sj?.approvals.spec.generated).toBe(true)
-    expect(sj?.approvals.spec.approved).toBe(true)
+    expect(sj?.approvals.spec.approved).toBe(false)
     expect(sj?.approvals.plan.generated).toBe(true)
-    expect(sj?.approvals.plan.approved).toBe(true)
+    expect(sj?.approvals.plan.approved).toBe(false)
     expect(sj?.approvals.tasks.generated).toBe(true)
   })
 

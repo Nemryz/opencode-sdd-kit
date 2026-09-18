@@ -422,11 +422,9 @@ export default tool({
           sj.phase = "spec"
           sj.approvals.spec.generated = true
         } else if (args.template === "plan") {
-          sj.approvals.spec.approved = true
           sj.approvals.plan.generated = true
           sj.phase = "plan"
         } else if (args.template === "tasks") {
-          sj.approvals.plan.approved = true
           sj.approvals.tasks.generated = true
           sj.phase = "tasks"
           if (sj.approvals.tasks.approved) {
@@ -438,10 +436,10 @@ export default tool({
       })
 
       const nextHint = args.template === "spec"
-        ? "/plan <tech stack>"
+        ? "/approve spec"
         : args.template === "plan"
-          ? "/tasks"
-          : "/impl"
+          ? "/approve plan"
+          : "/approve tasks"
 
       const phase = args.template === "spec" ? "spec" : args.template === "plan" ? "plan" : "tasks"
 

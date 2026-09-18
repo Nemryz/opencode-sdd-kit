@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import scaffoldTool from "../../speckit-scaffold"
+import approveTool from "../../speckit-approve"
 import validateTool from "../../speckit-validate"
 import statusTool from "../../speckit-status"
 import auditTool from "../../speckit-audit"
@@ -26,7 +27,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     const specR = await scaffoldTool.execute({ featureName: "User Auth", template: "spec" }, ctx)
     expect(specR.metadata?.featureDir).toBe("001-user-auth")
     expect(specR.metadata?.phase).toBe("spec")
-    expect(specR.metadata?.nextCommand).toContain("/plan")
+    expect(specR.metadata?.nextCommand).toContain("/approve spec")
 
     const specPath = path.join(worktree, "specs", "001-user-auth", "spec.md")
     const specContent = await fs.readFile(specPath, "utf-8")
@@ -38,10 +39,16 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj1?.approvals.spec.generated).toBe(true)
     expect(sj1?.approvals.spec.approved).toBe(false)
 
+    const approveSpec = await approveTool.execute({ artifact: "spec" }, ctx)
+    expect(approveSpec.title).toBe("spec approved")
+    expect(approveSpec.metadata?.nextStep).toContain("/plan")
+    const sj1b = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
+    expect(sj1b?.approvals.spec.approved).toBe(true)
+
     const planR = await scaffoldTool.execute({ featureName: "User Auth", template: "plan", techStack: "Node.js" }, ctx)
     expect(planR.metadata?.featureDir).toBe("001-user-auth")
     expect(planR.metadata?.phase).toBe("plan")
-    expect(planR.metadata?.nextCommand).toContain("/tasks")
+    expect(planR.metadata?.nextCommand).toContain("/approve plan")
 
     const planPath = path.join(worktree, "specs", "001-user-auth", "plan.md")
     const planContent = await fs.readFile(planPath, "utf-8")
@@ -53,10 +60,15 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj2?.approvals.spec.approved).toBe(true)
     expect(sj2?.approvals.plan.generated).toBe(true)
 
+    const approvePlan = await approveTool.execute({ artifact: "plan" }, ctx)
+    expect(approvePlan.title).toBe("plan approved")
+    const sj2b = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
+    expect(sj2b?.approvals.plan.approved).toBe(true)
+
     const tasksR = await scaffoldTool.execute({ featureName: "User Auth", template: "tasks" }, ctx)
     expect(tasksR.metadata?.featureDir).toBe("001-user-auth")
     expect(tasksR.metadata?.phase).toBe("tasks")
-    expect(tasksR.metadata?.nextCommand).toContain("/impl")
+    expect(tasksR.metadata?.nextCommand).toContain("/approve tasks")
 
     const tasksPath = path.join(worktree, "specs", "001-user-auth", "tasks.md")
     const tasksContent = await fs.readFile(tasksPath, "utf-8")
@@ -67,6 +79,13 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj3?.phase).toBe("tasks")
     expect(sj3?.approvals.plan.approved).toBe(true)
     expect(sj3?.approvals.tasks.generated).toBe(true)
+
+    const approveTasks = await approveTool.execute({ artifact: "tasks" }, ctx)
+    expect(approveTasks.title).toBe("tasks approved")
+    const sj4 = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
+    expect(sj4?.approvals.tasks.approved).toBe(true)
+    expect(sj4?.phase).toBe("ready")
+    expect(sj4?.ready_for_implementation).toBe(true)
   })
 
   it("validate reflects phase after each step", async () => {
@@ -142,7 +161,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     session = await readSession(worktree)
     expect(session.featureDir).toBe("002-f2")
     expect(session.phase).toBe("plan")
-    expect(session.nextStep).toContain("/tasks")
+    expect(session.nextStep).toContain("/approve plan")
   })
 
   it("multiple features with correct numbering", async () => {

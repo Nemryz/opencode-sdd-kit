@@ -118,7 +118,7 @@ describe("scaffold fallback content (no template files)", () => {
       { featureName: "Test", template: "spec" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/plan")
+    expect(result.metadata?.nextCommand).toContain("/approve spec")
   })
 
   it("returns correct next hint for plan", async () => {
@@ -126,7 +126,7 @@ describe("scaffold fallback content (no template files)", () => {
       { featureName: "Test", template: "plan" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/tasks")
+    expect(result.metadata?.nextCommand).toContain("/approve plan")
   })
 
   it("returns correct next hint for tasks", async () => {
@@ -134,7 +134,7 @@ describe("scaffold fallback content (no template files)", () => {
       { featureName: "Test", template: "tasks" },
       ctx,
     )
-    expect(result.metadata?.nextCommand).toContain("/impl")
+    expect(result.metadata?.nextCommand).toContain("/approve tasks")
   })
 
   it("maintains lifecycle spec -> plan -> tasks with fallback content", async () => {

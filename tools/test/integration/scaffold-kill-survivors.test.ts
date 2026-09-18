@@ -210,22 +210,22 @@ describe("Kill surviving mutants — speckit-scaffold", () => {
       expect(result.output).toContain("created in specs/")
     })
 
-    it("spec output contains 'Next: /plan'", async () => {
+    it("spec output contains 'Next: /approve spec'", async () => {
       await createConstitution(worktree)
       const result = await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
-      expect(result.output).toContain("Next: /plan")
+      expect(result.output).toContain("Next: /approve spec")
     })
 
-    it("plan output contains 'Next: /tasks'", async () => {
+    it("plan output contains 'Next: /approve plan'", async () => {
       await createConstitution(worktree)
       const result = await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
-      expect(result.output).toContain("Next: /tasks")
+      expect(result.output).toContain("Next: /approve plan")
     })
 
-    it("tasks output contains 'Next: /impl'", async () => {
+    it("tasks output contains 'Next: /approve tasks'", async () => {
       await createConstitution(worktree)
       const result = await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
-      expect(result.output).toContain("Next: /impl")
+      expect(result.output).toContain("Next: /approve tasks")
     })
   })
 
@@ -377,25 +377,25 @@ describe("Kill surviving mutants — speckit-scaffold", () => {
       expect(session.featureName).toBe("My Feature")
     })
 
-    it("session nextStep is /plan for spec", async () => {
+    it("session nextStep is /approve spec after spec", async () => {
       await createConstitution(worktree)
       await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
       const session = await readSession(worktree)
-      expect(session.nextStep).toBe("/plan <tech stack>")
+      expect(session.nextStep).toBe("/approve spec")
     })
 
-    it("session nextStep is /tasks for plan", async () => {
+    it("session nextStep is /approve plan after plan", async () => {
       await createConstitution(worktree)
       await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
       const session = await readSession(worktree)
-      expect(session.nextStep).toBe("/tasks")
+      expect(session.nextStep).toBe("/approve plan")
     })
 
-    it("session nextStep is /impl for tasks", async () => {
+    it("session nextStep is /approve tasks after tasks", async () => {
       await createConstitution(worktree)
       await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
       const session = await readSession(worktree)
-      expect(session.nextStep).toBe("/impl")
+      expect(session.nextStep).toBe("/approve tasks")
     })
   })
 

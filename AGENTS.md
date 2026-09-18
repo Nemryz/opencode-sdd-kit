@@ -19,6 +19,8 @@ You MUST follow this order. Never skip a phase.
 5. **Review** (`/review`) — Check cross-artifact consistency before implementation.
 6. **Implementation** (`/impl`) — Execute tasks in dependency order.
 
+**Approval gates:** each artifact must be approved before the next phase runs. Use `/approve spec` before `/plan`, `/approve plan` before `/tasks`, and `/approve tasks` before `/impl`. The pre-validation gates in the commands enforce this.
+
 Support: `/status` — show concise current phase and next step.
 
 ### Optional: Clarify Phase
@@ -53,6 +55,11 @@ Scaffolds `specs/NNN-slug/spec.md` via `speckit-scaffold` tool.
 If no constitution exists, suggest creating one. If no steering context exists, suggest `/steering`.
 Focus on WHAT and WHY. Write Gherkin scenarios. Prioritize P1 (MVP) / P2 (important) / P3 (nice to have).
 Mark ambiguous areas with `[NEEDS CLARIFICATION]`.
+
+### `/approve <artifact>`
+Approve a generated artifact (`spec`, `plan`, or `tasks`) to unlock the next phase. Uses `speckit-approve` tool.
+`spec` unlocks `/plan`, `plan` unlocks `/tasks`, `tasks` unlocks `/impl` and sets the feature to ready.
+Requires explicit user confirmation before approving.
 
 ### `/plan <tech stack>`
 Create an implementation plan. Loads `speckit-plan-engineer` skill.
@@ -195,8 +202,8 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-health` | Run health check, verify file integrity, restore from backups | `fix` (bool, optional) |
 | `speckit-delta` | Create incremental delta specs for existing features | `command`, `description`, `deltaId`, `featureDir` |
 | `speckit-perf` | Show performance statistics for all tools | `subcommand` (optional: "top N", "reset") |
-| `speckit-cache` | Manage smart cache for performance optimization | `subcommand` (optional: "status", "clear"), `tool` (optional: tool name for clear) |
 | `speckit-guard` | Manage file protection guard for critical SDD artifacts | `subcommand` (optional: "on", "off", "status", "add", "remove", "log", "debug"), `file` (for add/remove), `logOption` (optional: "all"), `debugOption` (optional: "on", "off") |
+| `speckit-approve` | Approve a generated artifact to unlock the next phase | `artifact` (spec/plan/tasks) |
 
 ---
 
@@ -280,7 +287,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-cache`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-approve`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 
