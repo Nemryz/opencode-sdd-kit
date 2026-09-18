@@ -1,0 +1,202 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import fs from "node:fs/promises"
+import path from "node:path"
+import guardPlugin, {
+  DEFAULT_CONFIG,
+  GuardConfigSchema,
+  isProtectedFile,
+  isProtectedAfterApproval,
+  isProtectedByPhase,
+  normalizeGuardPath,
+  extractRedirectTargets,
+} from "../../plugins/speckit-guard"
+import guardTool from "../../speckit-guard"
+import { mockContext, createTempWorktree, destroyTempWorktree } from "../helpers/setup"
+
+let worktree: string
+let ctx: ReturnType<typeof mockContext>
+
+beforeEach(async () => {
+  worktree = await createTempWorktree()
+  ctx = mockContext(worktree)
+})
+
+afterEach(async () => {
+  await destroyTempWorktree(worktree)
+})
+
+async function runHook(type: string, pattern: string | string[]): Promise<{ status: string }> {
+  const hooks = await guardPlugin.server({ worktree } as never)
+  const output = { status: "ask" }
+  await hooks["permission.ask"]!(
+    { type, pattern, id: "p1", sessionID: "s1", messageID: "m1", title: type, metadata: {}, time: { created: Date.now() } } as never,
+    output,
+  )
+  return output
+}
+
+function sessionFile(): string {
+  return path.join(worktree, ".opencode", "spec-memory", "session.json")
+}
+
+describe("guard case sensitivity and normalization", () => {
+  it.skipIf(process.platform === "linux")("matches protected files case-insensitively", () => {
+    const reason = isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "SESSION.JSON"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+    expect(reason).toContain("session.json")
+  })
+
+  it("matches protected files with mixed separators", () => {
+    const reason = isProtectedFile(".opencode\\spec-memory\\session.json", DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+  })
+
+  it("normalizes backslashes to forward slashes", () => {
+    expect(normalizeGuardPath(".opencode\\spec-memory\\session.json")).toContain(".opencode/spec-memory/session.json")
+  })
+
+  it.skipIf(process.platform === "linux")("detects protectedAfterApproval case-insensitively", () => {
+    const reason = isProtectedAfterApproval(path.join(worktree, "specs", "001-a", "PLAN.MD"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+  })
+
+  it.skipIf(process.platform === "linux")("detects phase protection case-insensitively", () => {
+    const reason = isProtectedByPhase(path.join(worktree, "specs", "001-a", "PLAN.MD"), "ready", DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+  })
+
+  it.skipIf(process.platform === "linux")("denies edit with uppercase name via hook", async () => {
+    await fs.writeFile(sessionFile(), "{}", "utf-8")
+    const output = await runHook("edit", path.join(worktree, ".opencode", "spec-memory", "SESSION.JSON"))
+    expect(output.status).toBe("deny")
+  })
+})
+
+describe("guard fail-closed on unreadable spec.json", () => {
+  it("denies protectedAfterApproval file when spec.json is missing", async () => {
+    const featureDir = path.join(worktree, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "plan.md"), "# Plan\n", "utf-8")
+    const output = await runHook("edit", path.join(featureDir, "plan.md"))
+    expect(output.status).toBe("deny")
+  })
+
+  it("denies protectedAfterApproval file when spec.json is corrupt", async () => {
+    const featureDir = path.join(worktree, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "spec.json"), "{corrupt", "utf-8")
+    await fs.writeFile(path.join(featureDir, "tasks.md"), "# Tasks\n", "utf-8")
+    const output = await runHook("edit", path.join(featureDir, "tasks.md"))
+    expect(output.status).toBe("deny")
+  })
+
+  it("denies phase-listed file when spec.json is missing", async () => {
+    const featureDir = path.join(worktree, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "tasks.md"), "# Tasks\n", "utf-8")
+    const output = await runHook("edit", path.join(featureDir, "tasks.md"))
+    expect(output.status).toBe("deny")
+  })
+
+  it("allows non-listed file when spec.json is missing", async () => {
+    const featureDir = path.join(worktree, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "notes.md"), "# Notes\n", "utf-8")
+    const output = await runHook("edit", path.join(featureDir, "notes.md"))
+    expect(output.status).toBe("ask")
+  })
+})
+
+describe("guard self protection", () => {
+  it("protects guard.json itself", () => {
+    const reason = isProtectedFile(path.join(worktree, ".opencode", "guard.json"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+    expect(reason).toContain("guard.json")
+  })
+
+  it("denies edit of guard.json via hook", async () => {
+    const output = await runHook("edit", path.join(worktree, ".opencode", "guard.json"))
+    expect(output.status).toBe("deny")
+  })
+})
+
+describe("guard config schema robustness", () => {
+  it("falls back to defaults for invalid types", async () => {
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), JSON.stringify({ enabled: "yes" }), "utf-8")
+    const result = await guardTool.execute({ subcommand: "status" }, ctx)
+    expect(result.title).toBe("Guard Status")
+    expect(result.output).toContain("ENABLED")
+  })
+
+  it("merges partial config with defaults", async () => {
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), JSON.stringify({ enabled: false }), "utf-8")
+    const result = await guardTool.execute({ subcommand: "status" }, ctx)
+    expect(result.output).toContain("DISABLED")
+    expect(result.output).toContain("constitution.md")
+  })
+
+  it("writes schema-valid config when toggling debug", async () => {
+    await guardTool.execute({ subcommand: "debug", debugOption: "on" }, ctx)
+    const raw = JSON.parse(await fs.readFile(path.join(worktree, ".opencode", "guard.json"), "utf-8"))
+    expect(GuardConfigSchema.safeParse(raw).success).toBe(true)
+    expect(raw.debug).toBe(true)
+  })
+
+  it("survives garbage JSON in guard.json", async () => {
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), "not json", "utf-8")
+    const result = await guardTool.execute({ subcommand: "status" }, ctx)
+    expect(result.title).toBe("Guard Status")
+  })
+})
+
+describe("guard shell redirect interception", () => {
+  it("extracts redirect targets", () => {
+    expect(extractRedirectTargets("echo hi > out.txt")).toEqual(["out.txt"])
+    expect(extractRedirectTargets("echo hi >> log.txt")).toEqual(["log.txt"])
+    expect(extractRedirectTargets('echo hi > "quoted file.md"')).toEqual(["quoted file.md"])
+    expect(extractRedirectTargets("echo hi | tee notes.md")).toEqual(["notes.md"])
+    expect(extractRedirectTargets("echo hi | tee -a notes.md")).toEqual(["notes.md"])
+  })
+
+  it("ignores stderr merges and here-docs", () => {
+    expect(extractRedirectTargets("cmd 2>&1")).toEqual([])
+    expect(extractRedirectTargets("cmd <<EOF")).toEqual([])
+    expect(extractRedirectTargets("git status")).toEqual([])
+  })
+
+  it("denies bash redirect to a protected file", async () => {
+    await fs.writeFile(sessionFile(), "{}", "utf-8")
+    const output = await runHook("bash", "echo attacked > .opencode/spec-memory/session.json")
+    expect(output.status).toBe("deny")
+  })
+
+  it("denies bash append redirect to a protected file", async () => {
+    const output = await runHook("bash", "echo attacked >> .opencode/spec-memory/config.json")
+    expect(output.status).toBe("deny")
+  })
+
+  it("denies tee into a protected file", async () => {
+    const output = await runHook("bash", "echo attacked | tee .opencode/guard.json")
+    expect(output.status).toBe("deny")
+  })
+
+  it("allows bash redirect to an unprotected file", async () => {
+    const output = await runHook("bash", "echo ok > notes.txt")
+    expect(output.status).toBe("ask")
+  })
+
+  it("allows harmless bash commands", async () => {
+    const output = await runHook("bash", "git status && npm test")
+    expect(output.status).toBe("ask")
+  })
+
+  it("increments denied stats on shell denial", async () => {
+    await runHook("bash", "echo x > .opencode/spec-memory/session.json")
+    const raw = JSON.parse(await fs.readFile(path.join(worktree, ".opencode", "guard.json"), "utf-8"))
+    expect(raw.stats.denied).toBeGreaterThanOrEqual(1)
+    expect(raw.denials.length).toBeGreaterThanOrEqual(1)
+  })
+})

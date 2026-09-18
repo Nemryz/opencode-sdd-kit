@@ -1,25 +1,29 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { z } from "zod"
+import { withLock, atomicWriteFile } from "../shared/io"
 
-export type GuardConfig = {
-  version: number
-  enabled: boolean
-  debug: boolean
-  protectedFiles: string[]
-  protectedAfterApproval: string[]
-  protectedByPhase: Record<string, string[]>
-  stats: {
-    denied: number
-    allowed: number
-    asked: number
-  }
-  denials: Array<{
-    timestamp: string
-    file: string
-    reason: string
-  }>
-}
+export const GuardConfigSchema = z.object({
+  version: z.number(),
+  enabled: z.boolean(),
+  debug: z.boolean(),
+  protectedFiles: z.array(z.string()),
+  protectedAfterApproval: z.array(z.string()),
+  protectedByPhase: z.record(z.string(), z.array(z.string())),
+  stats: z.object({
+    denied: z.number(),
+    allowed: z.number(),
+    asked: z.number(),
+  }),
+  denials: z.array(z.object({
+    timestamp: z.string(),
+    file: z.string(),
+    reason: z.string(),
+  })),
+})
+
+export type GuardConfig = z.infer<typeof GuardConfigSchema>
 
 type SpecJson = {
   phase: string
@@ -41,6 +45,7 @@ export const DEFAULT_CONFIG: GuardConfig = {
     ".opencode/steering/product.md",
     ".opencode/steering/tech.md",
     ".opencode/steering/structure.md",
+    ".opencode/guard.json",
   ],
   protectedAfterApproval: ["spec.json", "spec.md", "plan.md", "tasks.md"],
   protectedByPhase: {
@@ -55,9 +60,23 @@ export const DEFAULT_CONFIG: GuardConfig = {
 
 const MAX_DENIALS_LOG = 10
 
+export function normalizeGuardPath(p: string): string {
+  const unified = p.replace(/\\/g, "/")
+  return process.platform === "win32" || process.platform === "darwin" ? unified.toLowerCase() : unified
+}
+
+export function guardBasename(p: string): string {
+  const unified = p.replace(/\\/g, "/")
+  const idx = unified.lastIndexOf("/")
+  return idx >= 0 ? unified.slice(idx + 1) : unified
+}
+
 export function isProtectedFile(filePath: string, config: GuardConfig): string | null {
+  const normalized = normalizeGuardPath(filePath)
+  const base = guardBasename(normalized)
   for (const pattern of config.protectedFiles) {
-    if (filePath.endsWith(pattern) || path.basename(filePath) === path.basename(pattern)) {
+    const normalizedPattern = normalizeGuardPath(pattern)
+    if (normalized.endsWith(normalizedPattern) || base === guardBasename(normalizedPattern)) {
       return `Always protected: ${pattern}`
     }
   }
@@ -65,9 +84,9 @@ export function isProtectedFile(filePath: string, config: GuardConfig): string |
 }
 
 export function isProtectedAfterApproval(filePath: string, config: GuardConfig): string | null {
-  const basename = path.basename(filePath)
-  if (config.protectedAfterApproval.includes(basename)) {
-    return `Protected after approval: ${basename}`
+  const base = guardBasename(normalizeGuardPath(filePath))
+  if (config.protectedAfterApproval.some(f => normalizeGuardPath(f) === base)) {
+    return `Protected after approval: ${base}`
   }
   return null
 }
@@ -84,19 +103,40 @@ export async function getSpecJson(filePath: string, worktree: string): Promise<S
 }
 
 export function isApprovedForFile(basename: string, spec: SpecJson): boolean {
-  if (basename === "spec.json" || basename === "spec.md") return spec.approvals?.spec?.approved ?? false
-  if (basename === "plan.md") return spec.approvals?.plan?.approved ?? false
-  if (basename === "tasks.md") return spec.approvals?.tasks?.approved ?? false
+  const base = normalizeGuardPath(basename)
+  if (base === "spec.json" || base === "spec.md") return spec.approvals?.spec?.approved ?? false
+  if (base === "plan.md") return spec.approvals?.plan?.approved ?? false
+  if (base === "tasks.md") return spec.approvals?.tasks?.approved ?? false
   return false
 }
 
 export function isProtectedByPhase(filePath: string, phase: string, config: GuardConfig): string | null {
-  const basename = path.basename(filePath)
+  const base = guardBasename(normalizeGuardPath(filePath))
   const protectedInPhase = config.protectedByPhase[phase]
-  if (protectedInPhase && protectedInPhase.includes(basename)) {
-    return `Protected in ${phase} phase: ${basename}`
+  if (protectedInPhase && protectedInPhase.some(f => normalizeGuardPath(f) === base)) {
+    return `Protected in ${phase} phase: ${base}`
   }
   return null
+}
+
+export function isListedInAnyPhase(filePath: string, config: GuardConfig): boolean {
+  const base = guardBasename(normalizeGuardPath(filePath))
+  return Object.values(config.protectedByPhase).some(list => list.some(f => normalizeGuardPath(f) === base))
+}
+
+export function extractRedirectTargets(command: string): string[] {
+  const targets: string[] = []
+  const stripQuotes = (s: string) => s.replace(/^["']|["']$/g, "")
+  const redirectRe = />>?\s*("[^"]+"|'[^']+'|[^\s"'`;|&<>()]+)/g
+  const teeRe = /\btee\b(?:\s+-a)?\s+("[^"]+"|'[^']+'|[^\s"'`;|&<>()]+)/g
+  let match: RegExpExecArray | null
+  while ((match = redirectRe.exec(command)) !== null) {
+    targets.push(stripQuotes(match[1]))
+  }
+  while ((match = teeRe.exec(command)) !== null) {
+    targets.push(stripQuotes(match[1]))
+  }
+  return targets
 }
 
 export function addDenial(config: GuardConfig, file: string, reason: string): void {
@@ -114,79 +154,103 @@ const guardPlugin: Plugin = async (input) => {
   const configPath = path.join(input.worktree, ".opencode", "guard.json")
 
   async function readConfig(): Promise<GuardConfig> {
+    let parsed: unknown = null
     try {
-      const content = await fs.readFile(configPath, "utf-8")
-      return { ...DEFAULT_CONFIG, ...JSON.parse(content) }
+      parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
     } catch {
       return { ...DEFAULT_CONFIG }
     }
+    const result = GuardConfigSchema.safeParse({ ...DEFAULT_CONFIG, ...(parsed as object) })
+    return result.success ? result.data : { ...DEFAULT_CONFIG }
   }
 
   async function writeConfig(config: GuardConfig): Promise<void> {
-    await fs.mkdir(path.dirname(configPath), { recursive: true })
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2))
+    const result = GuardConfigSchema.safeParse(config)
+    if (!result.success) return
+    await withLock(configPath, async () => {
+      await atomicWriteFile(configPath, JSON.stringify(result.data, null, 2))
+    })
+  }
+
+  async function normalizePath(filePath: string): Promise<string> {
+    let resolved = path.isAbsolute(filePath) ? filePath : path.resolve(input.worktree, filePath)
+    try {
+      resolved = await fs.realpath(resolved)
+    } catch {
+      // file may not exist yet, fall back to the resolved path
+    }
+    return resolved
+  }
+
+  async function evaluatePath(rawPath: string, config: GuardConfig): Promise<string | null> {
+    const normalized = await normalizePath(rawPath)
+
+    const alwaysProtected = isProtectedFile(normalized, config)
+    if (alwaysProtected) return alwaysProtected
+
+    const spec = await getSpecJson(normalized, input.worktree)
+
+    const afterApproval = isProtectedAfterApproval(normalized, config)
+    if (afterApproval) {
+      if (!spec) return `${afterApproval} (spec.json unreadable, denied as a precaution)`
+      if (isApprovedForFile(guardBasename(normalized), spec)) return `${afterApproval} (approved)`
+    }
+
+    if (!spec) {
+      if (isListedInAnyPhase(normalized, config)) {
+        return "Phase-protected file with unreadable spec.json, denied as a precaution"
+      }
+      return null
+    }
+
+    return isProtectedByPhase(normalized, spec.phase, config)
+  }
+
+  async function deny(config: GuardConfig, output: { status: "ask" | "deny" | "allow" }, displayPath: string, reason: string): Promise<void> {
+    output.status = "deny"
+    config.stats.denied++
+    addDenial(config, displayPath, reason)
+    if (config.debug) {
+      console.log(`[Guard] DENIED: ${displayPath} - ${reason}`)
+    }
+    await writeConfig(config)
   }
 
   return {
     "permission.ask": async (permission, output) => {
-      if (permission.type !== "edit") return
-
       const config = await readConfig()
       if (!config.enabled) return
 
-      const filePath = permission.pattern
-        ? Array.isArray(permission.pattern) ? permission.pattern[0] : permission.pattern
-        : ""
+      const patterns = permission.pattern
+        ? Array.isArray(permission.pattern) ? permission.pattern : [permission.pattern]
+        : []
+      if (patterns.length === 0) return
 
-      if (!filePath) return
-
-      config.stats.asked++
-
-      const alwaysProtected = isProtectedFile(filePath, config)
-      if (alwaysProtected) {
-        output.status = "deny"
-        config.stats.denied++
-        addDenial(config, filePath, alwaysProtected)
-        if (config.debug) {
-          console.log(`[Guard] DENIED: ${filePath} - ${alwaysProtected}`)
+      if (permission.type === "edit") {
+        config.stats.asked++
+        const reason = await evaluatePath(patterns[0], config)
+        if (reason) {
+          await deny(config, output, patterns[0], reason)
+          return
         }
-        await writeConfig(config)
+      } else if (permission.type === "bash") {
+        config.stats.asked++
+        for (const command of patterns) {
+          for (const target of extractRedirectTargets(command)) {
+            const reason = await evaluatePath(target, config)
+            if (reason) {
+              await deny(config, output, target, `shell redirect target: ${reason}`)
+              return
+            }
+          }
+        }
+      } else {
         return
-      }
-
-      const protectedAfterApproval = isProtectedAfterApproval(filePath, config)
-      if (protectedAfterApproval) {
-        const spec = await getSpecJson(filePath, input.worktree)
-        if (spec && isApprovedForFile(path.basename(filePath), spec)) {
-          output.status = "deny"
-          config.stats.denied++
-          addDenial(config, filePath, `${protectedAfterApproval} (approved)`)
-          if (config.debug) {
-            console.log(`[Guard] DENIED: ${filePath} - ${protectedAfterApproval} (approved)`)
-          }
-          await writeConfig(config)
-          return
-        }
-      }
-
-      const spec = await getSpecJson(filePath, input.worktree)
-      if (spec) {
-        const protectedByPhase = isProtectedByPhase(filePath, spec.phase, config)
-        if (protectedByPhase) {
-          output.status = "deny"
-          config.stats.denied++
-          addDenial(config, filePath, protectedByPhase)
-          if (config.debug) {
-            console.log(`[Guard] DENIED: ${filePath} - ${protectedByPhase}`)
-          }
-          await writeConfig(config)
-          return
-        }
       }
 
       config.stats.allowed++
       if (config.debug) {
-        console.log(`[Guard] ALLOWED: ${filePath}`)
+        console.log(`[Guard] ALLOWED: ${permission.type}`)
       }
       await writeConfig(config)
     },

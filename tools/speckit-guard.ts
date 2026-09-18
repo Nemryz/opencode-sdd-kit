@@ -1,9 +1,10 @@
 import { tool } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { isValidProjectRoot, getProjectRootWarnings } from "./shared/types"
+import { isValidProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile } from "./shared/types"
 import {
   DEFAULT_CONFIG,
+  GuardConfigSchema,
   addDenial,
   type GuardConfig,
 } from "./plugins/speckit-guard"
@@ -78,17 +79,22 @@ export default tool({
       const configPath = path.join(projectRoot, ".opencode", "guard.json")
 
       async function readConfig(): Promise<GuardConfig> {
+        let parsed: unknown = null
         try {
-          const content = await fs.readFile(configPath, "utf-8")
-          return { ...DEFAULT_CONFIG, ...JSON.parse(content) }
+          parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
         } catch {
           return { ...DEFAULT_CONFIG }
         }
+        const result = GuardConfigSchema.safeParse({ ...DEFAULT_CONFIG, ...(parsed as object) })
+        return result.success ? result.data : { ...DEFAULT_CONFIG }
       }
 
       async function writeConfig(config: GuardConfig): Promise<void> {
-        await fs.mkdir(path.dirname(configPath), { recursive: true })
-        await fs.writeFile(configPath, JSON.stringify(config, null, 2))
+        const result = GuardConfigSchema.safeParse(config)
+        if (!result.success) return
+        await withLock(configPath, async () => {
+          await atomicWriteFile(configPath, JSON.stringify(result.data, null, 2))
+        })
       }
 
       const subcommand = args.subcommand || "status"
