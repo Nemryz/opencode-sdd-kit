@@ -270,7 +270,12 @@ export default tool({
             const { phase: filesPhase, nextStep: expectedNext } = detectPhase(
               report.spec, report.plan, report.tasks, constitutionExists,
             )
-            if (s.phase !== filesPhase) {
+            const liveSj = await readSpecJson(path.join(specsDir, s.featureDir))
+            const tasksApproved = liveSj?.approvals.tasks.approved ?? false
+            const isTasksNotApproved = s.phase === "tasks" && filesPhase === "ready" && !tasksApproved
+            const isCompleteNotDowngraded = s.phase === "complete" && filesPhase === "ready"
+            const isImplNotDowngraded = s.phase === "impl" && filesPhase === "ready"
+            if (s.phase !== filesPhase && !isTasksNotApproved && !isCompleteNotDowngraded && !isImplNotDowngraded) {
               sessionChanges.push({
                 field: "session phase",
                 apply: (sess) => {

@@ -257,8 +257,19 @@ describe("Phase 2: Health Module - Mutation Score Improvement", () => {
 
     it("reports degraded when some fixes fail", async () => {
       const sessionFp = sessionPath(worktree)
+      const configFp = configPath(worktree)
       const featureDir = await getFeatureDir()
       const sjFp = specJsonPath(featureDir)
+
+      await fs.mkdir(path.dirname(configFp), { recursive: true })
+      await fs.writeFile(configFp, JSON.stringify({
+        defaultTechStack: null,
+        lastUsedLanguage: null,
+        expressMode: false,
+        autoVersioning: false,
+        preferences: {},
+      }), "utf-8")
+      await writeFileChecksum(configFp)
 
       await writeSession(worktree, makeValidSession({ phase: "spec" }))
       await writeSession(worktree, makeValidSession({ phase: "plan" }))
@@ -443,8 +454,19 @@ describe("Phase 2: Health Module - Mutation Score Improvement", () => {
 
     it("reports degraded after partial fix", async () => {
       const sessionFp = sessionPath(worktree)
+      const configFp = configPath(worktree)
       const featureDir = await getFeatureDir()
       const sjFp = specJsonPath(featureDir)
+
+      await fs.mkdir(path.dirname(configFp), { recursive: true })
+      await fs.writeFile(configFp, JSON.stringify({
+        defaultTechStack: null,
+        lastUsedLanguage: null,
+        expressMode: false,
+        autoVersioning: false,
+        preferences: {},
+      }), "utf-8")
+      await writeFileChecksum(configFp)
 
       await writeSession(worktree, makeValidSession({ phase: "spec" }))
       await writeSession(worktree, makeValidSession({ phase: "plan" }))
@@ -467,6 +489,32 @@ describe("Phase 2: Health Module - Mutation Score Improvement", () => {
       expect(result.metadata.session.status).toBe("restored")
       expect(result.metadata.features[0].spec_json).toBe("corrupted")
       expect(result.metadata.overall).toBe("degraded")
+    })
+
+    it("reports critical when an artifact stays missing after partial fix", async () => {
+      const sessionFp = sessionPath(worktree)
+      const configFp = configPath(worktree)
+      const cfg = {
+        defaultTechStack: null,
+        lastUsedLanguage: null,
+        expressMode: false,
+        autoVersioning: false,
+        preferences: {},
+      }
+
+      await fs.mkdir(path.dirname(configFp), { recursive: true })
+      await fs.writeFile(configFp, JSON.stringify(cfg), "utf-8")
+      await writeWithBackup(configFp, JSON.stringify(cfg), worktree)
+      await writeFileChecksum(configFp)
+      await fs.writeFile(configFp, "CORRUPT", "utf-8")
+
+      await fs.rm(sessionFp, { force: true })
+
+      const result = await healthTool.execute({ fix: true }, ctx)
+      expect(result.metadata.session.status).toBe("missing")
+      expect(result.metadata.config.status).toBe("restored")
+      expect(result.metadata.overall).toBe("critical")
+      expect(result.output).toContain("CRITICAL")
     })
   })
 

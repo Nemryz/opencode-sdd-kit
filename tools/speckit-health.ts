@@ -94,9 +94,15 @@ export default tool({
         }
 
         if (fixedCount > 0) {
-          report.overall = report.features.some(f => f.spec_json === "corrupted") || report.session.status === "corrupted" || report.config.status === "corrupted"
-            ? "degraded"
-            : "healthy"
+          const hasMissing = report.session.status === "missing" || report.config.status === "missing"
+            || report.features.some(f => f.spec_json === "missing")
+          const hasCorrupted = report.session.status === "corrupted" || report.config.status === "corrupted"
+            || report.features.some(f => f.spec_json === "corrupted")
+          const hasRestored = report.session.status === "restored" || report.config.status === "restored"
+            || report.features.some(f => f.spec_json === "restored")
+          if (hasMissing) report.overall = "critical"
+          else if (hasCorrupted || hasRestored) report.overall = "degraded"
+          else report.overall = "healthy"
         }
       }
 

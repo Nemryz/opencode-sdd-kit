@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import cleanTool from "../../speckit-clean"
 import scaffoldTool from "../../speckit-scaffold"
+import approveTool from "../../speckit-approve"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
 import { readSpecJson, writeSpecJson, readSession, writeSession, specsDirPath, pushCorruptionWarning, corruptionWarnings, clearCorruptionWarnings } from "../../shared/types"
 
@@ -160,6 +161,56 @@ describe("clean spec.json mismatch detection", () => {
     const issues: string[] = result.metadata?.issues ?? []
     const specJsonIssues = issues.filter((i: string) => i.includes("spec.json") && i.includes("phase"))
     expect(specJsonIssues).toHaveLength(0)
+  })
+
+  it("does not downgrade session impl phase to ready on fix", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const session = await readSession(worktree)
+    session.phase = "impl"
+    session.nextStep = "/impl (continue)"
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const after = await readSession(worktree)
+    expect(after.phase).toBe("impl")
+    expect(after.nextStep).toBe("/impl (continue)")
+  })
+
+  it("does not downgrade session complete phase to ready on fix", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const session = await readSession(worktree)
+    session.phase = "complete"
+    session.nextStep = "/review or start a new feature"
+    await writeSession(worktree, session)
+    await cleanTool.execute({ fix: true }, ctx)
+    const after = await readSession(worktree)
+    expect(after.phase).toBe("complete")
+    expect(after.nextStep).toBe("/review or start a new feature")
+  })
+
+  it("keeps session tasks phase until tasks are approved", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
+    const session = await readSession(worktree)
+    session.phase = "tasks"
+    session.nextStep = "/approve tasks"
+    await writeSession(worktree, session)
+
+    await cleanTool.execute({ fix: true }, ctx)
+    let after = await readSession(worktree)
+    expect(after.phase).toBe("tasks")
+
+    await approveTool.execute({ artifact: "tasks" }, ctx)
+    await cleanTool.execute({ fix: true }, ctx)
+    after = await readSession(worktree)
+    expect(after.phase).toBe("ready")
   })
 })
 
