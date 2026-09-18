@@ -191,7 +191,7 @@ describe("speckit-guard unit", () => {
 
   describe("addDenial", () => {
     it("adds denial to config", () => {
-      const config = { ...DEFAULT_CONFIG, denials: [] }
+      const config: GuardConfig = { ...DEFAULT_CONFIG, denials: [] }
       addDenial(config, "test.md", "Always protected")
       expect(config.denials.length).toBe(1)
       expect(config.denials[0].file).toBe("test.md")
@@ -199,7 +199,7 @@ describe("speckit-guard unit", () => {
     })
 
     it("adds denial at beginning", () => {
-      const config = { ...DEFAULT_CONFIG, denials: [] }
+      const config: GuardConfig = { ...DEFAULT_CONFIG, denials: [] }
       addDenial(config, "first.md", "reason1")
       addDenial(config, "second.md", "reason2")
       expect(config.denials[0].file).toBe("second.md")
@@ -207,7 +207,7 @@ describe("speckit-guard unit", () => {
     })
 
     it("limits denials to 10", () => {
-      const config = { ...DEFAULT_CONFIG, denials: [] }
+      const config: GuardConfig = { ...DEFAULT_CONFIG, denials: [] }
       for (let i = 0; i < 15; i++) {
         addDenial(config, `file${i}.md`, `reason${i}`)
       }
@@ -216,7 +216,7 @@ describe("speckit-guard unit", () => {
     })
 
     it("includes timestamp", () => {
-      const config = { ...DEFAULT_CONFIG, denials: [] }
+      const config: GuardConfig = { ...DEFAULT_CONFIG, denials: [] }
       addDenial(config, "test.md", "reason")
       expect(config.denials[0].timestamp).toBeDefined()
     })

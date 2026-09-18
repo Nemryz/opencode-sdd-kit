@@ -12,11 +12,6 @@ opencode.jsonc
 .DS_Store
 .stryker-tmp/
 reports/
-specs/003-test/
-specs/004-test/
-specs/005-test/
-specs/006-test/
-specs/007-test/
-specs/008-test/
-specs/009-test/
-specs/010-test/
+coverage/
+specs/*-test/
+agents/novel.md

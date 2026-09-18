@@ -1,17 +1,17 @@
 {
   "name": "opencode-sdd-kit",
-  "version": "1.5.0",
+  "version": "1.5.2",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "preversion": "git diff --quiet && git diff --cached --quiet",
     "get-version": "node -p \"require('./package.json').version\"",
     "version:patch": "npm version patch --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
     "version:minor": "npm version minor --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
     "version:major": "npm version major --no-git-tag-version && git add package.json && git commit -m \"chore: bump version\"",
-    "tag": "node -e \"const v=require('./package.json').version;const{execSync}=require('child_process');execSync('git tag -a v'+v+' -m Release v'+v,{stdio:'inherit'})\"",
+    "tag": "node -e \"const v=require('./package.json').version;const{execSync}=require('child_process');execSync('git tag v'+v,{stdio:'inherit'})\"",
     "push": "git push origin master && git push origin --tags",
     "release:patch": "npm run version:patch && npm run tag && npm run push",
     "release:minor": "npm run version:minor && npm run tag && npm run push",
@@ -28,6 +28,7 @@
     "@stryker-mutator/typescript-checker": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^26.0.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "fast-check": "^4.9.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

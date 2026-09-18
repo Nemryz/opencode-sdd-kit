@@ -780,7 +780,7 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
     })
 
     it("handles missing approvals gracefully", () => {
-      const spec = { phase: "ready", approvals: undefined }
+      const spec = { phase: "ready", approvals: undefined } as any
       expect(isApprovedForFile("spec.json", spec)).toBe(false)
     })
   })

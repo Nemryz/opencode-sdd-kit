@@ -105,7 +105,7 @@ describe("writeSession + readSession", () => {
     const root = await worktree()
     const s = {
       ...DEFAULT_SESSION,
-      phase: "plan",
+      phase: "plan" as const,
       featureName: "my feature",
     }
     await writeSession(root, s)
@@ -116,7 +116,7 @@ describe("writeSession + readSession", () => {
 
   it("throws on invalid session data and preserves existing file", async () => {
     const root = await worktree()
-    const valid = { ...DEFAULT_SESSION, phase: "spec", featureName: "original" }
+    const valid = { ...DEFAULT_SESSION, phase: "spec" as const, featureName: "original" }
     await writeSession(root, valid)
     await expect(writeSession(root, { phase: "bogus" } as any)).rejects.toThrow("writeSession: validation failed")
     const result = await readSession(root)
@@ -431,7 +431,7 @@ describe("writeSession with autoVersioning", () => {
     execSync("git init", { cwd: root, stdio: "ignore" })
     execSync('git config user.email "test@test.com"', { cwd: root, stdio: "ignore" })
     execSync('git config user.name "Test"', { cwd: root, stdio: "ignore" })
-    const s = { ...DEFAULT_SESSION, phase: "spec" }
+    const s = { ...DEFAULT_SESSION, phase: "spec" as const }
     await writeSession(root, s)
     const log = execSync("git log --oneline", { cwd: root, encoding: "utf-8" })
     expect(log).toContain("auto: update session state")

@@ -62,8 +62,6 @@ function makeValidSpec(overrides?: Partial<SpecJson>): SpecJson {
   return {
     feature_name: "Test Feature",
     feature_number: 1,
-    title: "Test Feature",
-    status: "approved",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     phase: "spec",
@@ -72,9 +70,6 @@ function makeValidSpec(overrides?: Partial<SpecJson>): SpecJson {
       plan: { generated: false, approved: false },
       tasks: { generated: false, approved: false },
     },
-    spec_generated: true,
-    plan_generated: false,
-    tasks_generated: false,
     ready_for_implementation: false,
     active_delta: null,
     ...overrides,

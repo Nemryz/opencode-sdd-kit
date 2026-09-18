@@ -313,13 +313,13 @@ describe("clean auto-fix", () => {
     await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
     await scaffoldTool.execute({ featureName: "Auth", template: "tasks" }, ctx)
     const base = path.join(worktree, "specs", "001-auth")
-    let sj = await readSpecJson(base)
+    const sj = (await readSpecJson(base))!
     sj.phase = "spec"
     sj.ready_for_implementation = false
     sj.approvals = { spec: { generated: true, approved: true }, plan: { generated: true, approved: true }, tasks: { generated: true, approved: true } }
     await writeSpecJson(sj, base)
     await cleanTool.execute({ fix: true }, ctx)
-    const fixed = await readSpecJson(base)
+    const fixed = (await readSpecJson(base))!
     expect(fixed.phase).toBe("ready")
     expect(fixed.ready_for_implementation).toBe(true)
   })
@@ -384,7 +384,7 @@ describe("clean auto-fix", () => {
     session.nextStep = null
     await writeSession(worktree, session)
     const base = path.join(worktree, "specs", "001-auth")
-    let sj = await readSpecJson(base)
+    const sj = (await readSpecJson(base))!
     sj.phase = "spec"
     await writeSpecJson(sj, base)
     await cleanTool.execute({ fix: true }, ctx)
@@ -392,7 +392,7 @@ describe("clean auto-fix", () => {
     expect(session2.featureNumber).toBe(1)
     expect(session2.phase).toBe("ready")
     expect(session2.nextStep).toBe("/impl or /review")
-    const fixedSj = await readSpecJson(base)
+    const fixedSj = (await readSpecJson(base))!
     expect(fixedSj.phase).toBe("ready")
   })
 

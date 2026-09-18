@@ -116,8 +116,6 @@ describe("4. Health check with corrupt spec.json restores from backup", () => {
     const validSpec: SpecJson = {
       feature_name: "Test Feature",
       feature_number: 1,
-      title: "Test Feature",
-      status: "approved",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       phase: "spec",
@@ -126,9 +124,6 @@ describe("4. Health check with corrupt spec.json restores from backup", () => {
         plan: { generated: false, approved: false },
         tasks: { generated: false, approved: false },
       },
-      spec_generated: true,
-      plan_generated: false,
-      tasks_generated: false,
       ready_for_implementation: false,
       active_delta: null,
     }
@@ -150,8 +145,6 @@ describe("5. Health check with corrupted backup reports it", () => {
     const validSpec: SpecJson = {
       feature_name: "Test Feature",
       feature_number: 1,
-      title: "Test Feature",
-      status: "approved",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       phase: "spec",
@@ -160,9 +153,6 @@ describe("5. Health check with corrupted backup reports it", () => {
         plan: { generated: false, approved: false },
         tasks: { generated: false, approved: false },
       },
-      spec_generated: true,
-      plan_generated: false,
-      tasks_generated: false,
       ready_for_implementation: false,
       active_delta: null,
     }

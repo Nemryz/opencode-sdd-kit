@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@opencode-ai/plugin": ["./tools/test/helpers/plugin-test-shim.d.ts"]
+    }
+  },
+  "include": ["tools/test/**/*.ts"]
+}

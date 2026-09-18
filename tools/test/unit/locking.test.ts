@@ -163,7 +163,7 @@ describe("reentrant lock", () => {
   it("writeSession inside withLock does not deadlock", async () => {
     const t = await worktree()
     const fp = path.join(t, ".opencode", "spec-memory", "session.json")
-    const custom = { ...DEFAULT_SESSION, phase: "spec" }
+    const custom = { ...DEFAULT_SESSION, phase: "spec" as const }
     await withLock(fp, async () => {
       await writeSession(t, custom)
     })

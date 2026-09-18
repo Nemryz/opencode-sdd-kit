@@ -63,14 +63,13 @@ describe("AGENTS.md completeness", () => {
     expect(content).toMatch(/speckit-audit/)
   })
 
-  it("Known Regression History entries reference real commit hashes", () => {
-    const krrSection = content.slice(
-      content.indexOf("## Known Regression History"),
-      content.indexOf("---", content.indexOf("## Known Regression History")),
-    )
-    const commitMatches = krrSection.matchAll(/\b([a-f0-9]{7,})\b/g)
+  it("Known Regression History is documented in docs/regressions.md with real commit hashes", async () => {
+    const regPath = path.resolve(AGENTS_PATH, "..", "docs", "regressions.md")
+    const regContent = await fs.readFile(regPath, "utf-8")
+    const commitMatches = regContent.matchAll(/\b([a-f0-9]{7,})\b/g)
     const hashes = [...commitMatches].map(m => m[1])
     expect(hashes.length).toBeGreaterThanOrEqual(3)
+    expect(content).toContain("docs/regressions.md")
   })
 
   it("High risk C-category range matches actual high-risk.test.ts", async () => {

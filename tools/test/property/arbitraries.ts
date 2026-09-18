@@ -29,7 +29,7 @@ export function arbitrarySpecJson(): fc.Arbitrary<Record<string, unknown>> {
       tasks: fc.record({ generated: fc.boolean(), approved: fc.boolean() }),
     }),
     ready_for_implementation: fc.boolean(),
-    active_delta: fc.option(fc.string(), { null: null }),
+    active_delta: fc.option(fc.string(), { nil: null }),
   })
 }
 

@@ -345,7 +345,7 @@ describe("audit auto-fix", () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     const base = path.join(worktree, "specs", "001-auth")
-    let sj = await readSpecJson(base)
+    const sj = (await readSpecJson(base))!
     sj.ready_for_implementation = true
     await writeSpecJson(sj, base)
     const result = await auditTool.execute({ fix: true }, ctx)
@@ -360,7 +360,7 @@ describe("audit auto-fix", () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
     const base = path.join(worktree, "specs", "001-auth")
-    let sj = await readSpecJson(base)
+    const sj = (await readSpecJson(base))!
     sj.approvals.spec.generated = false
     await writeSpecJson(sj, base)
     const result = await auditTool.execute({ fix: true }, ctx)

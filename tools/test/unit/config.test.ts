@@ -37,7 +37,7 @@ describe("config execute branching", () => {
 
   it("shows default config with empty args", async () => {
     const result = await configTool.execute({}, ctx)
-    const text = toString(result.title, result.output)
+    const text = toString(result.title ?? "", result.output)
     expect(text).toContain("defaultTechStack: (not set)")
     expect(text).toContain("expressMode: false")
     expect(text).toContain("0 key(s)")
