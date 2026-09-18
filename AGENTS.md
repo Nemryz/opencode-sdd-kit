@@ -134,7 +134,7 @@ For better cost/quality ratio, assign different models to different agents in yo
 Example opencode.json config:
 ```
 {
-  "agents": {
+  "agent": {
     "build": { "model": "fast-model" },
     "plan":  { "model": "heavy-reasoner" },
     "spec":  { "model": "heavy-reasoner" }
@@ -154,16 +154,18 @@ Steering:
   product.md     .opencode/steering/product.md     — Product context (optional)
   tech.md        .opencode/steering/tech.md        — Tech stack & ADRs (optional)
   structure.md   .opencode/steering/structure.md   — Code conventions (optional)
-Shared types:    .opencode/artifacts.schema.json   — JSON Schema for all artifacts (optional)
 
 specs/
 └── NNN-feature-name/
     ├── spec.md          — Feature specification (required)
     ├── plan.md          — Implementation plan (required)
     ├── tasks.md         — Task breakdown (required)
+    ├── spec.json        — Feature state and approvals (required)
     ├── research.md      — Technology research (optional)
     ├── data-model.md    — Schema / entities (optional)
-    └── contracts/       — API contracts (optional)
+    ├── contracts/       — API contracts (optional)
+    └── deltas/          — Incremental delta specs (optional)
+        └── deltas.json  — Delta index
 ```
 
 Templates:  `~/.config/opencode/templates/`
@@ -191,7 +193,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 
 | Tool | Purpose | Key Arguments |
 |------|---------|---------------|
-| `speckit-scaffold` | Create `specs/NNN-name/`, constitution, or steering with template | `featureName`, `template` (spec/plan/tasks/constitution/steering), `overwrite` (bool) |
+| `speckit-scaffold` | Create `specs/NNN-name/` artifacts, constitution, steering, or project docs | `featureName`, `template` (spec/plan/tasks/constitution/steering/data-model/domain-map/glossary/research/contracts), `techStack`, `overwrite` (bool) |
 | `speckit-validate` | Check artifact existence and phase | `featureDir` (optional), `command` (optional) |
 | `speckit-audit` | Run comprehensive project audit | `fix` (bool, optional) |
 | `speckit-clean` | Scan all features and report inconsistencies | `fix` (bool, optional) |
@@ -224,20 +226,28 @@ User: /spec create an invoicing system with users, clients, products, and invoic
 Agent: Loads speckit-spec-writer skill. Determines next number (001).
        Checks steering context — if missing, suggests /steering first.
        Creates specs/001-invoicing-system/spec.md via speckit-scaffold.
-       "Spec created. Next: /plan <tech stack>"
+       "Spec created. Next: /approve spec"
 
-User: /status
-Agent: "spec ok | plan missing | tasks missing. Next: /plan Laravel + MySQL + Tailwind"
+User: /approve spec
+Agent: Summarizes the spec, asks for confirmation, marks approvals.spec.approved.
+       "spec approved. Next: /plan <tech stack>"
 
 User: /plan Laravel + MySQL + Tailwind
 Agent: Loads speckit-plan-engineer. Applies Constitution Gates.
        Creates specs/001-invoicing-system/plan.md.
-       "Plan created. Next: /tasks"
+       "Plan created. Next: /approve plan"
+
+User: /approve plan
+Agent: "plan approved. Next: /tasks"
 
 User: /tasks
 Agent: Loads speckit-task-decomposer.
        Creates specs/001-invoicing-system/tasks.md.
-       "Tasks created. Ready for implementation: /impl or review with /review"
+       "Tasks created. Next: /approve tasks"
+
+User: /approve tasks
+Agent: Marks tasks approved and sets the feature to ready.
+       "tasks approved. Next: /impl or /review"
 
 User: /impl
 Agent: Loads speckit-implementer. Executes tasks phase by phase.
@@ -249,9 +259,9 @@ Agent: Loads speckit-implementer. Executes tasks phase by phase.
 
 ## Concise Output Rule (NON-NEGOTIABLE)
 
-Every agent response and tool output MUST be 1-3 lines maximum. No status tables, no artifact listings, no checkmark trees, no verbose explanations.
+Agent chat responses MUST be 1-3 lines maximum in the `[Result] [Next: /command]` format. No status tables, no artifact listings, no checkmark trees, no verbose explanations.
 
-**Exception**: `/review` outputs are exempt — they produce structured reports with findings, severity ratings, and recommendations that naturally exceed 3 lines.
+**Exception**: report tools (`/review`, `/audit`, `/clean`, `/status`, `/health`, `/delta-status`, `/guard log`) produce structured multi-line output by design — relay them as-is and add at most one line of commentary.
 
 ### Format
 
@@ -309,78 +319,7 @@ Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-
 
 ## Known Regression History
 
-### R-1: TEMPLATES_DIR using os.homedir() instead of module-relative path
-
-**Introduced in:** `5cd31f2` (scaffold robustness fix)
-**Fixed in:** `797f1af`
-
-The template directory was resolved as `os.homedir() + "/.config/opencode/templates"`, which only works when the kit is cloned at `~/.config/opencode/`. On CI, other dev machines, or any clone outside the config directory, `readTemplate()` would always return `null`.
-
-**Root cause:** The original code used a relative path (`path.resolve(__dirname, "..", "templates")`) which was incorrectly replaced with an absolute os.homedir() path.
-
-**Fix:** Resolve relative to `import.meta.dirname` first, with os.homedir() as fallback.
-
-**Test coverage:** `scaffold.test.ts` verifies real template content (Article I, Article II) loads from the correct path.
-
-### R-2: isValidProjectRoot deadlock — constitution cannot bootstrap a new project
-
-**Introduced in:** `060e469` (scaffold race condition fix)
-**Fixed in:** current
-
-`isValidProjectRoot` requires `.opencode/spec-memory/` to exist, but the only code path that creates that directory is constitution scaffolding — which also calls `isValidProjectRoot` and rejects the operation on a fresh directory.
-
-**Root cause:** The project root validation was changed from a blacklist ("deny if inside ~/.config/opencode") to a whitelist ("must have .opencode/spec-memory/"), without exempting the bootstrap command.
-
-**Fix:** Exempt `template: "constitution"` from the `isValidProjectRoot` check in `speckit-scaffold.ts`.
-
-**Test coverage:** `cold-start.test.ts` (11 tests) verifies the full bootstrap sequence from an empty directory with no pre-created spec-memory.
-
-### R-3: Test helpers must not hide production preconditions
-
-**First identified in:** R-2 investigation
-
-The `createTempWorktree()` helper in `tools/test/helpers/setup.ts` pre-creates `.opencode/spec-memory/`, which means no test exercises the real cold-start path. This hid the R-2 deadlock through 493 tests.
-
-**Prevention guideline:** When adding a new test helper, verify it does not silently satisfy a precondition that production code must satisfy on its own. Add at least one test that starts from a truly empty directory without the helper.
-
-### R-4: Approval auto-fix substring collision — message.includes instead of explicit artifact field
-
-**Introduced in:** `babb4ac` (audit auto-fix extension to ready-violation and approval categories)
-**Fixed in:** `4101e4d`
-
-The approval auto-fix loop used `finding.message.includes("spec"/"plan"/"tasks")` to decide which approval field to flip. Since `finding.message` includes the feature directory name (e.g., `"001-tasks-view: spec.md exists but spec approval not marked generated"`), a feature named "tasks view" would cause `includes("tasks")` to match on **all** approval findings for that feature, not just the tasks one.
-
-**Root cause:** No explicit discriminator field on the `AuditFinding` interface; the fix logic relied on substring matching against a human-readable message that contained unrelated data (the directory name).
-
-**Fix:** Added `artifact?: "spec" | "plan" | "tasks"` to `AuditFinding`, set at creation time in `auditFeature()`, and switched the fix loop from `finding.message.includes("spec")` to `finding.artifact === "spec"`.
-
-**Test coverage:** `audit.test.ts` (29 tests) includes a regression test that creates feature `001-tasks-view` with only `spec.md` and verifies `--fix` does not overcorrect `approvals.tasks.generated`.
-
-### R-5: SessionState.phase typed as string vs Zod z.enum allowing silent interface-schema divergence
-
-**Introduced in:** Initial (interface and schema were always manual copies)
-**Fixed in:** `7a8ccf0`
-
-`SessionState.phase` was typed as `string` in the interface but `z.enum([...])` in the Zod schema. A typo like `"imp"` would pass TypeScript but be rejected by `safeParse` on the next `readSession`, silently resetting the entire session to `DEFAULT_SESSION`. Additionally, `writeSession`, `writeSpecJson`, and `writeConfig` serialized directly without validation, so invalid data would persist to disk before any read-side validation caught it.
-
-**Root cause:** Manual duplication of type definitions across interface and Zod schema; no runtime validation gate on write paths.
-
-**Fix:** Replaced all 4 manual interfaces (`SessionState`, `SpecJson`, `SDDConfig`, `ApprovalState`) with `export type Foo = z.infer<typeof FooSchema>` so the Zod schema is the single source of truth for both compile-time types and runtime validation. Added `safeParse` gates at the start of every write function, skipping the write on validation failure.
-
-**Test coverage:** `shared-io.test.ts` verifies that writing invalid session/spec data skips the write and preserves the existing file.
-
-### R-6: Direct fs.writeFile risked file corruption on interruption
-
-**Introduced in:** Initial (all write functions used `fs.writeFile` directly)
-**Fixed in:** `d7f4ac1`
-
-`writeSession`, `writeSpecJson`, and `writeConfig` all called `fs.writeFile(fp, data)` directly. If the process was interrupted during the write (power loss, crash), the file would be left truncated or corrupt with no recovery option. For session.json in particular, corruption causes `safeParse` to return `DEFAULT_SESSION`, losing the user's working state.
-
-**Root cause:** No atomic write pattern; direct mutation of the target file.
-
-**Fix:** Added an `atomicWriteFile(fp, data)` helper that writes to `fp + ".tmp"` first, then atomically renames `.tmp` to `fp` via `fs.rename`. If the write or rename fails, the `.tmp` file is cleaned up and the original file is untouched. All three write functions now use this helper.
-
-**Test coverage:** `shared-io.test.ts` verifies `.tmp` cleanup, overwrite correctness, parent directory creation, and empty content handling.
+Moved to `docs/regressions.md` — read it before modifying `tools/shared/` or cross-tool behavior.
 
 ---
 
@@ -450,93 +389,4 @@ When a fix loop needs to distinguish between multiple sub-items (e.g., spec/plan
 **Reproduced in:** `speckit-audit.ts` approval auto-fix (commit `4101e4d`): `finding.artifact === "spec"` replaced `finding.message.includes("spec")`.
 
 **Test pattern:** Create a feature whose name contains a phase word (e.g., "tasks view" → `001-tasks-view`), set only `spec.md`, unmark approvals, run `--fix`, and assert that only `approvals.spec.generated` flips to `true` while `approvals.tasks.generated` stays `false`.
-
-### R-7: Write functions throw on validation failure instead of silent skip
-
-**Introduced in:** `96e8932`
-
-`writeSession`, `writeSpecJson`, and `writeConfig` previously returned `void` on validation failure, silently skipping the write. This caused caller desync: the caller assumed data was persisted but it was not. All three functions now throw on `safeParse` failure, ensuring the caller knows the write was skipped.
-
-Additionally, `opencode.jsonc` was sanitized — `C:\Users\ignac\` personal paths replaced with `~/.config/opencode/**` — and scraping/rate-limit patterns were added to `COMPLEXITY_KEYWORDS`.
-
-**Test pattern:** Pass invalid data to each write function (e.g., `{ phase: "bogus" }` to `writeSession`) and assert that it throws with "validation failed" in the message.
-
-### R-8: writeConfig lock, parsePhase init guard, isErrorWithCode type guard, nullish coalescing, AuditFinding type
-
-**Introduced in:** `5bcf5f7`
-
-Six hardening items in one round:
-
-- **P-HIGH-1**: `writeConfig` acquired its own `acquireLock`/`releaseLock` internally (matching `writeSession` and `writeSpecJson`), removing the dependency on the caller's `withLock`.
-- **P-MED-1**: `parsePhase("init")` now explicitly returns `"spec"` instead of silently falling through the `isPhase` check.
-- **P-MED-2**: Three `isENOENT`/`isEEXIST`/`isESRCH` helpers replaced `(err as Record<string, unknown>).code` with a shared `isErrorWithCode` type guard, isolating the unsafe cast inside a single narrow function.
-- **P-LOW-1**: `||` → `??` in `speckit-validate.ts` line 33.
-- **P-LOW-2**: `args.taskDescription` now guarded with `?? ""` in `speckit-complexity.ts`.
-- **P-LOW-3**: All 37 `(f: any)` in `audit.test.ts` replaced with `(f: AuditFinding)` after exporting the interface from `speckit-audit.ts`.
-
-**Test pattern:** Each item has a focused regression test: `parsePhase("init")` returns `"spec"`, `isErrorWithCode` rejects non-Error values, `AuditFinding` is a typed interface importable from the audit tool.
-
-### R-9: Remove string sniffing, `||` to `??` consistency
-
-**Introduced in:** `c1deb64`
-
-- `specJsonMismatches` in `speckit-clean.ts` changed from `issues.filter(i => i.includes("spec.json")).length` (string sniffing) to a direct counter incremented at the source during the loop.
-- `||` → `??` in `speckit-config.ts` line 67 for consistency with line 61 (`args.defaultTechStack ?? null`).
-- Added `parsePhase("init")` test.
-
-### R-10: Resilience Layer — Backups, Transactions, and Corruption Warnings
-
-**Introduced in:** `15018a1`, `1f30c7e`, `15e90c6`, `dd8374f`
-
-Three interconnected features forming a resilience layer for state files:
-
-#### R-10a: `writeWithBackup` — automatic pre-write backups
-
-All write functions (`writeSession`, `writeSpecJson`, `writeConfig`) now use `writeWithBackup` instead of direct `atomicWriteFile`. Before writing, the helper reads the existing file content and saves it as `<file>.<timestamp>.bak` in `<project>/.opencode/backups/`. Old backups are trimmed to a maximum of 10. If the file does not exist yet, no backup is created.
-
-**Rationale:** Any bug or incorrect `--fix` that corrupts state is recoverable by restoring the most recent `.bak` file.
-
-**Test pattern:** Write to an existing file, verify `.bak` is created with the previous content. Write 15 times in sequence, verify only 10 backups remain. First write to a new file creates no backup.
-
-#### R-10b: Two-phase commit in `/clean --fix`
-
-The fix operation now follows a strict collect → validate → apply pattern:
-
-1. **Collect**: Iterate all features, read spec.json, compute the correct phase and `ready_for_implementation` flag, store pending changes in memory.
-2. **Validate**: Run `SpecJsonSchema.safeParse` on every pending spec.json. If ANY fails, throw before writing anything.
-3. **Apply**: Write all validated spec.json files using `writeWithBackup`.
-
-The session.json fix follows the same pattern: collect changes as callbacks, then apply atomically under a single lock.
-
-**Rationale:** Prevents partial repairs. Before R-10b, if `/clean --fix --fix` was interrupted mid-loop, some features were repaired and others were not.
-
-#### R-10c: `corruptionWarnings` global warning channel
-
-A global `CorruptionWarning[]` array accumulates warnings whenever a `read*` function detects corruption:
-
-- `readSession`: catches `JSON.parse` errors and `safeParse` failures, pushes warning (skips ENOENT — file not found is normal).
-- `readSpecJson`: same pattern.
-- `readConfig` (in `speckit-config.ts`): same pattern.
-
-The `pushCorruptionWarning` helper also writes to `console.warn` with a `[SDD]` prefix. Tools that consume warnings:
-- `/audit`: emits findings with `category: "corruption"`, `severity: "warn"`.
-- `/status`: appends `[CORRUPTION]` lines to output and adds `[corruption detected]` to the title.
-
-After consumption, each tool calls `clearCorruptionWarnings()`.
-
-**Rationale:** Previously, corrupt state files were silently replaced with defaults. Users had no indication that their session or spec.json was corrupted.
-
-**Test pattern:** Write invalid JSON to each state file, call the corresponding `read*` function, verify the warning array has an entry. Run `/audit` with corruption present, verify a `corruption` category finding exists. Run `/status` with corruption, verify output includes `[CORRUPTION]`. Delete the state file (ENOENT case), verify no warning is emitted.
-
-#### R-10d: Integration tests for corruption edge cases
-
-The `corruption.test.ts` file covers:
-- Corrupt session.json (invalid JSON) → warning emitted, appears in audit
-- Corrupt spec.json (invalid JSON) → warning emitted
-- Corrupt config.json (invalid JSON) → warning emitted
-- Empty session.json (SyntaxError from `JSON.parse("")`) → warning emitted
-- Empty spec.json (SyntaxError) → warning emitted
-- Valid files → no warnings
-- `clearCorruptionWarnings()` resets the array
-- Manual `pushCorruptionWarning` adds to the array
 

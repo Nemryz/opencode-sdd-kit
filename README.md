@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml/badge.svg)](https://github.com/Nemryz/opencode-sdd-kit/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
-[![Tests](https://img.shields.io/badge/tests-1552-brightgreen.svg)]()
-[![Mutation Testing](https://img.shields.io/badge/mutation-80%25-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-2278-brightgreen.svg)]()
+[![Mutation Testing](https://img.shields.io/badge/mutation-Stryker-blue.svg)]()
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)]()
 
 Spec-Driven Development workflow for opencode. This toolkit implements a structured methodology that guides software features from initial specification through final implementation. Each phase produces a specific document, each document validates the prerequisites for the next step, and no phase can be bypassed without proper validation.
@@ -92,12 +92,11 @@ The system follows a plugin-based architecture where each tool operates as a sel
 |  + speckit-perf                                                      |
 |  + speckit-health                                                    |
 |  + speckit-guard                                                     |
-|  + speckit-cache                                                     |
+|  + speckit-approve                                                   |
 |  + shared/ (io.ts, schemas.ts, types.ts)                            |
 +---------------------------------------------------------------------+
-|  Plugins Layer (3 runtime plugins)                                   |
+|  Plugins Layer (2 runtime plugins)                                   |
 |  + speckit-perfmon (performance monitoring)                          |
-|  + speckit-cache (smart caching)                                     |
 |  + speckit-guard (permission protection)                             |
 +---------------------------------------------------------------------+
 |  State Layer                                                         |
@@ -106,7 +105,6 @@ The system follows a plugin-based architecture where each tool operates as a sel
 |  + config.json (SDD configuration)                                   |
 |  + guard.json (permission rules)                                     |
 |  + perf.json (performance statistics)                                |
-|  + cache.json (cached data)                                          |
 |  + backups/ (with SHA-256 checksums)                                 |
 +---------------------------------------------------------------------+
 ```
@@ -128,12 +126,12 @@ The toolkit organizes its components into a clear directory hierarchy that separ
 ```
 ~/.config/opencode/
   AGENTS.md              Workflow orchestration and agent definitions
-  commands/              CLI command handlers (10 files)
+  commands/              CLI command handlers (11 files)
   skills/                Skill instructions (6 skills plus shared rules)
   tools/                 TypeScript tool modules (13 files)
   tools/shared/          Shared modules (io.ts, schemas.ts, types.ts)
-  tools/plugins/         Runtime plugins (3 files)
-  tools/test/            Test suite (60 test files)
+  tools/plugins/         Runtime plugins (2 files)
+  tools/test/            Test suite (74 test files)
   templates/             Artifact templates (12 templates)
   docs/                  Reference documentation
 ```
@@ -176,7 +174,7 @@ The toolkit includes thirteen specialized tools, each designed for a specific pu
 | speckit-health | Health monitoring with auto-repair and backup restoration |
 | speckit-perf | Performance statistics collection and analysis |
 | speckit-guard | File protection management with permission tiers |
-| speckit-cache | Smart caching layer with TTL and invalidation |
+| speckit-approve | Approves generated artifacts to unlock the next workflow phase |
 
 ### Shared Modules
 
@@ -219,7 +217,7 @@ The toolkit extends its functionality through runtime plugins that intercept sys
 
 Plugins are TypeScript modules that register event handlers with the opencode runtime. They intercept specific system events such as tool execution, permission requests, and command processing. When an event occurs, the plugin's handler function executes, allowing it to monitor, modify, or prevent the event.
 
-The fundamental difference between plugins and tools lies in their invocation pattern. Tools require explicit user commands like `/audit` or `/validate`. Plugins activate automatically whenever their registered events occur. A performance monitoring plugin tracks every tool execution without being asked. A caching plugin intercepts data requests transparently. A protection plugin blocks unauthorized file modifications proactively.
+The fundamental difference between plugins and tools lies in their invocation pattern. Tools require explicit user commands like `/audit` or `/validate`. Plugins activate automatically whenever their registered events occur. A performance monitoring plugin tracks every tool execution without being asked. A protection plugin blocks unauthorized file modifications proactively.
 
 This distinction enables plugins to provide system-wide functionality that operates consistently across all tools and workflows. You do not need to remember to invoke them, they simply work.
 
@@ -241,12 +239,11 @@ When multiple plugins register for the same hook, they execute in registration o
 
 ### Available Plugins
 
-The toolkit includes three production-ready plugins that address common development needs:
+The toolkit includes two production-ready plugins that address common development needs:
 
 | Plugin | Hooks | Purpose | Configuration |
 |--------|-------|---------|---------------|
 | speckit-perfmon | tool.execute.before, tool.execute.after | Performance monitoring and statistics | perf.json |
-| speckit-cache | tool.execute.before, tool.execute.after | Smart data caching with TTL | cache.json |
 | speckit-guard | permission.ask | File protection with permission tiers | guard.json |
 
 ### Plugin Configuration
@@ -257,19 +254,18 @@ Plugins register through the opencode.jsonc configuration file. Copy the templat
 cp opencode.jsonc.example opencode.jsonc
 ```
 
-The plugins section defines which plugins are active and their initialization parameters:
+The plugin array defines which plugins are active, as a list of module paths:
 
 ```json
 {
-  "plugins": {
-    "tools/plugins/speckit-perfmon": {},
-    "tools/plugins/speckit-cache": {},
-    "tools/plugins/speckit-guard": {}
-  }
+  "plugin": [
+    "./tools/plugins/speckit-perfmon.ts",
+    "./tools/plugins/speckit-guard.ts"
+  ]
 }
 ```
 
-To disable a plugin, remove its entry from the plugins section or prefix the path with a comment marker. The toolkit continues functioning normally with any combination of plugins enabled or disabled.
+To disable a plugin, remove its entry from the plugin array. The toolkit continues functioning normally with any combination of plugins enabled or disabled.
 
 Each plugin maintains its own configuration file in the .opencode directory. These files store runtime state, accumulated statistics, and user-defined rules. The plugins manage these files automatically, but you can edit them directly if needed.
 
@@ -282,32 +278,29 @@ Building a custom plugin requires understanding the hook system and following th
 **Step 2: Define the plugin interface.** Export an object with an `id` string and a `server` function that receives the context and returns hook handlers:
 
 ```typescript
-import type { Plugin } from "opencode"
+import type { Plugin } from "@opencode-ai/plugin"
 
-const yourPlugin: Plugin = {
-  id: "speckit-yourplugin",
-  server: async (ctx) => {
-    return {
-      "tool.execute.before": async (event) => {
-        // Execute before tool runs
-      },
-      "tool.execute.after": async (event) => {
-        // Execute after tool completes
-      }
+const yourPlugin: Plugin = async (input) => {
+  return {
+    "tool.execute.before": async (event, output) => {
+      // Execute before tool runs
+    },
+    "tool.execute.after": async (event, output) => {
+      // Execute after tool completes
     }
   }
 }
 
-export default yourPlugin
+export default { id: "speckit-yourplugin", server: yourPlugin }
 ```
 
-**Step 3: Register the plugin.** Add your plugin to the plugins section in opencode.jsonc:
+**Step 3: Register the plugin.** Add your plugin to the plugin array in opencode.jsonc:
 
 ```json
 {
-  "plugins": {
-    "tools/plugins/speckit-yourplugin": {}
-  }
+  "plugin": [
+    "./tools/plugins/speckit-yourplugin.ts"
+  ]
 }
 ```
 
@@ -361,6 +354,7 @@ After installation, the toolkit is ready to use. The following commands provide 
 ```
 /status                         Show current workflow state
 /spec <description>             Create a feature specification
+/approve <artifact>             Approve spec, plan, or tasks to unlock the next phase
 /plan <tech stack>              Create an implementation plan
 /tasks                          Break the plan into actionable tasks
 /review                         Check cross-artifact consistency
@@ -373,7 +367,7 @@ After installation, the toolkit is ready to use. The following commands provide 
 
 ### Workflow Walkthrough
 
-A typical session progresses through the phases in order, each one producing a new artifact and updating the feature specification phase.
+A typical session progresses through the phases in order, each one producing a new artifact and updating the feature specification phase. Each artifact must be approved before the next command will proceed.
 
 ```
 > /status
@@ -381,22 +375,32 @@ No features yet. Run /spec <description> to create the first feature.
 
 > /spec create a task management system with users and projects
 Agent creates specs/001-task-management/spec.md.
-spec.md created. Next: /plan <tech stack>
+Spec created. Next: /approve spec
+
+> /approve spec
+Agent summarizes the spec and asks for confirmation.
+spec approved. Next: /plan <tech stack>
 
 > /plan Node.js + PostgreSQL + React
 Agent creates specs/001-task-management/plan.md.
-plan.md created. Next: /tasks
+Plan created. Next: /approve plan
+
+> /approve plan
+plan approved. Next: /tasks
 
 > /tasks
 Agent creates specs/001-task-management/tasks.md.
-tasks.md created. Ready: /impl or /review
+Tasks created. Next: /approve tasks
+
+> /approve tasks
+tasks approved. Next: /impl or /review
 
 > /review
 Agent checks specification, plan, and tasks for consistency.
 Review complete, 0 issues found. Ready for /impl
 ```
 
-Each step validates the prerequisites before proceeding. The system prevents you from jumping ahead without completing the required artifacts, ensuring that every feature follows the complete development lifecycle.
+Each step validates the prerequisites before proceeding. The system prevents you from jumping ahead without completing the required artifacts and approvals, ensuring that every feature follows the complete development lifecycle.
 
 ## Workflow Deep Dive
 
@@ -436,15 +440,17 @@ Express Mode does not bypass validation. The generated artifacts still conform t
 
 ### Complexity Routing
 
-The implementer evaluates each task and routes it through one of three tiers based on complexity scoring:
+The implementer evaluates each task and routes it through one of three tiers based on a numeric score. The score combines keyword analysis of the task description with four structured factors:
 
-**Simple tasks** proceed directly to implementation. These tasks affect fewer than three files, introduce no new dependencies, and contain no boundary annotations or ambiguity markers. The agent implements them immediately without additional ceremony.
+**File count.** One or fewer files adds no points, two to three files adds one point, four to eight files adds three points, and nine or more files adds five points.
 
-**Standard tasks** follow the Test-Driven Development cycle. These tasks affect three to eight files, may introduce new dependencies, and require careful validation. The agent writes tests first, then implements the functionality to make those tests pass.
+**New dependencies.** Introducing new external dependencies adds three points.
 
-**Complex tasks** dispatch sub-agents for parallel work. These tasks affect more than eight files, introduce new dependencies, contain multiple boundary annotations, or include `[NEEDS CLARIFICATION]` markers. The agent delegates these tasks to specialized sub-agents that work in parallel and coordinate their results.
+**Boundary annotations.** Involving multiple `_Boundary:_` annotations adds two points.
 
-The complexity score considers four factors: file count, dependency changes, boundary annotations, and ambiguity markers. Each factor contributes to the overall score, and the routing thresholds ensure that tasks receive the appropriate level of attention and ceremony.
+**Ambiguity markers.** Unresolved `[NEEDS CLARIFICATION]` markers add two points.
+
+The routing thresholds are: **simple** for scores up to two, **standard** for scores up to six, and **complex** above six. Simple tasks proceed directly to implementation, standard tasks follow the Test-Driven Development cycle, and complex tasks dispatch sub-agents for parallel work. Use the `speckit-complexity` tool to preview the score and reasoning for any task.
 
 ## State Management
 
@@ -462,13 +468,11 @@ The toolkit maintains state through several interconnected files that track work
 
 **perf.json** records performance statistics for all tool executions including call counts, execution times, percentile calculations, and historical trends. This file enables the performance monitoring plugin to track system health over time.
 
-**cache.json** maintains cached data with time-to-live tracking, hit/miss statistics, and automatic invalidation metadata. This file accelerates repeated operations by avoiding redundant computation.
-
 ### Resilience Layer
 
 The resilience layer operates through three interconnected mechanisms that protect your work against data corruption and accidental deletion.
 
-**Automatic Backups.** Before any write to session.json, spec.json, or config.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Old backups are trimmed to a maximum of ten per file, ensuring that recent history is preserved without consuming excessive storage.
+**Automatic Backups.** Before any write to session.json, spec.json, or config.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Backups are grouped per source file and trimmed to a maximum of ten per source, ensuring that recent history is preserved without consuming excessive storage.
 
 **Checksum Verification.** Each backup receives a SHA-256 checksum stored in a companion .sha256 file. When restoration is triggered, the system verifies the checksum matches before attempting to restore. This prevents restoring from corrupted backups that might cause additional problems.
 
@@ -490,13 +494,13 @@ The toolkit provides several configuration options that control its behavior. Th
 |---------|---------|-------------|
 | defaultTechStack | none | Preferred technology stack for /plan |
 | expressMode | false | Skip conversational proposals |
-| autoVersioning | true | Automatic version tracking |
+| autoVersioning | false | Automatic git commit on state writes |
 | lastUsedLanguage | none | Previously used programming language |
 | preferences | {} | User-defined key-value pairs |
 
 ### Configuration File
 
-The configuration file lives at .opencode/config.json and follows the Zod schema defined in the toolkit. The `/config` command reads and writes this file with full validation.
+The configuration file lives at .opencode/spec-memory/config.json and follows the Zod schema defined in the toolkit. The `/config` command reads and writes this file with full validation.
 
 To read the current configuration:
 
@@ -523,7 +527,7 @@ This file defines which models to use for different agent roles, which plugins t
 
 ## Test Suite
 
-The project includes 1552 automated tests distributed across 60 test files. The test suite covers multiple quality dimensions, each designed to validate a specific aspect of the system's correctness and reliability.
+The project includes 2278 automated tests distributed across 74 test files. The test suite covers multiple quality dimensions, each designed to validate a specific aspect of the system's correctness and reliability.
 
 ### Unit Tests
 
@@ -607,10 +611,9 @@ The project utilizes Stryker mutation testing to measure test suite effectivenes
 | speckit-selfheal | Health scan and automatic repair |
 | speckit-status | Workflow state reporting |
 | speckit-guard | Permission management |
-| speckit-cache | Caching layer |
+| speckit-approve | Artifact approval gate |
 | speckit-perf | Performance statistics |
 | plugins/speckit-perfmon | Performance monitoring plugin |
-| plugins/speckit-cache | Caching plugin |
 | plugins/speckit-guard | Permission protection plugin |
 
 ### Thresholds

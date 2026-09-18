@@ -11,7 +11,7 @@ entities:
     relations: [EntityName(relationType)]
     bounded-context: context-name
 ---
-# Domain Glossary
+# Domain Glossary for [PROJECT NAME]
 
 ## EntityName
 

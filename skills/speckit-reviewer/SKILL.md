@@ -1,10 +1,10 @@
 ---
 name: speckit-reviewer
-description: Check cross-artifact consistency between spec, plan, and tasks with boundary audit and ownership classification
+description: Check cross-artifact consistency between spec, plan, and tasks with boundary audit and ownership classification. Use before implementation or after changes to validate artifacts.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: all
+  phase: "all"
   workflow: sdd
   shared-rules: spec-writing.md, design-principles.md, tasks-generation.md
 ---

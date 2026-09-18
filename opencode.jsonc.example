@@ -1,7 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-flash-free",
-  "plugin": ["./tools/plugins/speckit-perfmon.ts", "./tools/plugins/speckit-cache.ts", "./tools/plugins/speckit-guard.ts"],
+  "plugin": ["./tools/plugins/speckit-perfmon.ts", "./tools/plugins/speckit-guard.ts"],
+  "agent": {
+    "spec": {
+      "model": "opencode/mimo-v2.5-free",
+      "temperature": 0.1
+    }
+  },
   "permission": {
     "external_directory": {
       "~/.config/opencode/**": "allow"

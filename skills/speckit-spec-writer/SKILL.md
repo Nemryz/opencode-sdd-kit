@@ -1,10 +1,10 @@
 ---
 name: speckit-spec-writer
-description: Define what to build with user stories, acceptance criteria, and success metrics
+description: Define what to build with user stories, acceptance criteria, and success metrics. Use when starting a new feature or clarifying requirements before planning.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: 1
+  phase: "1"
   workflow: sdd
   shared-rules: spec-writing.md
 ---

@@ -1,10 +1,10 @@
 ---
 name: speckit-implementer
-description: Execute implementation tasks in dependency order, building and testing each phase
+description: Execute implementation tasks in dependency order, building and testing each phase. Use when tasks are approved and code execution begins.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: 4
+  phase: "4"
   workflow: sdd
   shared-rules: design-principles.md, tasks-generation.md
 ---

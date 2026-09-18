@@ -1,10 +1,10 @@
 ---
 name: speckit-task-decomposer
-description: Break implementation plans into actionable, ordered tasks with dependency tracking
+description: Break implementation plans into actionable, ordered tasks with dependency tracking. Use when a plan is approved and needs a task breakdown.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: 3
+  phase: "3"
   workflow: sdd
   shared-rules: tasks-generation.md
 ---
@@ -80,7 +80,7 @@ Before writing spec.json, run a lightweight review:
 
 1. Every user story has at least one task
 2. Every task has a verifiable deliverable
-3. No task is too large (split if > 1 day of work)
+3. No task is too large (split if it exceeds one focused session, 1-4 hours)
 4. Dependency graph is acyclic
 5. `[P]` tasks have no hidden inter-dependencies
 6. Boundary annotations don't overlap
@@ -154,7 +154,7 @@ T-001
 - **Stop**: Both spec and plan must exist
 - **Recovery**: "Complete spec and plan phases first before task decomposition"
 
-### Error: Task too large (> 1 day)
+### Error: Task too large (> 1 focused session)
 - **Stop**: Do not write oversized tasks
 - **Recovery**: Split into smaller tasks, check atomicity again
 
@@ -178,7 +178,7 @@ T-001
 - [ ] Each `[P]` task has `_Boundary:_` annotation
 - [ ] Each non-obvious dependency has `_Depends:_` annotation
 - [ ] Each task has a file path or clear deliverable
-- [ ] No task is too large (split if > 1 day of work)
+- [ ] No task is too large (split if it exceeds one focused session, 1-4 hours)
 - [ ] Setup phase exists for infrastructure
 - [ ] `@mention` syntax used for sub-agent dispatch when applicable
 - [ ] Task-graph sanity review passed

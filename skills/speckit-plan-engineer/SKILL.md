@@ -1,10 +1,10 @@
 ---
 name: speckit-plan-engineer
-description: Create technical implementation plans with architecture decisions and risk analysis
+description: Create technical implementation plans with architecture decisions and risk analysis. Use when a spec is approved and technology decisions are needed.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: 2
+  phase: "2"
   workflow: sdd
   shared-rules: design-principles.md
 ---

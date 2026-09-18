@@ -1,10 +1,10 @@
 ---
 name: speckit-constitution
-description: Create or update project governing principles and development guidelines
+description: Create or update the project constitution. Use when a project has no governing principles yet or when existing articles need review before any spec or plan work.
 license: MIT
 compatibility: opencode
 metadata:
-  phase: 0
+  phase: "0"
   workflow: sdd
   shared-rules: design-principles.md
 ---
@@ -69,7 +69,6 @@ Wait for user confirmation before proceeding to writing.
 2. Call `speckit-scaffold` with `template: "constitution"` to scaffold the file
 3. Fill in each article with project-specific content
 4. Add `_Boundary:_` annotations to relevant articles
-5. Update spec.json to mark constitution as generated
 
 **Sub-agent dispatch (optional, for complex projects):**
 If the project context is large or ambiguous, dispatch sub-agents:
