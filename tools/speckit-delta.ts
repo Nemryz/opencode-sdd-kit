@@ -15,8 +15,10 @@ import {
   writeFrontmatterChecksum,
   computeBodyChecksum,
   syncFrontmatterFromSpecJson,
-  specsDirPath,
   withLock,
+  writeWithBackup,
+  isSafeFeatureDirName,
+  resolveFeatureDir,
   clearCorruptionWarnings,
   makeDeltaIndex,
   makeDelta,
@@ -48,23 +50,36 @@ function deltaSlug(title: string): string {
     .slice(0, 40)
 }
 
-async function readDeltasIndex(featureDir: string): Promise<DeltasIndex> {
+type DeltasIndexRead = { ok: true; index: DeltasIndex } | { ok: false }
+
+async function readDeltasIndex(featureDir: string): Promise<DeltasIndexRead> {
   const fp = deltasIndexPath(featureDir)
+  let data: string
   try {
-    const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
-    const result = DeltasIndexSchema.safeParse(parsed)
-    if (result.success) return result.data
-  } catch { /* ignore */ }
-  const dirName = path.basename(featureDir)
-  return makeDeltaIndex(dirName)
+    data = await fs.readFile(fp, "utf-8")
+  } catch {
+    return { ok: true, index: makeDeltaIndex(path.basename(featureDir)) }
+  }
+  try {
+    const result = DeltasIndexSchema.safeParse(JSON.parse(data))
+    if (result.success) return { ok: true, index: result.data }
+  } catch { /* fall through to corrupt */ }
+  return { ok: false }
+}
+
+function corruptIndexError(featureDir: string) {
+  return {
+    title: "Error",
+    output: `Delta index ${deltasIndexPath(featureDir)} is corrupt or invalid. Refusing to overwrite it. Restore it from .opencode/backups or remove it manually.`,
+  }
 }
 
 async function writeDeltasIndex(index: DeltasIndex, featureDir: string): Promise<void> {
-  const dir = deltasDir(featureDir)
-  await fs.mkdir(dir, { recursive: true })
   const fp = deltasIndexPath(featureDir)
-  await fs.writeFile(fp, JSON.stringify(index, null, 2), "utf-8")
+  const root = path.dirname(path.dirname(featureDir))
+  await withLock(fp, async () => {
+    await writeWithBackup(fp, JSON.stringify(index, null, 2), root)
+  })
 }
 
 async function computeFileHash(filePath: string): Promise<string> {
@@ -83,12 +98,14 @@ async function findTargetFeatureDir(projectRoot: string, featureName: string): P
       return dir
     }
   }
-  return dirs.length > 0 ? dirs[dirs.length - 1] : null
+  return dirs.length === 1 ? dirs[0] : null
 }
 
 async function handleSpecDelta(projectRoot: string, featureDir: string, targetDir: string, description: string) {
-  const index = await readDeltasIndex(featureDir)
-  const activeDeltas = index.deltas.filter(d => d.status !== "cancelled")
+  const read = await readDeltasIndex(featureDir)
+  if (!read.ok) return corruptIndexError(featureDir)
+  const index = read.index
+  const activeDeltas = index.deltas.filter(d => d.status !== "cancelled" && d.status !== "consolidated")
   if (activeDeltas.length >= DELTA_MAX_PER_FEATURE) {
     return { title: "Error", output: `Delta limit reached (${DELTA_MAX_PER_FEATURE}). Consolidate or cancel existing deltas.` }
   }
@@ -128,7 +145,9 @@ async function handleSpecDelta(projectRoot: string, featureDir: string, targetDi
 async function handlePlanDelta(projectRoot: string, featureDir: string, targetDir: string, deltaId: string) {
   if (!deltaId) return { title: "Error", output: "Delta ID required (e.g., D001)" }
 
-  const index = await readDeltasIndex(featureDir)
+  const read = await readDeltasIndex(featureDir)
+  if (!read.ok) return corruptIndexError(featureDir)
+  const index = read.index
   const delta = index.deltas.find(d => d.id === deltaId)
   if (!delta) return { title: "Error", output: `Delta ${deltaId} not found` }
   if (delta.status !== "draft") return { title: "Error", output: `Delta ${deltaId} status is ${delta.status}, expected draft` }
@@ -156,7 +175,9 @@ async function handlePlanDelta(projectRoot: string, featureDir: string, targetDi
 async function handleTasksDelta(projectRoot: string, featureDir: string, targetDir: string, deltaId: string) {
   if (!deltaId) return { title: "Error", output: "Delta ID required (e.g., D001)" }
 
-  const index = await readDeltasIndex(featureDir)
+  const read = await readDeltasIndex(featureDir)
+  if (!read.ok) return corruptIndexError(featureDir)
+  const index = read.index
   const delta = index.deltas.find(d => d.id === deltaId)
   if (!delta) return { title: "Error", output: `Delta ${deltaId} not found` }
   if (delta.status !== "planned") return { title: "Error", output: `Delta ${deltaId} status is ${delta.status}, expected planned` }
@@ -185,9 +206,19 @@ async function handleTasksDelta(projectRoot: string, featureDir: string, targetD
 async function handleImplDelta(projectRoot: string, featureDir: string, targetDir: string, deltaId: string) {
   if (!deltaId) return { title: "Error", output: "Delta ID required (e.g., D001)" }
 
-  const index = await readDeltasIndex(featureDir)
+  const read = await readDeltasIndex(featureDir)
+  if (!read.ok) return corruptIndexError(featureDir)
+  const index = read.index
   const delta = index.deltas.find(d => d.id === deltaId)
   if (!delta) return { title: "Error", output: `Delta ${deltaId} not found` }
+
+  if (delta.status === "consolidated") {
+    return {
+      title: `Delta ${deltaId} already consolidated`,
+      output: `Delta ${deltaId} was consolidated at ${delta.consolidated_at || "unknown"}. No changes made.`,
+      metadata: { deltaId },
+    }
+  }
 
   if (delta.status === "ready") {
     delta.status = "implementing"
@@ -221,32 +252,9 @@ async function handleImplDelta(projectRoot: string, featureDir: string, targetDi
     const deltaTasksContent = await fs.readFile(deltaTasksPath, "utf-8").catch(() => "")
     const deltaSpecContent = await fs.readFile(deltaSpecPath, "utf-8").catch(() => "")
 
-    if (deltaPlanContent) {
-      const existingPlan = await fs.readFile(planFp, "utf-8").catch(() => "")
-      const deltaBody = extractBody(deltaPlanContent)
-      if (deltaBody) {
-        const merged = existingPlan.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
-        await fs.writeFile(planFp, merged, "utf-8")
-      }
-    }
-
-    if (deltaTasksContent) {
-      const existingTasks = await fs.readFile(tasksFp, "utf-8").catch(() => "")
-      const deltaBody = extractBody(deltaTasksContent)
-      if (deltaBody) {
-        const merged = existingTasks.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
-        await fs.writeFile(tasksFp, merged, "utf-8")
-      }
-    }
-
-    if (deltaSpecContent) {
-      const existingSpec = await fs.readFile(specFp, "utf-8").catch(() => "")
-      const deltaBody = extractBody(deltaSpecContent)
-      if (deltaBody) {
-        const merged = existingSpec.trimEnd() + "\n\n---\n\n## Delta " + deltaId + ": " + delta.title + "\n\n" + deltaBody
-        await fs.writeFile(specFp, merged, "utf-8")
-      }
-    }
+    await appendDeltaSection(planFp, deltaId, delta.title, extractBody(deltaPlanContent))
+    await appendDeltaSection(tasksFp, deltaId, delta.title, extractBody(deltaTasksContent))
+    await appendDeltaSection(specFp, deltaId, delta.title, extractBody(deltaSpecContent))
 
     const sj = await readSpecJson(featureDir)
     if (sj) {
@@ -274,6 +282,15 @@ async function handleImplDelta(projectRoot: string, featureDir: string, targetDi
   return { title: "Error", output: `Delta ${deltaId} status is ${delta.status}, expected ready or implementing` }
 }
 
+async function appendDeltaSection(targetFp: string, deltaId: string, title: string, body: string): Promise<void> {
+  if (!body) return
+  const existing = await fs.readFile(targetFp, "utf-8").catch(() => "")
+  const marker = `## Delta ${deltaId}: ${title}`
+  if (existing.includes(marker)) return
+  const merged = existing.trimEnd() + "\n\n---\n\n" + marker + "\n\n" + body
+  await fs.writeFile(targetFp, merged, "utf-8")
+}
+
 function extractBody(mdContent: string): string {
   const lines = mdContent.split("\n")
   const bodyLines: string[] = []
@@ -299,7 +316,9 @@ function extractBody(mdContent: string): string {
 }
 
 async function handleDeltaStatus(projectRoot: string, featureDir: string, targetDir: string) {
-  const index = await readDeltasIndex(featureDir)
+  const read = await readDeltasIndex(featureDir)
+  if (!read.ok) return corruptIndexError(featureDir)
+  const index = read.index
   if (index.deltas.length === 0) {
     return {
       title: "No deltas",
@@ -354,12 +373,28 @@ export default tool({
         }
       }
 
-      const targetDir = args.featureDir || await findTargetFeatureDir(projectRoot, args.description || "")
-      if (!targetDir) {
-        return { title: "Error", output: "No feature directories found. Create a spec first with /spec" }
+      let targetDir: string
+      if (args.featureDir !== undefined) {
+        if (!isSafeFeatureDirName(args.featureDir)) {
+          return { title: "Error", output: `Invalid featureDir: ${args.featureDir}` }
+        }
+        targetDir = args.featureDir
+      } else {
+        const found = await findTargetFeatureDir(projectRoot, args.description || "")
+        if (!found) {
+          const dirs = await getFeatureDirs(projectRoot)
+          if (dirs.length === 0) {
+            return { title: "Error", output: "No feature directories found. Create a spec first with /spec" }
+          }
+          return { title: "Error", output: `Multiple features found (${dirs.join(", ")}). Pass featureDir explicitly.` }
+        }
+        targetDir = found
       }
 
-      const featureDir = path.join(specsDirPath(projectRoot), targetDir)
+      const featureDir = resolveFeatureDir(projectRoot, targetDir)
+      if (!featureDir) {
+        return { title: "Error", output: `Invalid feature directory: ${targetDir}` }
+      }
       const specFp = path.join(featureDir, "spec.md")
       const specExists = await exists(specFp)
       if (!specExists) {
