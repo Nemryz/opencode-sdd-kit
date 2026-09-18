@@ -10,10 +10,7 @@ import {
   isValidProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
-  readFrontmatter,
-  writeFrontmatter,
   writeFrontmatterChecksum,
-  computeBodyChecksum,
   syncFrontmatterFromSpecJson,
   withLock,
   writeWithBackup,
@@ -27,7 +24,6 @@ import {
 import type {
   Delta,
   DeltasIndex,
-  DeltaFrontmatterData,
 } from "./shared/schemas"
 import { DeltasIndexSchema } from "./shared/schemas"
 

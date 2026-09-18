@@ -90,7 +90,7 @@ export default tool({
         featureDir,
         nextStep,
         lastResult: `${artifact} approved for ${featureDir}`,
-        history: [...session.history, `/approve ${artifact}`].slice(-20),
+        history: [...session.history, `/approve ${artifact}`],
       })
 
       return {

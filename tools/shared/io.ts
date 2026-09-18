@@ -495,7 +495,12 @@ export async function readSession(root: string): Promise<SessionState> {
   }
 }
 
+export const MAX_SESSION_HISTORY = 20
+
 export async function writeSession(root: string, s: SessionState): Promise<void> {
+  if (Array.isArray(s.history) && s.history.length > MAX_SESSION_HISTORY) {
+    s.history = s.history.slice(-MAX_SESSION_HISTORY)
+  }
   const result = SessionStateSchema.safeParse(s)
   if (!result.success) {
     throw new Error(`writeSession: validation failed, data not written: ${String(result.error)}`)

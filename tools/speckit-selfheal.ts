@@ -98,16 +98,21 @@ export default tool({
 
       // D1: Health Scan — clean
       const cleanResult = toolResult(await cleanTool.execute({ fix: args.fix }, context))
-      const cleanIssues = (cleanResult.metadata?.issues ?? []) as Array<Record<string, unknown>>
+      const cleanIssues = (cleanResult.metadata?.issues ?? []) as Array<unknown>
       for (const issue of cleanIssues) {
-        const severity = String(issue.severity ?? "info")
+        const message = typeof issue === "string"
+          ? issue
+          : String((issue as Record<string, unknown>).message ?? "")
+        const severity = typeof issue === "string"
+          ? "info"
+          : String((issue as Record<string, unknown>).severity ?? "info")
         const cat = categorize("phase-mismatch", severity)
         findings.push({
           id: `C-${findings.length + 1}`,
           source: "clean",
           severity: cat.severity,
           category: cat.category,
-          message: String(issue.message ?? ""),
+          message,
           originalSeverity: severity,
           originalCategory: "clean",
         })
@@ -142,23 +147,17 @@ export default tool({
       }
       const total = findings.length
 
-      // D3 + D4: Fix handling — delegated to audit/clean with fix=true
-      // The audit and clean tools already apply their own fixes when fix=true.
-      // If the user passes --fix to selfheal, it re-runs both with fix=true.
-      // After fix, it re-reads corruptionWarnings to detect if any new issues appeared.
+      // D3 + D4: Fix handling — audit and clean already applied their fixes during
+      // the scan phase when fix=true, so count the results from those findings
+      // instead of re-running the fixers (which would report zero fixed).
       let fixed = 0
       let skipped = 0
       let failed = 0
-      if (args.fix && findings.length > 0) {
-        const fixAudit = toolResult(await auditTool.execute({ fix: true }, context))
-        await cleanTool.execute({ fix: true }, context)
-        const fixedFindings = (fixAudit.metadata?.findings ?? []) as Array<{ message: string }>
-        for (const ff of fixedFindings) {
-          if (ff.message?.includes("(auto-fixed)")) {
+      if (args.fix) {
+        for (const f of findings) {
+          if (f.source === "audit" && f.message.includes("(auto-fixed)")) {
             fixed++
           }
-        }
-        for (const f of findings) {
           if (f.severity === "LOW" || f.originalSeverity === "info") {
             skipped++
           }

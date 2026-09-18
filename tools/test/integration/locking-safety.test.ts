@@ -38,7 +38,7 @@ describe("withLock parallel exclusion", () => {
       maxActive = Math.max(maxActive, active)
       await sleep(40)
       active--
-    })
+    }, { staleThreshold: 60000, timeout: 10000 })
 
     await Promise.all([worker(), worker(), worker()])
     expect(maxActive).toBe(1)
@@ -51,7 +51,7 @@ describe("withLock parallel exclusion", () => {
     const worker = (id: number, ms: number) => withLock(fp, async () => {
       order.push(id)
       await sleep(ms)
-    })
+    }, { staleThreshold: 60000, timeout: 10000 })
 
     await Promise.all([worker(1, 60), worker(2, 10), worker(3, 10)])
     expect(order.length).toBe(3)

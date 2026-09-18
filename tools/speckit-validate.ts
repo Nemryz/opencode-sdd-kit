@@ -11,7 +11,6 @@ import {
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   reconstructFromFrontmatter,
-  verifyBackupIntegrity,
   SpecJson,
   SessionState,
   PHASE_NEXT_STEP,
@@ -21,8 +20,6 @@ import {
   sessionPath,
   withLock,
   clearCorruptionWarnings,
-  SessionStateSchema,
-  SpecJsonSchema,
 } from "./shared/types"
 
 export default tool({
@@ -53,10 +50,6 @@ export default tool({
           metadata: { parentProject, requiresConfirmation: true },
         }
       }
-      const backupReport = await verifyBackupIntegrity(projectRoot, {
-        session: SessionStateSchema,
-        spec: SpecJsonSchema,
-      })
       const toolResult = await withLock(sessionPath(projectRoot), async () => {
         const s = await readSession(projectRoot)
         const featureDir = args.featureDir ?? s.featureDir ?? (await getLatestFeatureDir(projectRoot))
@@ -140,7 +133,6 @@ export default tool({
         s.nextStep = nextStep
         s.lastResult = parts.join(" | ")
         s.history.push(args.command ? "/" + args.command : "/review")
-        if (s.history.length > 20) s.history = s.history.slice(-20)
 
         await writeSession(projectRoot, s)
 

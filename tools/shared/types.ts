@@ -10,12 +10,15 @@ export * from "./io"
 
 // ─────────────────────────── Project root validation ───────────
 
-const DRIVE_ROOT_RE = /^[A-Z]:\\?$/i
+const DRIVE_ROOT_RE = /^[A-Za-z]:[\\/]?$/
 
 export async function isValidProjectRoot(root: string): Promise<boolean> {
   if (DRIVE_ROOT_RE.test(root)) return false
   try {
-    const specMemoryDir = path.join(root, PATHS.OPENCODE_DIR, PATHS.SPEC_MEMORY_DIR)
+    const opencodeDir = path.join(root, PATHS.OPENCODE_DIR)
+    const opencodeStat = await fs.lstat(opencodeDir)
+    if (opencodeStat.isSymbolicLink()) return false
+    const specMemoryDir = path.join(opencodeDir, PATHS.SPEC_MEMORY_DIR)
     const stat = await fs.lstat(specMemoryDir)
     if (stat.isSymbolicLink()) return false
     return stat.isDirectory()
@@ -81,11 +84,18 @@ export async function getProjectRootWarnings(root: string): Promise<ProjectRootW
   // Skip drive roots entirely (already handled by isValidProjectRoot)
   if (DRIVE_ROOT_RE.test(root)) return warnings
 
-  // Check kit installation directory
+  // Slightly hardened: normalize separators and case before comparing
   const homeDir = os.homedir()
+  const platform = os.platform()
   const kitDir = path.join(homeDir, ".config", "opencode")
   const normalized = root.replace(/[/\\]+$/, "")
-  if (normalized === kitDir || normalized.startsWith(kitDir + path.sep)) {
+  const foldPath = (p: string): string => {
+    const unified = p.replace(/\\/g, "/")
+    return platform === "win32" || platform === "darwin" ? unified.toLowerCase() : unified
+  }
+  const normalizedFolded = foldPath(normalized)
+  const kitDirFolded = foldPath(kitDir)
+  if (normalizedFolded === kitDirFolded || normalizedFolded.startsWith(kitDirFolded + "/")) {
     warnings.push({
       type: "kit-installation",
       message: "You are running from the opencode-sdd-kit installation directory. This may cause unexpected behavior because the kit could modify its own configuration files. Do you want to continue?",
@@ -93,8 +103,7 @@ export async function getProjectRootWarnings(root: string): Promise<ProjectRootW
   }
 
   // Check shallow path (platform-aware threshold)
-  const platform = os.platform()
-  const segments = normalized.split(path.sep).filter(Boolean)
+  const segments = normalized.split(/[\\/]/).filter(Boolean)
   const shallowThreshold = platform === "win32" ? 3 : platform === "darwin" ? 2 : 0
   if (shallowThreshold > 0 && segments.length < shallowThreshold) {
     warnings.push({

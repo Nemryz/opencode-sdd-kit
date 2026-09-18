@@ -289,7 +289,7 @@ describe("scaffold data-model", () => {
       ctx,
     )
     expect(result.title).toBe("Error")
-    expect(result.metadata?.error).toContain("no features exist")
+    expect(result.metadata?.error).toContain("no matching feature")
   })
 })
 

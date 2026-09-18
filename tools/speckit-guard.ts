@@ -5,7 +5,6 @@ import { isValidProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile }
 import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
-  addDenial,
   type GuardConfig,
 } from "./plugins/speckit-guard"
 

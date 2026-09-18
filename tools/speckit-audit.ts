@@ -258,16 +258,6 @@ async function auditProject(projectRoot: string): Promise<AuditReport> {
     })
   }
 
-  for (const w of corruptionWarnings) {
-    findings.push({
-      severity: "warn",
-      category: "corruption",
-      message: `${w.file}: ${w.message}`,
-      file: w.file,
-    })
-  }
-  clearCorruptionWarnings()
-
   const steeringDir = steeringDirPath(projectRoot)
   const steeringExists = await exists(steeringDir)
   if (steeringExists) {
@@ -318,6 +308,18 @@ async function auditProject(projectRoot: string): Promise<AuditReport> {
     }
   }
 
+  // Collect corruption warnings last so warnings pushed while auditing features
+  // (e.g. corrupt spec.json read during auditFeature) are included in this report
+  for (const w of corruptionWarnings) {
+    findings.push({
+      severity: "warn",
+      category: "corruption",
+      message: `${w.file}: ${w.message}`,
+      file: w.file,
+    })
+  }
+  clearCorruptionWarnings()
+
   const summary = { info: 0, warn: 0, error: 0 }
   for (const f of findings) {
     summary[f.severity]++
@@ -359,6 +361,7 @@ export default tool({
 
       if (args.fix && report.findings.length > 0) {
         let fixedCount = 0
+        let fixedErrorCount = 0
         const fixedBases: string[] = []
         for (const finding of report.findings) {
           if (finding.severity === "error" && finding.category === "phase-mismatch") {
@@ -378,6 +381,7 @@ export default tool({
                   fixedBases.push(base)
                   finding.message += " (auto-fixed)"
                   fixedCount++
+                  fixedErrorCount++
                 }
               })
             }
@@ -394,6 +398,7 @@ export default tool({
                   fixedBases.push(base)
                   finding.message += " (auto-fixed)"
                   fixedCount++
+                  fixedErrorCount++
                 }
               })
             }
@@ -439,7 +444,7 @@ export default tool({
             const sj = await readSpecJson(base)
             if (sj) await syncFrontmatterFromSpecJson(base, sj, { last_audit: auditMeta })
           }
-          report.summary.error -= fixedCount
+          report.summary.error -= fixedErrorCount
           if (report.summary.error < 0) report.summary.error = 0
           report.passed = report.summary.error === 0
         }

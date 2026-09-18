@@ -104,9 +104,9 @@ describe("Kill surviving mutants — speckit-scaffold", () => {
   })
 
   describe("output string assertions — data-model (L263, L282)", () => {
-    it("data-model no features error contains 'No feature directories'", async () => {
+    it("data-model no features error contains 'No matching feature directory'", async () => {
       const result = await scaffoldTool.execute({ featureName: "Test", template: "data-model" }, ctx)
-      expect(result.output).toContain("No feature directories")
+      expect(result.output).toContain("No matching feature directory")
     })
 
     it("data-model created output contains 'created in specs/'", async () => {
@@ -130,9 +130,9 @@ describe("Kill surviving mutants — speckit-scaffold", () => {
   })
 
   describe("output string assertions — research (L294, L315)", () => {
-    it("research no features error contains 'No feature directories'", async () => {
+    it("research no features error contains 'No matching feature directory'", async () => {
       const result = await scaffoldTool.execute({ featureName: "Test", template: "research" }, ctx)
-      expect(result.output).toContain("No feature directories")
+      expect(result.output).toContain("No matching feature directory")
     })
 
     it("research created output contains 'created in specs/'", async () => {
@@ -150,9 +150,9 @@ describe("Kill surviving mutants — speckit-scaffold", () => {
   })
 
   describe("output string assertions — contracts (L333)", () => {
-    it("contracts no features error contains 'No feature directories'", async () => {
+    it("contracts no features error contains 'No matching feature directory'", async () => {
       const result = await scaffoldTool.execute({ featureName: "Test", template: "contracts" }, ctx)
-      expect(result.output).toContain("No feature directories")
+      expect(result.output).toContain("No matching feature directory")
     })
 
     it("contracts created output contains 'contracts/ directory created'", async () => {

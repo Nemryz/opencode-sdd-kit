@@ -88,7 +88,7 @@ async function findTargetFeatureDir(projectRoot: string, featureName: string): P
       const dirSlug = d.replace(/^\d+-/, "")
       return dirSlug === slug
     })
-    return exact ?? dirs[dirs.length - 1]
+    return exact ?? (dirs.length === 1 ? dirs[0] : null)
   } catch {
     return null
   }
@@ -260,8 +260,8 @@ export default tool({
         if (!targetDir) {
           return {
             title: "Error",
-            output: "No feature directories found in specs/. Create a spec first with /spec <description>",
-            metadata: { error: "no features exist" },
+            output: "No matching feature directory found in specs/. Create a spec first with /spec <description>, or pass an exact feature name.",
+            metadata: { error: "no matching feature" },
           }
         }
         const featurePath = path.join(specsDirPath(projectRoot), targetDir)
@@ -291,8 +291,8 @@ export default tool({
         if (!targetDir) {
           return {
             title: "Error",
-            output: "No feature directories found in specs/. Create a spec first with /spec <description>",
-            metadata: { error: "no features exist" },
+            output: "No matching feature directory found in specs/. Create a spec first with /spec <description>, or pass an exact feature name.",
+            metadata: { error: "no matching feature" },
           }
         }
 
@@ -398,7 +398,7 @@ export default tool({
         .replace(/\[FEATURE NAME\]/g, args.featureName)
         .replace(/\[TECH STACK\]/g, args.techStack ?? "")
         .replace(/NNN-feature-name/g, featureDirName)
-        .replace(/NNN/g, String(featureNumber).padStart(3, "0"))
+        .replace(/\bNNN\b/g, String(featureNumber).padStart(3, "0"))
 
       await fs.writeFile(filePath, content, "utf-8")
 
@@ -441,6 +441,9 @@ export default tool({
           ? "/approve plan"
           : "/approve tasks"
 
+      const missingSpec = (args.template === "plan" || args.template === "tasks")
+        && !(await exists(path.join(featurePath, "spec.md")))
+
       const phase = args.template === "spec" ? "spec" : args.template === "plan" ? "plan" : "tasks"
 
       await withLock(sessionPath(projectRoot), async () => {
@@ -453,13 +456,15 @@ export default tool({
         session.nextStep = nextHint
         session.lastResult = `${fileName} created in specs/${featureDirName}/`
         session.history.push("/" + args.template)
-        if (session.history.length > 20) session.history = session.history.slice(-20)
         await writeSession(projectRoot, session)
       })
 
       let output = `${fileName} created in specs/${featureDirName}/`
       if (slugTruncated) {
         output += ` (truncated: "${args.featureName}" was too long)`
+      }
+      if (missingSpec) {
+        output += " (warning: no spec.md in this feature, scaffold the spec first)"
       }
       output += `  Next: ${nextHint}`
 
@@ -472,6 +477,7 @@ export default tool({
           phase,
           nextCommand: nextHint,
           truncated: slugTruncated,
+          missingSpec,
         },
       }
     } catch (err) {

@@ -291,7 +291,6 @@ export default tool({
         if (sessionChanges.length > 0) {
           s.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
           s.history.push("/clean")
-          if (s.history.length > 20) s.history = s.history.slice(-20)
           await withLock(sessionPath(projectRoot), async () => {
             const liveS = await readSession(projectRoot)
             for (const change of sessionChanges) {
@@ -299,7 +298,6 @@ export default tool({
             }
             liveS.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
             liveS.history.push("/clean")
-            if (liveS.history.length > 20) liveS.history = liveS.history.slice(-20)
             await writeSession(projectRoot, liveS)
           })
         }

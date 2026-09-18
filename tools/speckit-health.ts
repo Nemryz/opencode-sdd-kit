@@ -3,8 +3,6 @@ import {
   runHealthCheck,
   readConfigWithRestore,
   findLatestValidBackup,
-  acquireLock,
-  releaseLock,
   writeSession,
   writeConfigWithBackup,
   clearCorruptionWarnings,
