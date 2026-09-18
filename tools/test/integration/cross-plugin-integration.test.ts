@@ -3,7 +3,6 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import guardPlugin from "../../plugins/speckit-guard"
-import cachePlugin from "../../plugins/speckit-cache"
 import perfmonPlugin from "../../plugins/speckit-perfmon"
 
 let worktree: string
@@ -12,9 +11,7 @@ beforeEach(async () => {
   worktree = await fs.mkdtemp(path.join(os.tmpdir(), "cross-plugin-"))
   const opencodeDir = path.join(worktree, ".opencode")
   const specMemoryDir = path.join(opencodeDir, "spec-memory")
-  const cacheDir = path.join(opencodeDir, "cache")
   await fs.mkdir(specMemoryDir, { recursive: true })
-  await fs.mkdir(cacheDir, { recursive: true })
   await fs.writeFile(path.join(opencodeDir, "session.json"), "{}")
   await fs.writeFile(path.join(specMemoryDir, "constitution.md"), "# Constitution")
 })
@@ -25,25 +22,11 @@ afterEach(async () => {
 
 describe("Cross-Plugin Integration", () => {
 
-  describe("Guard + Cache integration", () => {
+  describe("Guard plugin", () => {
     it("guard plugin can be loaded", async () => {
       const server = await guardPlugin.server({ worktree } as any)
       expect(server).toBeDefined()
       expect(server["permission.ask"]).toBeDefined()
-    })
-
-    it("cache plugin can be loaded", async () => {
-      const server = await cachePlugin.server({ worktree } as any)
-      expect(server).toBeDefined()
-      expect(server["tool.execute.before"]).toBeDefined()
-      expect(server["tool.execute.after"]).toBeDefined()
-    })
-
-    it("guard and cache can coexist", async () => {
-      const guardServer = await guardPlugin.server({ worktree } as any)
-      const cacheServer = await cachePlugin.server({ worktree } as any)
-      expect(guardServer).toBeDefined()
-      expect(cacheServer).toBeDefined()
     })
   })
 
@@ -89,7 +72,7 @@ describe("Cross-Plugin Integration", () => {
     })
   })
 
-  describe("Cache + Perfmon integration", () => {
+  describe("Perfmon plugin", () => {
     it("perfmon plugin can be loaded", async () => {
       const server = await perfmonPlugin.server({ worktree } as any)
       expect(server).toBeDefined()
@@ -97,7 +80,7 @@ describe("Cross-Plugin Integration", () => {
       expect(server["tool.execute.after"]).toBeDefined()
     })
 
-    it("cache can read perf data", async () => {
+    it("perf data can be read", async () => {
       const perfPath = path.join(worktree, ".opencode", "perf.json")
       await fs.writeFile(perfPath, JSON.stringify({
         lastUpdated: new Date().toISOString(),
@@ -119,25 +102,20 @@ describe("Cross-Plugin Integration", () => {
     })
   })
 
-  describe("All plugins coexistence", () => {
-    it("all three plugins can be loaded simultaneously", async () => {
+  describe("Plugins coexistence", () => {
+    it("guard and perfmon can be loaded simultaneously", async () => {
       const guardServer = await guardPlugin.server({ worktree } as any)
-      const cacheServer = await cachePlugin.server({ worktree } as any)
       const perfmonServer = await perfmonPlugin.server({ worktree } as any)
 
       expect(guardServer).toBeDefined()
-      expect(cacheServer).toBeDefined()
       expect(perfmonServer).toBeDefined()
     })
 
     it("all plugins have required hooks", async () => {
       const guardServer = await guardPlugin.server({ worktree } as any)
-      const cacheServer = await cachePlugin.server({ worktree } as any)
       const perfmonServer = await perfmonPlugin.server({ worktree } as any)
 
       expect(guardServer["permission.ask"]).toBeDefined()
-      expect(cacheServer["tool.execute.before"]).toBeDefined()
-      expect(cacheServer["tool.execute.after"]).toBeDefined()
       expect(perfmonServer["tool.execute.before"]).toBeDefined()
       expect(perfmonServer["tool.execute.after"]).toBeDefined()
     })
@@ -164,20 +142,6 @@ describe("Cross-Plugin Integration", () => {
       const stored = JSON.parse(await fs.readFile(configPath, "utf-8"))
       expect(stored.protectedFiles).toContain(".opencode/spec-memory/constitution.md")
       expect(stored.protectedAfterApproval).toContain("spec.json")
-    })
-
-    it("cache config can be created", async () => {
-      const cachePath = path.join(worktree, ".opencode", "cache", "cache.json")
-      const config = {
-        version: 1,
-        entries: [],
-        stats: { hits: 0, misses: 0, timeSaved: 0 },
-      }
-      await fs.writeFile(cachePath, JSON.stringify(config))
-
-      const stored = JSON.parse(await fs.readFile(cachePath, "utf-8"))
-      expect(stored.version).toBe(1)
-      expect(stored.entries).toHaveLength(0)
     })
 
     it("perfmon config can be created", async () => {

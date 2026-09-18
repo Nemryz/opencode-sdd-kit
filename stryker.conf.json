@@ -23,10 +23,8 @@
     "tools/speckit-selfheal.ts",
     "tools/speckit-status.ts",
     "tools/speckit-guard.ts",
-    "tools/speckit-cache.ts",
     "tools/speckit-perf.ts",
     "tools/plugins/speckit-perfmon.ts",
-    "tools/plugins/speckit-cache.ts",
     "tools/plugins/speckit-guard.ts"
   ],
   "thresholds": {
