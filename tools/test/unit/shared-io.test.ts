@@ -9,6 +9,7 @@ import {
   readSpecJson,
   writeSpecJson,
   writeWithBackup,
+  backupSourceKey,
   atomicWriteFile,
   getFeatureDirs,
   getLatestFeatureDir,
@@ -313,13 +314,14 @@ describe("writeWithBackup", () => {
     await fs.writeFile(fp, "base", "utf-8")
     const backupDir = path.join(root, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
+    const sourceKey = backupSourceKey(fp)
     for (let i = 0; i < 15; i++) {
-      await fs.writeFile(path.join(backupDir, `session.json.${i}.bak`), `old-${i}`, "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${1000 + i}.bak`), `old-${i}`, "utf-8")
     }
     await writeWithBackup(fp, "new", root)
     const baks = await fs.readdir(backupDir)
-    const bakFiles = baks.filter(f => f.endsWith(".bak"))
-    expect(bakFiles.length).toBeLessThanOrEqual(11)
+    const bakFiles = baks.filter(f => f.startsWith(`${sourceKey}.`) && f.endsWith(".bak"))
+    expect(bakFiles.length).toBe(10)
   })
 
   it("backup survives atomicWriteFile failure", async () => {

@@ -12,6 +12,7 @@ import {
   writeFileChecksum,
   verifyLiveFileChecksum,
   findLatestValidBackup,
+  backupSourceKey,
   verifyBackupIntegrity,
   pushCorruptionWarning,
   clearCorruptionWarnings,
@@ -119,9 +120,11 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
 
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
-      const bakFile = path.join(backupDir, `session.json.${Date.now()}.bak`)
-      await fs.writeFile(bakFile, JSON.stringify(valid), "utf-8")
-      await fs.writeFile(`${bakFile}.sha256`, "", "utf-8")
+      const content = JSON.stringify(valid)
+      const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
+      await fs.writeFile(bakFile, content, "utf-8")
+      const crypto = await import("node:crypto")
+      await fs.writeFile(`${bakFile}.sha256`, crypto.createHash("sha256").update(content).digest("hex"), "utf-8")
 
       await fs.writeFile(fp, "corrupted data", "utf-8")
       const result = await readSession(root)
@@ -137,9 +140,11 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
 
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
-      const bakFile = path.join(backupDir, `spec.json.${Date.now()}.bak`)
-      await fs.writeFile(bakFile, JSON.stringify(sj), "utf-8")
-      await fs.writeFile(`${bakFile}.sha256`, "", "utf-8")
+      const content = JSON.stringify(sj)
+      const bakFile = path.join(backupDir, `${backupSourceKey(specJsonPath(featureDir))}.${Date.now()}.bak`)
+      await fs.writeFile(bakFile, content, "utf-8")
+      const crypto = await import("node:crypto")
+      await fs.writeFile(`${bakFile}.sha256`, crypto.createHash("sha256").update(content).digest("hex"), "utf-8")
 
       const fp = specJsonPath(featureDir)
       await fs.writeFile(fp, "corrupted", "utf-8")
@@ -319,7 +324,11 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
       const fp = path.join(root, "test.json")
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
-      await fs.writeFile(path.join(backupDir, `test.json.${Date.now()}.bak`), "not json", "utf-8")
+      const content = JSON.stringify({ any: "data" })
+      const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
+      await fs.writeFile(bakFile, content, "utf-8")
+      const crypto = await import("node:crypto")
+      await fs.writeFile(`${bakFile}.sha256`, crypto.createHash("sha256").update(content).digest("hex"), "utf-8")
       const result = await findLatestValidBackup(fp, root, { safeParse: () => ({ success: false }) })
       expect(result).toBeNull()
     })
@@ -330,7 +339,11 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
       const validData = { key: "value" }
-      await fs.writeFile(path.join(backupDir, `test.json.${Date.now()}.bak`), JSON.stringify(validData), "utf-8")
+      const content = JSON.stringify(validData)
+      const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
+      await fs.writeFile(bakFile, content, "utf-8")
+      const crypto = await import("node:crypto")
+      await fs.writeFile(`${bakFile}.sha256`, crypto.createHash("sha256").update(content).digest("hex"), "utf-8")
       const schema = { safeParse: (d: unknown) => ({ success: true, data: d }) }
       const result = await findLatestValidBackup(fp, root, schema)
       expect(result).toEqual(validData)
@@ -341,10 +354,17 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
       const fp = path.join(root, "test.json")
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
+      const crypto = await import("node:crypto")
+      const hash = (c: string) => crypto.createHash("sha256").update(c).digest("hex")
+      const sourceKey = backupSourceKey(fp)
       const ts1 = Date.now() - 1000
       const ts2 = Date.now()
-      await fs.writeFile(path.join(backupDir, `test.json.${ts1}.bak`), JSON.stringify({ v: 1 }), "utf-8")
-      await fs.writeFile(path.join(backupDir, `test.json.${ts2}.bak`), JSON.stringify({ v: 2 }), "utf-8")
+      const c1 = JSON.stringify({ v: 1 })
+      const c2 = JSON.stringify({ v: 2 })
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts1}.bak`), c1, "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts1}.bak.sha256`), hash(c1), "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts2}.bak`), c2, "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts2}.bak.sha256`), hash(c2), "utf-8")
       const schema = { safeParse: (d: unknown) => ({ success: true, data: d }) }
       const result = await findLatestValidBackup(fp, root, schema)
       expect(result).toEqual({ v: 2 })
@@ -355,10 +375,17 @@ describe("Phase 4: IO Module - Mutation Score Improvement", () => {
       const fp = path.join(root, "test.json")
       const backupDir = path.join(root, ".opencode", "backups")
       await fs.mkdir(backupDir, { recursive: true })
+      const crypto = await import("node:crypto")
+      const hash = (c: string) => crypto.createHash("sha256").update(c).digest("hex")
+      const sourceKey = backupSourceKey(fp)
       const ts1 = Date.now() - 2000
       const ts2 = Date.now() - 1000
-      await fs.writeFile(path.join(backupDir, `test.json.${ts1}.bak`), JSON.stringify({ v: 1 }), "utf-8")
-      await fs.writeFile(path.join(backupDir, `test.json.${ts2}.bak`), "{invalid json", "utf-8")
+      const c1 = JSON.stringify({ v: 1 })
+      const c2 = "{invalid json"
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts1}.bak`), c1, "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts1}.bak.sha256`), hash(c1), "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts2}.bak`), c2, "utf-8")
+      await fs.writeFile(path.join(backupDir, `${sourceKey}.${ts2}.bak.sha256`), hash(c2), "utf-8")
       const schema = { safeParse: (d: unknown) => ({ success: true, data: d }) }
       const result = await findLatestValidBackup(fp, root, schema)
       expect(result).toEqual({ v: 1 })

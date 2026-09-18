@@ -399,10 +399,8 @@ describe("Phase 2: Health Module - Mutation Score Improvement", () => {
     it("shows backup info when available", async () => {
       const featureDir = await getFeatureDir()
       const sjFp = specJsonPath(featureDir)
-      const featureName = path.basename(featureDir)
-      const backupDir = path.join(worktree, ".opencode", "backups")
-      await fs.mkdir(backupDir, { recursive: true })
-      await fs.writeFile(path.join(backupDir, `${featureName}-spec.json.2026.bak`), "{}", "utf-8")
+      await writeWithBackup(sjFp, JSON.stringify(makeValidSpec(), null, 2), worktree)
+      await writeFileChecksum(sjFp)
 
       const result = await healthTool.execute({}, ctx)
       expect(result.output).toContain("backups")

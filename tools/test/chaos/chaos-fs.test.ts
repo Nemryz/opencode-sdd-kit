@@ -232,30 +232,39 @@ describe("Chaos: Partial write corruption", () => {
 
 describe("Chaos: Corrupt backup .bak", () => {
   it("findLatestValidBackup skips invalid backup content", async () => {
-    const { findLatestValidBackup } = await import("../../shared/io")
+    const { findLatestValidBackup, backupSourceKey } = await import("../../shared/io")
     const { SessionStateSchema } = await import("../../shared/schemas")
     const fp = path.join(tmpDir, ".opencode", "spec-memory", "session.json")
     const backupDir = path.join(tmpDir, ".opencode", "backups")
 
-    const timestamp = Date.now()
-    const bakFile = path.join(backupDir, `session.json.${timestamp}.bak`)
-    await fs.writeFile(bakFile, "not valid json {{{", "utf-8")
+    const content = "not valid json {{{"
+    const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
+    await fs.writeFile(bakFile, content, "utf-8")
+    const { createHash } = await import("node:crypto")
+    await fs.writeFile(`${bakFile}.sha256`, createHash("sha256").update(content).digest("hex"), "utf-8")
 
     const result = await findLatestValidBackup(fp, tmpDir, SessionStateSchema)
     expect(result).toBeNull()
   })
 
   it("findLatestValidBackup returns valid backup when others are corrupt", async () => {
-    const { findLatestValidBackup } = await import("../../shared/io")
+    const { findLatestValidBackup, backupSourceKey } = await import("../../shared/io")
     const { SessionStateSchema } = await import("../../shared/schemas")
     const fp = path.join(tmpDir, ".opencode", "spec-memory", "session.json")
     const backupDir = path.join(tmpDir, ".opencode", "backups")
+    const { createHash } = await import("node:crypto")
+    const hash = (c: string) => createHash("sha256").update(c).digest("hex")
+    const sourceKey = backupSourceKey(fp)
 
-    const badBak = path.join(backupDir, `session.json.${Date.now() - 1000}.bak`)
-    await fs.writeFile(badBak, "invalid", "utf-8")
+    const badContent = "invalid"
+    const badBak = path.join(backupDir, `${sourceKey}.${Date.now() - 1000}.bak`)
+    await fs.writeFile(badBak, badContent, "utf-8")
+    await fs.writeFile(`${badBak}.sha256`, hash(badContent), "utf-8")
 
-    const goodBak = path.join(backupDir, `session.json.${Date.now()}.bak`)
-    await fs.writeFile(goodBak, JSON.stringify(makeSession()), "utf-8")
+    const goodContent = JSON.stringify(makeSession())
+    const goodBak = path.join(backupDir, `${sourceKey}.${Date.now()}.bak`)
+    await fs.writeFile(goodBak, goodContent, "utf-8")
+    await fs.writeFile(`${goodBak}.sha256`, hash(goodContent), "utf-8")
 
     const result = await findLatestValidBackup(fp, tmpDir, SessionStateSchema)
     expect(result).not.toBeNull()

@@ -8,6 +8,7 @@ import {
   readSpecJson,
   writeSpecJson,
   writeWithBackup,
+  backupSourceKey,
   atomicWriteFile,
   writeFileChecksum,
   verifyLiveFileChecksum,
@@ -288,12 +289,11 @@ describe("Kill: runHealthCheck", () => {
     await fs.mkdir(featureDir, { recursive: true })
     await writeSpecJson(makeSpecJson("test", 1), featureDir)
 
-    // Create backup in the feature-specific backup dir structure
-    // The health check filters backups by f.includes(entry.name)
+    // Health counts backups by source key of the feature spec.json path
     const backupDir = path.join(root, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
     const sjContent = JSON.stringify(makeSpecJson("test", 1))
-    const bakFile = path.join(backupDir, "spec.json.001-test.999.bak")
+    const bakFile = path.join(backupDir, `${backupSourceKey(specJsonPath(featureDir))}.999.bak`)
     await fs.writeFile(bakFile, sjContent, "utf-8")
     const crypto = await import("node:crypto")
     const hash = crypto.createHash("sha256").update(sjContent).digest("hex")
@@ -302,7 +302,6 @@ describe("Kill: runHealthCheck", () => {
     const report = await runHealthCheck(root)
     const fh = report.features.find(f => f.dir === "001-test")
     expect(fh).toBeDefined()
-    // The backup filename contains "001-test" so it should be found
     expect(fh!.backups.total).toBe(1)
     expect(fh!.backups.valid).toBe(1)
   })
@@ -319,8 +318,9 @@ describe("Kill: runHealthCheck", () => {
     // Write backup with content that has a wrong checksum
     const content = "not valid json"
     const wrongHash = "0000000000000000000000000000000000000000000000000000000000000000"
-    await fs.writeFile(path.join(backupDir, "spec.json.001-test.999.bak"), content, "utf-8")
-    await fs.writeFile(path.join(backupDir, "spec.json.001-test.999.bak.sha256"), wrongHash, "utf-8")
+    const sourceKey = backupSourceKey(specJsonPath(featureDir))
+    await fs.writeFile(path.join(backupDir, `${sourceKey}.999.bak`), content, "utf-8")
+    await fs.writeFile(path.join(backupDir, `${sourceKey}.999.bak.sha256`), wrongHash, "utf-8")
 
     const report = await runHealthCheck(root)
     const fh = report.features.find(f => f.dir === "001-test")
@@ -998,7 +998,7 @@ describe("Kill: readSession corruption warning", () => {
     // Create a backup
     const backupDir = path.join(root, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
-    const bakFile = path.join(backupDir, `session.json.${Date.now()}.bak`)
+    const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
     await fs.writeFile(bakFile, JSON.stringify(valid), "utf-8")
     const crypto = await import("node:crypto")
     const hash = crypto.createHash("sha256").update(JSON.stringify(valid)).digest("hex")
@@ -1052,7 +1052,7 @@ describe("Kill: readConfigWithRestore", () => {
     const backupDir = path.join(root, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
     const valid = { ...DEFAULT_CONFIG, lastUsedLanguage: "fr" }
-    const bakFile = path.join(backupDir, `config.json.${Date.now()}.bak`)
+    const bakFile = path.join(backupDir, `${backupSourceKey(fp)}.${Date.now()}.bak`)
     await fs.writeFile(bakFile, JSON.stringify(valid), "utf-8")
     const crypto = await import("node:crypto")
     const hash = crypto.createHash("sha256").update(JSON.stringify(valid)).digest("hex")

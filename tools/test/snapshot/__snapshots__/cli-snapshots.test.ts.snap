@@ -71,9 +71,9 @@ exports[`Snapshot: /status (with corruption) > matches snapshot with corruption 
 [CORRUPTION] <PATH> Unexpected token 'i', "invalid json {{{" is not valid JSON"
 `;
 
-exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 1`] = `"Phase: plan"`;
+exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 1`] = `"Ready to implement"`;
 
-exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 2`] = `"spec.json phase: plan | spec ok | plan ok | tasks ok | Next: /tasks"`;
+exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 2`] = `"spec.json phase: ready | spec ok | plan ok | tasks ok | Next: /impl or /review"`;
 
 exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 1`] = `"Phase: spec"`;
 

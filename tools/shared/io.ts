@@ -1,6 +1,7 @@
 import path from "node:path"
 import fs from "node:fs/promises"
 import crypto from "node:crypto"
+import { AsyncLocalStorage } from "node:async_hooks"
 import {
   sessionPath,
   specJsonPath,
@@ -84,21 +85,41 @@ export interface LockHandle {
   lockDir: string
   filePath: string
   reentrant?: boolean
+  token?: string
+}
+
+interface LockInfo {
+  pid: number
+  createdAt: string
+  token?: string
 }
 
 const heldLocks = new Set<string>()
+const lockContext = new AsyncLocalStorage<Set<string>>()
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function readLockJson(lockDir: string): Promise<{ pid: number; createdAt: string } | null> {
+async function readLockJson(lockDir: string): Promise<LockInfo | null> {
   try {
     const data = await fs.readFile(path.join(lockDir, "lock.json"), "utf-8")
     return JSON.parse(data)
   } catch {
     return null
   }
+}
+
+async function removeLockDir(lockDir: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await fs.rm(lockDir, { recursive: true, force: true })
+      return true
+    } catch {
+      await sleep(10)
+    }
+  }
+  return false
 }
 
 function isPidAlive(pid: number): boolean {
@@ -113,14 +134,23 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
-export async function acquireLock(filePath: string, options?: LockOptions): Promise<LockHandle> {
+export async function acquireLock(
+  filePath: string,
+  options?: LockOptions,
+  internal?: { ignoreProcessHeld?: boolean },
+): Promise<LockHandle> {
   const lockDir = filePath + ".lock"
-  if (heldLocks.has(lockDir)) {
+  const contextHeld = lockContext.getStore()
+  if (contextHeld?.has(lockDir)) {
+    return { lockDir, filePath, reentrant: true }
+  }
+  if (!internal?.ignoreProcessHeld && heldLocks.has(lockDir)) {
     return { lockDir, filePath, reentrant: true }
   }
   const timeout = options?.timeout ?? 5000
   const staleThreshold = options?.staleThreshold ?? 10000
   const start = Date.now()
+  const token = `${process.pid}:${crypto.randomUUID()}`
 
   while (true) {
     try {
@@ -133,22 +163,32 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
       await fs.mkdir(lockDir, { recursive: false })
       await fs.writeFile(
         path.join(lockDir, "lock.json"),
-        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }),
+        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString(), token }),
         "utf-8",
       )
       heldLocks.add(lockDir)
-      return { lockDir, filePath, reentrant: false }
+      return { lockDir, filePath, reentrant: false, token }
     } catch (err) {
       if (isEEXIST(err)) {
         const info = await readLockJson(lockDir)
         if (info && info.pid !== process.pid && !isPidAlive(info.pid)) {
-          await fs.rm(lockDir, { recursive: true, force: true })
-          continue
+          if (await removeLockDir(lockDir)) continue
         }
+
+        let stale = false
         const createdAt = info ? new Date(info.createdAt).getTime() : NaN
-        if (!info || isNaN(createdAt) || (Date.now() - createdAt > staleThreshold)) {
-          await fs.rm(lockDir, { recursive: true, force: true })
-          continue
+        if (!info || isNaN(createdAt)) {
+          // lock.json missing or unreadable: the creator may be between mkdir and
+          // writeFile. Fall back to the directory mtime so a just-created lock is
+          // not stolen during that window (TOCTOU).
+          const stat = await fs.stat(lockDir).catch(() => null)
+          stale = stat ? Date.now() - stat.mtimeMs > staleThreshold : false
+        } else {
+          stale = Date.now() - createdAt > staleThreshold
+        }
+
+        if (stale) {
+          if (await removeLockDir(lockDir)) continue
         }
         if (Date.now() - start >= timeout) {
           throw new Error(`Lock timeout: could not acquire lock for ${filePath}`)
@@ -163,11 +203,15 @@ export async function acquireLock(filePath: string, options?: LockOptions): Prom
 
 export async function releaseLock(handle: LockHandle): Promise<void> {
   if (handle.reentrant) return
-  heldLocks.delete(handle.lockDir)
   try {
-    await fs.rm(handle.lockDir, { recursive: true, force: true })
+    const info = await readLockJson(handle.lockDir)
+    if (info?.token && info.token !== handle.token) {
+      return
+    }
+    heldLocks.delete(handle.lockDir)
+    await removeLockDir(handle.lockDir)
   } catch {
-    // idempotent
+    heldLocks.delete(handle.lockDir)
   }
 }
 
@@ -176,9 +220,16 @@ export function resetLocks(): void {
 }
 
 export async function withLock<T>(filePath: string, fn: () => Promise<T>, options?: LockOptions): Promise<T> {
-  const handle = await acquireLock(filePath, options)
+  const lockDir = filePath + ".lock"
+  const contextHeld = lockContext.getStore()
+  if (contextHeld?.has(lockDir)) {
+    return fn()
+  }
+  const handle = await acquireLock(filePath, options, { ignoreProcessHeld: true })
+  const nextHeld = new Set(contextHeld ?? [])
+  nextHeld.add(lockDir)
   try {
-    return await fn()
+    return await lockContext.run(nextHeld, fn)
   } finally {
     await releaseLock(handle)
   }
@@ -189,12 +240,23 @@ export async function withLock<T>(filePath: string, fn: () => Promise<T>, option
 const BACKUP_DIR_NAME = "backups"
 const MAX_BACKUPS = 10
 
+export function backupSourceKey(fp: string): string {
+  const normalized = process.platform === "win32" ? path.resolve(fp).toLowerCase() : path.resolve(fp)
+  return `${path.basename(fp)}.${computeSha256(normalized).slice(0, 8)}`
+}
+
+function backupTimestamp(name: string): number {
+  const match = name.match(/\.(\d+)\.bak$/)
+  return match ? Number(match[1]) : 0
+}
+
 export async function writeWithBackup(fp: string, data: string, root: string): Promise<void> {
   const existing = await fs.readFile(fp, "utf-8").catch(() => null)
   if (existing !== null) {
     const backupDir = path.join(root, ".opencode", BACKUP_DIR_NAME)
+    const sourceKey = backupSourceKey(fp)
     const timestamp = Date.now()
-    const bakFile = path.join(backupDir, `${path.basename(fp)}.${timestamp}.bak`)
+    const bakFile = path.join(backupDir, `${sourceKey}.${timestamp}.bak`)
     await fs.mkdir(backupDir, { recursive: true })
     
     await fs.writeFile(bakFile, existing, "utf-8")
@@ -208,10 +270,11 @@ export async function writeWithBackup(fp: string, data: string, root: string): P
     }
     
     const allBaks = await fs.readdir(backupDir).catch(() => [])
-    const bakFiles = allBaks.filter(f => f.endsWith(".bak"))
-    if (bakFiles.length > MAX_BACKUPS) {
-      const sorted = bakFiles.sort()
-      for (const old of sorted.slice(0, bakFiles.length - MAX_BACKUPS)) {
+    const sourceBaks = allBaks
+      .filter(f => f.startsWith(`${sourceKey}.`) && f.endsWith(".bak"))
+      .sort((a, b) => backupTimestamp(b) - backupTimestamp(a))
+    if (sourceBaks.length > MAX_BACKUPS) {
+      for (const old of sourceBaks.slice(MAX_BACKUPS)) {
         await fs.rm(path.join(backupDir, old), { force: true })
         await fs.rm(path.join(backupDir, `${old}.sha256`), { force: true })
       }
@@ -241,7 +304,7 @@ export async function findLatestValidBackup<T>(
   schema: { safeParse: (data: unknown) => { success: boolean; data?: T } },
 ): Promise<T | null> {
   const backupDir = path.join(root, ".opencode", BACKUP_DIR_NAME)
-  const basename = path.basename(fp)
+  const sourceKey = backupSourceKey(fp)
 
   let files: string[]
   try {
@@ -251,13 +314,15 @@ export async function findLatestValidBackup<T>(
   }
 
   const backups = files
-    .filter(f => f.startsWith(basename) && f.endsWith(".bak"))
-    .sort()
-    .reverse()
+    .filter(f => f.startsWith(`${sourceKey}.`) && f.endsWith(".bak"))
+    .sort((a, b) => backupTimestamp(b) - backupTimestamp(a))
 
   for (const bak of backups) {
     try {
-      const content = await fs.readFile(path.join(backupDir, bak), "utf-8")
+      const bakPath = path.join(backupDir, bak)
+      const content = await fs.readFile(bakPath, "utf-8")
+      const checksumValid = await verifyChecksum(bakPath, content)
+      if (!checksumValid) continue
       const parsed = JSON.parse(content)
       const result = schema.safeParse(parsed)
       if (result.success) {
@@ -319,7 +384,7 @@ export async function verifyBackupIntegrity(
         continue
       }
 
-      const basename = bak.replace(/\.\d+\.bak$/, "")
+      const basename = bak.replace(/\.\w{8}\.\d+\.bak$/, "").replace(/\.\d+\.bak$/, "")
       const schema = schemas[basename]
       if (schema) {
         const parsed = JSON.parse(content)
@@ -381,19 +446,14 @@ export async function readSession(root: string): Promise<SessionState> {
     const checksumValid = await verifyFileChecksum(fp)
     if (!checksumValid) {
       pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
-      const restored = await findLatestValidBackup<SessionState>(fp, root, SessionStateSchema)
-      if (restored) {
-        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
-        return restored
-      }
-      return { ...DEFAULT_SESSION }
     }
-    
+
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_SESSION, ...parsed }
     const result = SessionStateSchema.safeParse(merged)
     if (result.success) {
+      if (!checksumValid) await writeFileChecksum(fp)
       return result.data
     }
     pushCorruptionWarning(fp, result.error.message)
@@ -423,8 +483,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
     throw new Error(`writeSession: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = sessionPath(root)
-  const handle = await acquireLock(fp)
-  try {
+  await withLock(fp, async () => {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
     await writeFileChecksum(fp)
     
@@ -439,9 +498,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
     if (!checksumValid) {
       throw new Error(`writeSession: post-write checksum verification failed`)
     }
-  } finally {
-    await releaseLock(handle)
-  }
+  })
   await tryAutoCommit(fp, root)
 }
 
@@ -454,18 +511,13 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
     const checksumValid = await verifyFileChecksum(fp)
     if (!checksumValid) {
       pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted")
-      const restored = await findLatestValidBackup<SpecJson>(fp, root, SpecJsonSchema)
-      if (restored) {
-        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
-        return restored
-      }
-      return null
     }
-    
+
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const result = SpecJsonSchema.safeParse(parsed)
     if (result.success) {
+      if (!checksumValid) await writeFileChecksum(fp)
       return result.data
     }
     pushCorruptionWarning(fp, result.error.message)
@@ -497,8 +549,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
   }
   const root = path.dirname(path.dirname(featureDir))
   const fp = specJsonPath(featureDir)
-  const handle = await acquireLock(fp)
-  try {
+  await withLock(fp, async () => {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
     await writeFileChecksum(fp)
     
@@ -513,9 +564,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
     if (!checksumValid) {
       throw new Error(`writeSpecJson: post-write checksum verification failed`)
     }
-  } finally {
-    await releaseLock(handle)
-  }
+  })
   await tryAutoCommit(fp, root)
 }
 
@@ -528,14 +577,16 @@ export async function readConfig(root: string): Promise<SDDConfig> {
     const checksumValid = await verifyFileChecksum(fp)
     if (!checksumValid) {
       pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted", configSuggestion)
-      return { ...DEFAULT_CONFIG }
     }
-    
+
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
-    if (result.success) return result.data
+    if (result.success) {
+      if (!checksumValid) await writeFileChecksum(fp)
+      return result.data
+    }
     pushCorruptionWarning(fp, result.error.message, configSuggestion)
     return { ...DEFAULT_CONFIG }
   } catch (err) {
@@ -746,13 +797,10 @@ export async function writeConfigWithBackup(root: string, cfg: SDDConfig): Promi
     throw new Error(`writeConfigWithBackup: validation failed, data not written: ${String(result.error)}`)
   }
   const fp = configPath(root)
-  const handle = await acquireLock(fp)
-  try {
+  await withLock(fp, async () => {
     await writeWithBackup(fp, JSON.stringify(result.data, null, 2), root)
     await writeFileChecksum(fp)
-  } finally {
-    await releaseLock(handle)
-  }
+  })
   await tryAutoCommit(fp, root)
 }
 
@@ -763,19 +811,16 @@ export async function readConfigWithRestore(root: string): Promise<SDDConfig> {
     const checksumValid = await verifyLiveFileChecksum(fp)
     if (!checksumValid) {
       pushCorruptionWarning(fp, "checksum mismatch, file may be corrupted", configSuggestion)
-      const restored = await findLatestValidBackup<SDDConfig>(fp, root, ConfigSchema)
-      if (restored) {
-        console.warn(`[SDD] Restored ${fp} from backup (checksum mismatch)`)
-        return restored
-      }
-      return { ...DEFAULT_CONFIG }
     }
 
     const data = await fs.readFile(fp, "utf-8")
     const parsed = JSON.parse(data)
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
-    if (result.success) return result.data
+    if (result.success) {
+      if (!checksumValid) await writeFileChecksum(fp)
+      return result.data
+    }
     pushCorruptionWarning(fp, result.error.message, configSuggestion)
     const restored = await findLatestValidBackup<SDDConfig>(fp, root, ConfigSchema)
     if (restored) {
@@ -900,7 +945,8 @@ export async function runHealthCheck(projectRoot: string): Promise<HealthReport>
         const backupDir = path.join(projectRoot, ".opencode", BACKUP_DIR_NAME)
         try {
           const bakFiles = await fs.readdir(backupDir)
-          const featureBaks = bakFiles.filter(f => f.includes(entry.name) && f.endsWith(".bak"))
+          const sjSourceKey = backupSourceKey(sjFp)
+          const featureBaks = bakFiles.filter(f => f.startsWith(`${sjSourceKey}.`) && f.endsWith(".bak"))
           featureHealth.backups.total = featureBaks.length
           for (const bak of featureBaks) {
             const bakPath = path.join(backupDir, bak)

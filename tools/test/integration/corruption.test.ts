@@ -4,11 +4,14 @@ import path from "node:path"
 import auditTool from "../../speckit-audit"
 import {
   readConfig,
+  readConfigWithRestore,
   readSession,
   readSpecJson,
   writeSession,
   writeSpecJson,
   writeWithBackup,
+  writeFileChecksum,
+  backupSourceKey,
   verifyBackupIntegrity,
   sessionPath,
   specJsonPath,
@@ -20,6 +23,8 @@ import {
   BackupIntegrityReport,
   makeSpecJson,
   specsDirPath,
+  DEFAULT_SESSION,
+  DEFAULT_CONFIG,
 } from "../../shared/types"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
 
@@ -161,9 +166,21 @@ describe("auto restore from backup", () => {
     const sjp = specJsonPath(specDir)
     const backupDir = path.join(worktree, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
-    await fs.writeFile(path.join(backupDir, "spec.json.1000.bak"), "{invalid", "utf-8")
+    const sourceKey = backupSourceKey(sjp)
+    const { createHash } = await import("node:crypto")
+    const hash = (c: string) => createHash("sha256").update(c).digest("hex")
+
+    const badContent = "{invalid"
+    const badBak = path.join(backupDir, `${sourceKey}.2000.bak`)
+    await fs.writeFile(badBak, badContent, "utf-8")
+    await fs.writeFile(`${badBak}.sha256`, hash(badContent), "utf-8")
+
     const validSpec = makeSpecJson("auth", 1)
-    await fs.writeFile(path.join(backupDir, "spec.json.2000.bak"), JSON.stringify(validSpec), "utf-8")
+    const goodContent = JSON.stringify(validSpec)
+    const goodBak = path.join(backupDir, `${sourceKey}.1000.bak`)
+    await fs.writeFile(goodBak, goodContent, "utf-8")
+    await fs.writeFile(`${goodBak}.sha256`, hash(goodContent), "utf-8")
+
     await fs.writeFile(sjp, "{corrupt", "utf-8")
     clearCorruptionWarnings()
     const result = await readSpecJson(specDir)
@@ -177,11 +194,59 @@ describe("auto restore from backup", () => {
     const sjp = specJsonPath(specDir)
     const backupDir = path.join(worktree, ".opencode", "backups")
     await fs.mkdir(backupDir, { recursive: true })
-    await fs.writeFile(path.join(backupDir, "spec.json.1000.bak"), "{invalid", "utf-8")
+    const badContent = "{invalid"
+    const badBak = path.join(backupDir, `${backupSourceKey(sjp)}.1000.bak`)
+    await fs.writeFile(badBak, badContent, "utf-8")
+    const { createHash } = await import("node:crypto")
+    await fs.writeFile(`${badBak}.sha256`, createHash("sha256").update(badContent).digest("hex"), "utf-8")
     await fs.writeFile(sjp, "{corrupt", "utf-8")
     clearCorruptionWarnings()
     const result = await readSpecJson(specDir)
     expect(result).toBeNull()
+  })
+
+  it("does not restore another feature's spec.json backup", async () => {
+    const dir1 = path.join(specsDirPath(worktree), "001-auth")
+    const dir2 = path.join(specsDirPath(worktree), "002-billing")
+    await fs.mkdir(dir1, { recursive: true })
+    await fs.mkdir(dir2, { recursive: true })
+    const sj1 = makeSpecJson("auth", 1)
+    await writeSpecJson(sj1, dir1)
+    await writeSpecJson(sj1, dir2)
+    await writeSpecJson({ ...sj1, phase: "plan" }, dir1)
+
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const key2 = backupSourceKey(specJsonPath(dir2))
+    const bak2 = (await fs.readdir(backupDir)).filter(f => f.startsWith(`${key2}.`) && f.endsWith(".bak"))
+    expect(bak2).toHaveLength(0)
+
+    await fs.writeFile(specJsonPath(dir2), "{corrupt", "utf-8")
+    clearCorruptionWarnings()
+    const result = await readSpecJson(dir2)
+    expect(result).toBeNull()
+  })
+
+  it("retains backups per source instead of globally", async () => {
+    const dir1 = path.join(specsDirPath(worktree), "001-auth")
+    const dir2 = path.join(specsDirPath(worktree), "002-billing")
+    await fs.mkdir(dir1, { recursive: true })
+    await fs.mkdir(dir2, { recursive: true })
+    const sj = makeSpecJson("auth", 1)
+    for (let i = 0; i < 12; i++) {
+      await writeSpecJson({ ...sj, phase: i % 2 === 0 ? "spec" : "plan" }, dir1)
+    }
+    for (let i = 0; i < 3; i++) {
+      await writeSpecJson({ ...sj, phase: i % 2 === 0 ? "spec" : "plan" }, dir2)
+    }
+
+    const backupDir = path.join(worktree, ".opencode", "backups")
+    const files = await fs.readdir(backupDir)
+    const key1 = backupSourceKey(specJsonPath(dir1))
+    const key2 = backupSourceKey(specJsonPath(dir2))
+    const count1 = files.filter(f => f.startsWith(`${key1}.`) && f.endsWith(".bak")).length
+    const count2 = files.filter(f => f.startsWith(`${key2}.`) && f.endsWith(".bak")).length
+    expect(count1).toBe(10)
+    expect(count2).toBe(2)
   })
 
   it("returns null when backup directory is missing", async () => {
@@ -250,7 +315,7 @@ describe("checksum verification", () => {
     expect(result.phase).toBe("init")
   })
 
-  it("readSpecJson verifies checksum before parsing", async () => {
+  it("accepts intact live spec.json when checksum is stale", async () => {
     const specDir = path.join(specsDirPath(worktree), "001-auth")
     await fs.mkdir(specDir, { recursive: true })
     const sjp = specJsonPath(specDir)
@@ -267,7 +332,7 @@ describe("checksum verification", () => {
     clearCorruptionWarnings()
     const result = await readSpecJson(specDir)
     expect(result).not.toBeNull()
-    expect(result?.feature_name).toBe("auth")
+    expect(result?.feature_name).toBe("auth-updated")
   })
 
   it("readConfig verifies checksum before parsing", async () => {
@@ -411,5 +476,67 @@ describe("verifyBackupIntegrity", () => {
     expect(report.totalBackups).toBe(0)
     expect(report.valid).toBe(0)
     expect(report.corrupted).toBe(0)
+  })
+})
+
+describe("checksum mismatch tolerance with intact live JSON", () => {
+  it("readSession accepts intact live file and refreshes checksum", async () => {
+    const sp = sessionPath(worktree)
+    await fs.mkdir(path.dirname(sp), { recursive: true })
+    const valid = { ...DEFAULT_SESSION, phase: "plan" as const, featureDir: "001-auth" }
+    await writeSession(worktree, valid)
+    await fs.writeFile(sp, JSON.stringify({ ...valid, phase: "tasks" }), "utf-8")
+    clearCorruptionWarnings()
+    const result = await readSession(worktree)
+    expect(result.phase).toBe("tasks")
+    clearCorruptionWarnings()
+    const second = await readSession(worktree)
+    expect(second.phase).toBe("tasks")
+    expect(corruptionWarnings.filter(w => w.file === sp)).toHaveLength(0)
+  })
+
+  it("readSpecJson accepts intact live file and refreshes checksum", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    await writeSpecJson(makeSpecJson("auth", 1), specDir)
+    const fp = specJsonPath(specDir)
+    const updated = { ...makeSpecJson("auth", 1), phase: "plan" as const }
+    await fs.writeFile(fp, JSON.stringify(updated), "utf-8")
+    clearCorruptionWarnings()
+    const result = await readSpecJson(specDir)
+    expect(result?.phase).toBe("plan")
+    clearCorruptionWarnings()
+    const second = await readSpecJson(specDir)
+    expect(second?.phase).toBe("plan")
+    expect(corruptionWarnings.filter(w => w.file === fp)).toHaveLength(0)
+  })
+
+  it("readConfigWithRestore accepts intact live file and refreshes checksum", async () => {
+    const fp = configPath(worktree)
+    await fs.mkdir(path.dirname(fp), { recursive: true })
+    const cfg = { ...DEFAULT_CONFIG, lastUsedLanguage: "es" }
+    await fs.writeFile(fp, JSON.stringify(cfg), "utf-8")
+    await writeFileChecksum(fp)
+    await fs.writeFile(fp, JSON.stringify({ ...cfg, lastUsedLanguage: "fr" }), "utf-8")
+    clearCorruptionWarnings()
+    const result = await readConfigWithRestore(worktree)
+    expect(result.lastUsedLanguage).toBe("fr")
+    clearCorruptionWarnings()
+    const second = await readConfigWithRestore(worktree)
+    expect(second.lastUsedLanguage).toBe("fr")
+    expect(corruptionWarnings.filter(w => w.file === fp)).toHaveLength(0)
+  })
+
+  it("still restores from backup when live JSON is invalid", async () => {
+    const specDir = path.join(specsDirPath(worktree), "001-auth")
+    await fs.mkdir(specDir, { recursive: true })
+    const sjp = specJsonPath(specDir)
+    await writeSpecJson(makeSpecJson("auth", 1), specDir)
+    await writeWithBackup(sjp, JSON.stringify(makeSpecJson("auth", 1)), worktree)
+    await fs.writeFile(sjp, "{not valid json", "utf-8")
+    clearCorruptionWarnings()
+    const result = await readSpecJson(specDir)
+    expect(result).not.toBeNull()
+    expect(result?.feature_name).toBe("auth")
   })
 })
