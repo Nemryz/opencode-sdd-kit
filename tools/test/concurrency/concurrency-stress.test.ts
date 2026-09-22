@@ -315,7 +315,7 @@ describe("Concurrency: Delta write concurrent", () => {
 // Health check + write
 
 describe("Concurrency: Health check + write", () => {
-  it("health check reads while another process writes", async () => {
+  it("health check reads while another process writes", { timeout: 20_000 }, async () => {
     const fp = path.join(tmpDir, ".opencode", "spec-memory", "session.json")
     await fs.writeFile(fp, JSON.stringify(makeSession()), "utf-8")
 

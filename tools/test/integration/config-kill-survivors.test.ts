@@ -64,7 +64,7 @@ describe("config kill survivors - projectWarnings path", () => {
     }
   })
 
-  it("joins multiple warnings with a blank line separator", async () => {
+  it.skipIf(process.platform !== "win32")("joins multiple warnings with a blank line separator", async () => {
     const rootBin = "C:\\bin"
     let exists = true
     try {
