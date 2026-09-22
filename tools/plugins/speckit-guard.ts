@@ -46,6 +46,7 @@ export const DEFAULT_CONFIG: GuardConfig = {
     ".opencode/steering/tech.md",
     ".opencode/steering/structure.md",
     ".opencode/guard.json",
+    "spec.json",
   ],
   protectedAfterApproval: ["spec.json", "spec.md", "plan.md", "tasks.md"],
   protectedByPhase: {

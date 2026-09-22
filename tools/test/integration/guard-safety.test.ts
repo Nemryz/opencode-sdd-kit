@@ -120,6 +120,39 @@ describe("guard self protection", () => {
   })
 })
 
+describe("guard spec.json anti-forgery protection", () => {
+  it("always protects spec.json of any feature by basename", () => {
+    const reason = isProtectedFile(path.join(worktree, "specs", "001-test", "spec.json"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+    expect(reason).toContain("spec.json")
+  })
+
+  it("protects spec.json even when the feature file does not exist yet", () => {
+    const reason = isProtectedFile(path.join(worktree, "specs", "002-other", "spec.json"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+  })
+
+  it("denies edit of spec.json via hook", async () => {
+    const output = await runHook("edit", path.join(worktree, "specs", "001-test", "spec.json"))
+    expect(output.status).toBe("deny")
+  })
+
+  it("denies shell redirect to spec.json", async () => {
+    const output = await runHook("bash", "echo forged > specs/001-test/spec.json")
+    expect(output.status).toBe("deny")
+  })
+
+  it.skipIf(process.platform === "linux")("matches SPEC.JSON case-insensitively", () => {
+    const reason = isProtectedFile(path.join(worktree, "specs", "001-test", "SPEC.JSON"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+  })
+
+  it("still allows editing non-protected feature files", async () => {
+    const output = await runHook("edit", path.join(worktree, "specs", "001-test", "notes.md"))
+    expect(output.status).toBe("ask")
+  })
+})
+
 describe("guard config schema robustness", () => {
   it("falls back to defaults for invalid types", async () => {
     await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
