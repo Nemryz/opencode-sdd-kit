@@ -19,7 +19,7 @@ You MUST follow this order. Never skip a phase.
 5. **Review** (`/review`) — Check cross-artifact consistency before implementation.
 6. **Implementation** (`/impl`) — Execute tasks in dependency order.
 
-**Approval gates:** each artifact must be approved before the next phase runs. Use `/approve spec` before `/plan`, `/approve plan` before `/tasks`, and `/approve tasks` before `/impl`. The pre-validation gates in the commands enforce this.
+**Approval gates:** each artifact must be approved before the next phase runs. Use `/approve spec` before `/plan`, `/approve plan` before `/tasks`, and `/approve tasks` before `/impl`. The pre-validation gates in the commands enforce this. Approvals are permission-gated (`speckit-approve: ask`), so opencode prompts the user to confirm — the agent must never approve on the user's behalf.
 
 Support: `/status` — show concise current phase and next step.
 
@@ -292,6 +292,9 @@ Examples:
 5. If the user asks for implementation while in the `spec` agent, suggest switching to `build`.
 6. All artifacts are written in English by default.
 7. The `[NEEDS CLARIFICATION]` marker means stop and ask the user before proceeding.
+8. NEVER edit `spec.json`, `session.json`, `config.json` or `guard.json` by hand. Use the suite tools; the guard blocks direct edits to critical state files.
+9. If a phase gate blocks, tell the user which `/approve <artifact>` to run. Never self-approve — approval requires explicit user confirmation.
+10. Resolve the model per session. `agent.<name>.model` is only a preference for when the agent is selected; switching agents does not change an existing session's model.
 
 ---
 
