@@ -44,7 +44,7 @@ Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.tasks.
 - Run tests after every implementation task
 - Never skip a task silently
 - If tests fail, fix them before proceeding
-- Report progress after each phase
+- Report progress after each phase, including a suggested commit (files + message) for the user to apply
 - On completion, run: build check, full test suite, lint check, manual verification
 - When all phases pass final verification, call `speckit-phase` with `phase: complete`
 

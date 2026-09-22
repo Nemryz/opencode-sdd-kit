@@ -102,11 +102,13 @@ If a task is complex, dispatch sub-agents:
 
 Use `_Boundary: ComponentName_` annotations from `tasks.md` to assign scope to each sub-agent. Clear ownership prevents overlap and merge conflicts.
 
-Max 2 debug rounds per task. If still blocked after 2 rounds, mark `_Blocked:_` with reason.
+Max 2 debug rounds per task. If still blocked after 2 rounds, report the blocked task and root cause in your summary (do NOT edit tasks.md — it is protected after approval).
 
-**Commit discipline:**
-- Stage only files changed for this task (never `git add -A` or `git add .`)
-- Commit format: `feat(<feature>): <task description>`
+**Commit suggestions per phase:**
+- After each phase completes with green tests/lint/build, propose a commit to the user: list that phase's files and a suggested message `feat(<feature>): phase N — <summary>`
+- Never run `git add -A` or `git add .`; stage only that phase's files
+- If the repository has no commits yet, suggest an initial commit for the scaffold (package.json, configs, .gitignore) before the first phase commit
+- Wait for the user's go-ahead before committing, unless the user asked you to commit automatically
 
 ### Step 5: Run Tests After Each Phase
 
@@ -148,7 +150,7 @@ Within a phase, respect the dependency DAG. Run `[P]` tasks concurrently.
 ## Safety & Fallback
 
 ### Error: Task blocked after 2 debug rounds
-- **Stop**: Mark task as `_Blocked: <reason>_` in tasks.md
+- **Stop**: Report the task as `_Blocked: <reason>_` in your summary (tasks.md is protected after approval; do not edit it)
 - **Recovery**: Report to user with root cause analysis. Human intervention required.
 
 ### Error: Tests fail after implementation

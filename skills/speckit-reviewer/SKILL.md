@@ -127,7 +127,7 @@ If `UPSTREAM`, name the owning spec and explain which dependent specs need reval
 ### Step 6: kiro-verify-completion Protocol
 
 After implementation review, validate completeness:
-1. All tasks marked `[x]` in tasks.md
+1. Task completion is verified by evidence — test tasks exist and pass, and each task's deliverable is present and exercised (tasks.md is immutable after approval: no `[x]` markers are required or expected)
 2. Full test suite passes
 3. Build succeeds
 4. Lint passes
