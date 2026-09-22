@@ -44,11 +44,6 @@ export default tool({
         }
       }
 
-      if (!args.artifact) {
-        return { title: "Error", output: "Artifact required. Usage: /approve spec | /approve plan | /approve tasks" }
-      }
-      const artifact = args.artifact
-
       const session = await readSession(projectRoot)
       const featureDir = session.featureDir ?? await getLatestFeatureDir(projectRoot)
       if (!featureDir) {
@@ -60,6 +55,24 @@ export default tool({
       if (!specJson) {
         return { title: "Error", output: `spec.json not found in specs/${featureDir}` }
       }
+
+      if (!args.artifact) {
+        const order = ["spec", "plan", "tasks"] as const
+        const states = order.map(a => {
+          const state = specJson.approvals[a]
+          if (!state.generated) return `${a}: not generated`
+          if (state.approved) return `${a}: approved`
+          return `${a}: pending`
+        })
+        const pending = order.find(a => specJson.approvals[a].generated && !specJson.approvals[a].approved) ?? null
+        const hint = pending ? `  Next: /approve ${pending}` : ""
+        return {
+          title: pending ? `Approval pending: ${pending}` : "Approval status",
+          output: states.join(" | ") + hint,
+          metadata: { artifact: null, pending, featureDir, approvals: specJson.approvals },
+        }
+      }
+      const artifact = args.artifact
 
       const artifactFile = ARTIFACT_FILES[artifact]
       if (!await exists(path.join(base, artifactFile))) {

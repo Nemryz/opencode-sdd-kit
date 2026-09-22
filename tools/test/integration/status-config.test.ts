@@ -4,6 +4,7 @@ import path from "node:path"
 import statusTool from "../../speckit-status"
 import configTool from "../../speckit-config"
 import scaffoldTool from "../../speckit-scaffold"
+import approveTool from "../../speckit-approve"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
 import { readSession, writeSession, readSpecJson, writeSpecJson, configPath } from "../../shared/types"
 
@@ -39,6 +40,24 @@ describe("status", () => {
     expect(result.metadata?.featureCount).toBe(1)
     expect(result.metadata?.features[0].dir).toBe("001-auth")
     expect(result.metadata?.features[0].phase).toBe("spec")
+  })
+
+  it("shows approval-aware next step until the spec is approved", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const result = await statusTool.execute({}, ctx)
+    expect(result.metadata?.nextCommand).toBe("/approve spec")
+    expect(result.output).toContain("Next: /approve spec")
+    const session = await readSession(worktree)
+    expect(session.nextStep).toBe("/approve spec")
+  })
+
+  it("falls back to the phase next step once the spec is approved", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec" }, ctx)
+    const result = await statusTool.execute({}, ctx)
+    expect(result.metadata?.nextCommand).toBe("/plan <tech stack>")
   })
 
   it("reports multiple features with different phases", async () => {

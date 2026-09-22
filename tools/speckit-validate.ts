@@ -11,6 +11,7 @@ import {
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   reconstructFromFrontmatter,
+  approvalAwareNextStep,
   SpecJson,
   SessionState,
   PHASE_NEXT_STEP,
@@ -120,7 +121,7 @@ export default tool({
           nextStep = constitutionExists ? "/spec <description>" : "create constitution.md first"
         } else if (specJsonPhase && !mismatch) {
           phase = specJsonPhase
-          nextStep = PHASE_NEXT_STEP[phase] ?? "/review"
+          nextStep = approvalAwareNextStep(specJson, PHASE_NEXT_STEP[phase] ?? "/review")
         } else {
           ;({ phase, nextStep } = detectPhase(specOk, planOk, tasksOk, constitutionExists))
         }

@@ -97,6 +97,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(v1.metadata?.phase).toBe("spec")
     expect(v1.metadata?.artifacts?.spec).toBe(true)
     expect(v1.metadata?.artifacts?.plan).toBe(false)
+    expect(v1.metadata?.nextCommand).toBe("/approve spec")
 
     await scaffoldTool.execute({ featureName: "Login", template: "plan" }, ctx)
     const v2 = await validateTool.execute({ featureDir: "001-login" }, ctx)

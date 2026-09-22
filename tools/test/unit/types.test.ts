@@ -15,6 +15,7 @@ import {
   detectParentProjectWithoutSession,
   parsePhase,
   makeSpecJson,
+  approvalAwareNextStep,
   PHASE_NEXT_STEP,
   DEFAULT_SESSION,
   DEFAULT_CONFIG,
@@ -802,5 +803,48 @@ describe("ConfigSchema unknown field stripping", () => {
     if (r.success) {
       expect((r.data as any).extra_field).toBeUndefined()
     }
+  })
+})
+
+describe("approvalAwareNextStep", () => {
+  const withApprovals = (spec: boolean, plan: boolean, tasks: boolean) => ({
+    ...makeSpecJson("test", 1),
+    approvals: {
+      spec: { generated: true, approved: spec },
+      plan: { generated: true, approved: plan },
+      tasks: { generated: true, approved: tasks },
+    },
+  })
+
+  it("returns the fallback for null spec.json", () => {
+    expect(approvalAwareNextStep(null, "/plan <tech stack>")).toBe("/plan <tech stack>")
+  })
+
+  it("asks to approve spec when it is generated but not approved", () => {
+    expect(approvalAwareNextStep(withApprovals(false, false, false), "/tasks")).toBe("/approve spec")
+  })
+
+  it("asks to approve plan when spec is approved and plan is not", () => {
+    expect(approvalAwareNextStep(withApprovals(true, false, false), "/tasks")).toBe("/approve plan")
+  })
+
+  it("asks to approve tasks when previous artifacts are approved", () => {
+    expect(approvalAwareNextStep(withApprovals(true, true, false), "/impl or /review")).toBe("/approve tasks")
+  })
+
+  it("returns the fallback when everything is approved", () => {
+    expect(approvalAwareNextStep(withApprovals(true, true, true), "/impl or /review")).toBe("/impl or /review")
+  })
+
+  it("ignores artifacts that were never generated", () => {
+    const sj = {
+      ...makeSpecJson("test", 1),
+      approvals: {
+        spec: { generated: true, approved: true },
+        plan: { generated: false, approved: false },
+        tasks: { generated: false, approved: false },
+      },
+    }
+    expect(approvalAwareNextStep(sj, "/tasks")).toBe("/tasks")
   })
 })

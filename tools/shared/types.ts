@@ -299,6 +299,14 @@ export function detectPhaseFromFiles(
   return "ready"
 }
 
+export function approvalAwareNextStep(sj: SpecJson | null, fallback: string): string {
+  if (!sj) return fallback
+  if (sj.approvals.spec.generated && !sj.approvals.spec.approved) return "/approve spec"
+  if (sj.approvals.plan.generated && !sj.approvals.plan.approved) return "/approve plan"
+  if (sj.approvals.tasks.generated && !sj.approvals.tasks.approved) return "/approve tasks"
+  return fallback
+}
+
 // ─────────────────────────── Feature directory utilities ───────────────────────────
 
 export async function getFeatureDirs(projectRoot: string): Promise<string[]> {

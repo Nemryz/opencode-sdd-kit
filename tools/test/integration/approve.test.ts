@@ -86,11 +86,47 @@ describe("approve tool", () => {
     expect(sjAfter).toEqual(sjBefore)
   })
 
-  it("errors without an artifact argument", async () => {
+  it("lists pending approvals without an artifact argument", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
     const result = await approveTool.execute({}, ctx)
+    expect(result.title).toBe("Approval pending: spec")
+    expect(result.output).toContain("spec: pending")
+    expect(result.output).toContain("plan: not generated")
+    expect(result.output).toContain("tasks: not generated")
+    expect(result.output).toContain("Next: /approve spec")
+    expect(result.metadata?.pending).toBe("spec")
+  })
+
+  it("moves the pending hint to plan after spec is approved", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
+    await approveTool.execute({ artifact: "spec" }, ctx)
+    const result = await approveTool.execute({}, ctx)
+    expect(result.title).toBe("Approval pending: plan")
+    expect(result.output).toContain("spec: approved")
+    expect(result.output).toContain("plan: pending")
+    expect(result.output).toContain("Next: /approve plan")
+  })
+
+  it("reports fully approved status without a pending hint", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "tasks" }, ctx)
+    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "plan" }, ctx)
+    await approveTool.execute({ artifact: "tasks" }, ctx)
+    const result = await approveTool.execute({}, ctx)
+    expect(result.title).toBe("Approval status")
+    expect(result.output).toContain("spec: approved")
+    expect(result.output).toContain("plan: approved")
+    expect(result.output).toContain("tasks: approved")
+    expect(result.output).not.toContain("Next:")
+  })
+
+  it("errors when no feature exists and no artifact argument", async () => {
+    const result = await approveTool.execute({}, ctx)
     expect(result.title).toBe("Error")
-    expect(result.output).toContain("Artifact required")
+    expect(result.output).toContain("No feature found")
   })
 
   it("errors when the artifact file does not exist", async () => {

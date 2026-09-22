@@ -73,8 +73,8 @@ exports[`Snapshot: /status (with corruption) > matches snapshot with corruption 
 
 exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 1`] = `"Ready to implement"`;
 
-exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 2`] = `"spec.json phase: ready | spec ok | plan ok | tasks ok | Next: /impl or /review"`;
+exports[`Snapshot: /validate (ready phase) > matches snapshot for ready phase validation 2`] = `"spec.json phase: ready | spec ok | plan ok | tasks ok | Next: /approve spec"`;
 
 exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 1`] = `"Phase: spec"`;
 
-exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 2`] = `"spec.json phase: spec | spec ok | plan missing | tasks missing | Next: /plan <tech stack>"`;
+exports[`Snapshot: /validate (spec phase) > matches snapshot for spec phase validation 2`] = `"spec.json phase: spec | spec ok | plan missing | tasks missing | Next: /approve spec"`;

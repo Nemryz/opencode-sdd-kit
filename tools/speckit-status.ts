@@ -10,8 +10,10 @@ import {
   isValidProjectRoot,
   getProjectRootWarnings,
   reconstructFromFrontmatter,
+  approvalAwareNextStep,
   PHASE_NEXT_STEP,
   SessionState,
+  SpecJson,
   constitutionPath,
   specsDirPath,
   sessionPath,
@@ -42,6 +44,8 @@ export default tool({
       const phaseCounts: Record<string, number> = {}
       let latest: string | null = null
       let latestPhase: SessionState["phase"] | "none" | "unknown" = "none"
+      let latestSj: SpecJson | null = null
+      let computedNext = "/spec <description>"
       let summary = "No features yet."
 
       await withLock(sessionPath(projectRoot), async () => {
@@ -61,6 +65,9 @@ export default tool({
 
           if (!sj) {
             sj = await reconstructFromFrontmatter(base)
+          }
+          if (dir === latest) {
+            latestSj = sj
           }
 
           let phase: SessionState["phase"]
@@ -87,7 +94,11 @@ export default tool({
           session.phase = latestPhase
         }
         session.featureDir = latest
-        session.nextStep = PHASE_NEXT_STEP[session.phase] ?? "/spec <description>"
+        computedNext = approvalAwareNextStep(
+          latestSj,
+          PHASE_NEXT_STEP[latestPhase] ?? "/spec <description>",
+        )
+        session.nextStep = computedNext
         session.lastResult = summary
         session.history.push("/status")
         if (session.history.length > 20) session.history = session.history.slice(-20)
@@ -101,7 +112,7 @@ export default tool({
       const corruptionPart = corruptionLines.length > 0 ? "\n" + corruptionLines.join("\n") : ""
       const line = dirs.length === 0
         ? "No features yet. Next: /spec <description>" + corruptionPart
-        : `${summary}  ${dashboard}${corruptionPart}`
+        : `${summary}  ${dashboard}  Next: ${computedNext}${corruptionPart}`
 
       return {
         title: `Status: ${dirs.length} feature(s)` + (corruptionLines.length > 0 ? " [corruption detected]" : ""),
@@ -113,7 +124,7 @@ export default tool({
           latestFeature: latest,
           constitutionExists,
           phaseCounts,
-          nextCommand: PHASE_NEXT_STEP[latestPhase] ?? "/spec <description>",
+          nextCommand: computedNext,
         },
       }
     } catch (err) {
