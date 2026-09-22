@@ -179,7 +179,7 @@ export default tool({
         if (patternReason) {
           return {
             title: "Protected By Pattern",
-            output: `${args.file} matches an always-protected pattern (${patternReason}), so removing this exact string would have no effect. Remove the pattern entry itself, or use "/guard off" (with confirmation) to disable the guard temporarily. Nothing was removed.`,
+            output: `${args.file} matches an always-protected pattern (${patternReason}), so removing this exact string would have no effect. Remove the pattern entry itself, or use "/guard off" (with confirmation) only if strictly needed. Nothing was removed.`,
           }
         }
 
@@ -190,7 +190,7 @@ export default tool({
           const how = afterApproval ? "after approval" : "by workflow phase"
           return {
             title: "Protected Dynamically",
-            output: `${args.file} is not in the always-protected list. It is protected ${how} based on spec.json state, so it cannot be removed individually. Use "/guard off" (with confirmation) to disable the guard temporarily, or leave the protection in place. Nothing was removed.`,
+            output: `${args.file} is not in the always-protected list. It is protected ${how} based on spec.json state, so it cannot be removed individually. To change an approved artifact, edit it and re-approve with "/approve <artifact>"; use "/guard off" (with confirmation) only if strictly needed. Nothing was removed.`,
           }
         }
 

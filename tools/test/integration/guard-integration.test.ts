@@ -113,6 +113,7 @@ describe("speckit-guard integration", () => {
       const result = await runTool({ subcommand: "remove", file: "spec.md", confirmed: true })
       expect(result.title).toBe("Protected Dynamically")
       expect(result.output).toContain("after approval")
+      expect(result.output).toContain("/approve")
       expect(result.output).toContain("Nothing was removed")
     })
 
