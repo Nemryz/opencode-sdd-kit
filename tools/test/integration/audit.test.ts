@@ -5,6 +5,7 @@ import auditTool, { AuditFinding } from "../../speckit-audit"
 import scaffoldTool from "../../speckit-scaffold"
 import { mockContext, createTempWorktree, destroyTempWorktree, createConstitution } from "../helpers/setup"
 import { readSpecJson, writeSpecJson, steeringDirPath, PATHS } from "../../shared/types"
+import { computeBodyChecksum } from "../../shared/io"
 
 let worktree: string
 let ctx: ReturnType<typeof mockContext>
@@ -237,6 +238,37 @@ describe("audit per-feature findings", () => {
     const result = await auditTool.execute({}, ctx)
     const findings = result.metadata?.findings ?? []
     expect(findings.some((f: AuditFinding) => f.category === "approval-order" && f.severity === "warn")).toBe(true)
+  })
+
+  it("reports warn when an approved artifact changed after approval", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.approvals.spec.approved = true
+      sj.approvals.spec.hash = "deadbeef"
+      await writeSpecJson(sj, base)
+    }
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: AuditFinding) => f.category === "approval-drift" && f.severity === "warn")).toBe(true)
+  })
+
+  it("does not report approval drift when the hash matches", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    const base = path.join(worktree, "specs", "001-auth")
+    const content = await fs.readFile(path.join(base, "spec.md"), "utf-8")
+    const sj = await readSpecJson(base)
+    if (sj) {
+      sj.approvals.spec.approved = true
+      sj.approvals.spec.hash = computeBodyChecksum(content)
+      await writeSpecJson(sj, base)
+    }
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: AuditFinding) => f.category === "approval-drift")).toBe(false)
   })
 
   it("reports error for ready_violation when ready_for_implementation set but artifacts missing", async () => {

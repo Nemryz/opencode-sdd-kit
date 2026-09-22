@@ -53,6 +53,8 @@ export function structureSteeringPath(root: string): string {
 export const ApprovalStateSchema = z.object({
   generated: z.boolean(),
   approved: z.boolean(),
+  approved_at: z.string().optional(),
+  hash: z.string().optional(),
 })
 
 export const SpecJsonSchema = z.object({

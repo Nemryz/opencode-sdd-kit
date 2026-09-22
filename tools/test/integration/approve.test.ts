@@ -4,7 +4,7 @@ import path from "node:path"
 import approveTool from "../../speckit-approve"
 import scaffoldTool from "../../speckit-scaffold"
 import { mockContext, createTempWorktree, destroyTempWorktree } from "../helpers/setup"
-import { readSession, readSpecJson, specsDirPath, specJsonPath } from "../../shared/types"
+import { readSession, readSpecJson, writeSpecJson, specsDirPath, specJsonPath } from "../../shared/types"
 import { readFrontmatter } from "../../shared/io"
 
 let worktree: string
@@ -44,6 +44,48 @@ describe("approve tool", () => {
 
     const sj = await readSpecJson(await featureDirOf())
     expect(sj?.approvals.spec.approved).toBe(false)
+  })
+
+  it("records an approval hash and timestamp", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
+    const sj = await readSpecJson(await featureDirOf())
+    expect(sj?.approvals.spec.hash).toBeDefined()
+    expect(sj?.approvals.spec.approved_at).toBeDefined()
+  })
+
+  it("re-approves when content changed after approval", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
+    const before = (await readSpecJson(await featureDirOf()))?.approvals.spec.hash
+    const specPath = path.join(await featureDirOf(), "spec.md")
+    await fs.appendFile(specPath, "\n## Extra section\n", "utf-8")
+
+    const pending = await approveTool.execute({ artifact: "spec" }, ctx)
+    expect(pending.title).toBe("Confirm Re-Approval")
+    expect(pending.metadata?.requiresConfirmation).toBe(true)
+
+    const result = await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
+    expect(result.title).toBe("spec re-approved")
+    expect(result.metadata?.reapproved).toBe(true)
+
+    const sj = await readSpecJson(await featureDirOf())
+    expect(sj?.approvals.spec.approved).toBe(true)
+    expect(sj?.approvals.spec.hash).not.toBe(before)
+  })
+
+  it("records a hash for legacy approvals without one", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    const featureDir = await featureDirOf()
+    const sj = await readSpecJson(featureDir)
+    if (sj) {
+      sj.approvals.spec.approved = true
+      await writeSpecJson(sj, featureDir)
+    }
+    const result = await approveTool.execute({ artifact: "spec" }, ctx)
+    expect(result.title).toBe("spec already approved")
+    const after = await readSpecJson(featureDir)
+    expect(after?.approvals.spec.hash).toBeDefined()
   })
 
   it("updates spec.md frontmatter status to approved", async () => {

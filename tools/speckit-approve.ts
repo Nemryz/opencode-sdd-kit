@@ -1,4 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
+import fs from "node:fs/promises"
 import path from "node:path"
 import {
   exists,
@@ -12,6 +13,7 @@ import {
   writeSession,
   writeSpecJson,
 } from "./shared/types"
+import { computeBodyChecksum } from "./shared/io"
 
 const ARTIFACT_FILES: Record<string, string> = {
   spec: "spec.md",
@@ -76,11 +78,40 @@ export default tool({
       const artifact = args.artifact
 
       const artifactFile = ARTIFACT_FILES[artifact]
-      if (!await exists(path.join(base, artifactFile))) {
+      const artifactPath = path.join(base, artifactFile)
+      if (!await exists(artifactPath)) {
         return { title: "Error", output: `${artifactFile} does not exist in specs/${featureDir}. Generate it first.` }
       }
 
       if (specJson.approvals[artifact].approved) {
+        const content = await fs.readFile(artifactPath, "utf-8")
+        const currentHash = computeBodyChecksum(content)
+        const storedHash = specJson.approvals[artifact].hash
+
+        if (storedHash && storedHash !== currentHash) {
+          if (!args.confirmed) {
+            return {
+              title: "Confirm Re-Approval",
+              output: `${artifactFile} changed since it was approved for ${featureDir}. Re-approve to record the current content? Ask the user to confirm, then re-run with confirmed: true.`,
+              metadata: { requiresConfirmation: true, artifact, featureDir, drift: true },
+            }
+          }
+          specJson.approvals[artifact].hash = currentHash
+          specJson.approvals[artifact].approved_at = new Date().toISOString()
+          await writeSpecJson(specJson, base)
+          return {
+            title: `${artifact} re-approved`,
+            output: `${artifact} re-approved for ${featureDir} (content changed since last approval)  Next: ${ARTIFACT_NEXT_STEPS[artifact]}`,
+            metadata: { artifact, featureDir, reapproved: true },
+          }
+        }
+
+        if (!storedHash) {
+          specJson.approvals[artifact].hash = currentHash
+          specJson.approvals[artifact].approved_at = new Date().toISOString()
+          await writeSpecJson(specJson, base)
+        }
+
         return {
           title: `${artifact} already approved`,
           output: `${artifact} is already approved for ${featureDir}.`,
@@ -101,6 +132,9 @@ export default tool({
         specJson.phase = "ready"
         specJson.ready_for_implementation = true
       }
+      const approvedContent = await fs.readFile(artifactPath, "utf-8")
+      specJson.approvals[artifact].hash = computeBodyChecksum(approvedContent)
+      specJson.approvals[artifact].approved_at = new Date().toISOString()
       await writeSpecJson(specJson, base)
       await syncFrontmatterFromSpecJson(base, specJson)
 

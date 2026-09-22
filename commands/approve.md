@@ -26,6 +26,7 @@ Read `.opencode/spec-memory/session.json` to identify the active feature.
 
 - Never approve without explicit user confirmation
 - The tool only approves when called with `confirmed: true` — never pass it without asking the user first
+- If the tool reports the artifact changed since approval (drift), explain the change and ask before re-approving
 - Approval records state only, it does not change artifact content
 - If the tool reports the artifact is missing or already approved, report it and stop
 

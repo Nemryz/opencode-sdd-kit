@@ -23,6 +23,7 @@ import {
   clearCorruptionWarnings,
 } from "./shared/types"
 import { DeltasIndexSchema, type Delta } from "./shared/schemas"
+import { computeBodyChecksum } from "./shared/io"
 
 export interface AuditFinding {
   severity: "info" | "warn" | "error"
@@ -141,6 +142,27 @@ async function auditFeature(
       message: `${dirName}: spec approved but plan not transitioned to generated`,
       file: path.join(base, "spec.json"),
     })
+  }
+
+  const artifactFiles: Record<string, string> = { spec: "spec.md", plan: "plan.md", tasks: "tasks.md" }
+  for (const artifact of ["spec", "plan", "tasks"] as const) {
+    const state = sj.approvals[artifact]
+    if (!state.approved || !state.hash) continue
+    const artifactPath = path.join(base, artifactFiles[artifact])
+    try {
+      const content = await fs.readFile(artifactPath, "utf-8")
+      if (computeBodyChecksum(content) !== state.hash) {
+        findings.push({
+          severity: "warn",
+          category: "approval-drift",
+          artifact,
+          message: `${dirName}: ${artifactFiles[artifact]} was modified after approval — re-run /approve ${artifact}`,
+          file: artifactPath,
+        })
+      }
+    } catch {
+      // missing artifact files are reported by other checks
+    }
   }
 
   if (sj.ready_for_implementation && !(specOk && planOk && tasksOk)) {
