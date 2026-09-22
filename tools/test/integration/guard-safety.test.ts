@@ -153,6 +153,32 @@ describe("guard spec.json anti-forgery protection", () => {
   })
 })
 
+describe("guard steering docs stay writable for /steering", () => {
+  it("does not always-protect steering docs", () => {
+    for (const name of ["product.md", "tech.md", "structure.md"]) {
+      const reason = isProtectedFile(path.join(worktree, ".opencode", "steering", name), DEFAULT_CONFIG)
+      expect(reason).toBeNull()
+    }
+  })
+
+  it("allows editing steering docs via hook", async () => {
+    await fs.mkdir(path.join(worktree, ".opencode", "steering"), { recursive: true })
+    const output = await runHook("edit", path.join(worktree, ".opencode", "steering", "product.md"))
+    expect(output.status).toBe("ask")
+  })
+
+  it("keeps the constitution always protected", () => {
+    const reason = isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "constitution.md"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+    expect(reason).toContain("Always protected")
+  })
+
+  it("keeps session.json and config.json always protected", () => {
+    expect(isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "session.json"), DEFAULT_CONFIG)).not.toBeNull()
+    expect(isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "config.json"), DEFAULT_CONFIG)).not.toBeNull()
+  })
+})
+
 describe("guard config schema robustness", () => {
   it("falls back to defaults for invalid types", async () => {
     await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })

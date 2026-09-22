@@ -39,9 +39,10 @@ describe("speckit-guard unit", () => {
       expect(result).toContain("Always protected")
     })
 
-    it("returns reason for steering files", () => {
-      const result = isProtectedFile(".opencode/steering/product.md", DEFAULT_CONFIG)
-      expect(result).toContain("Always protected")
+    it("does not protect steering files, they are written by /steering", () => {
+      expect(isProtectedFile(".opencode/steering/product.md", DEFAULT_CONFIG)).toBeNull()
+      expect(isProtectedFile(".opencode/steering/tech.md", DEFAULT_CONFIG)).toBeNull()
+      expect(isProtectedFile(".opencode/steering/structure.md", DEFAULT_CONFIG)).toBeNull()
     })
 
     it("returns null for unprotected files", () => {
