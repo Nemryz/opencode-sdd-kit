@@ -102,6 +102,16 @@ Use `--fix` to auto-repair phase mismatches in spec.json.
 Read or update SDD configuration. Uses `speckit-config` tool.
 Examples: `/config defaultTechStack=Node.js+PostgreSQL` or `/config key=language value=python`
 
+### `/guard [status|on|off|add <file>|remove <file>|log|debug on|off]`
+Manage the file protection guard. Uses `speckit-guard` tool.
+`off` and `remove` require user confirmation (`confirmed: true`).
+
+### `/health [--fix]`
+Check SDD state integrity and restore corrupted files from backups. Uses `speckit-health` tool.
+
+### `/delta-status [featureDir]`
+Show the status of incremental delta specs. Uses `speckit-delta` tool with `command: "delta-status"`.
+
 ---
 
 ## Agent Roles — Tab-Switchable

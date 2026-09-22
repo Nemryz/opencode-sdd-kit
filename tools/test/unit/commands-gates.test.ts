@@ -198,3 +198,70 @@ describe("B-10: config.md phase gate", () => {
     expect(content).toMatch(/key=.*value=/)
   })
 })
+
+describe("B-11: guard.md command", () => {
+  let content: string
+  beforeAll(async () => { content = await readCommand("guard.md") })
+
+  it("calls the speckit-guard tool", () => {
+    expect(content).toMatch(/speckit-guard/)
+  })
+
+  it("documents the status and on/off subcommands", () => {
+    expect(content).toMatch(/status/)
+    expect(content).toMatch(/on/)
+    expect(content).toMatch(/off/)
+  })
+
+  it("requires confirmation for off and remove", () => {
+    expect(content).toMatch(/confirmed: true/)
+  })
+
+  it("maps log and debug options", () => {
+    expect(content).toMatch(/logOption/)
+    expect(content).toMatch(/debugOption/)
+  })
+})
+
+describe("B-12: health.md command", () => {
+  let content: string
+  beforeAll(async () => { content = await readCommand("health.md") })
+
+  it("calls the speckit-health tool", () => {
+    expect(content).toMatch(/speckit-health/)
+  })
+
+  it("documents the fix flag", () => {
+    expect(content).toMatch(/fix: true/)
+    expect(content).toMatch(/--fix/)
+  })
+})
+
+describe("B-13: delta-status.md command", () => {
+  let content: string
+  beforeAll(async () => { content = await readCommand("delta-status.md") })
+
+  it("calls speckit-delta with delta-status", () => {
+    expect(content).toMatch(/speckit-delta/)
+    expect(content).toMatch(/delta-status/)
+  })
+
+  it("mentions featureDir for scoping", () => {
+    expect(content).toMatch(/featureDir/)
+  })
+})
+
+describe("B-14: report tools referenced in AGENTS.md exist", () => {
+  it("every /command in the report tools exception line has a command file", async () => {
+    const agentsPath = path.resolve(COMMANDS_DIR, "..", "AGENTS.md")
+    const agents = await fs.readFile(agentsPath, "utf-8")
+    const line = agents.split("\n").find(l => l.includes("**Exception**: report tools"))
+    expect(line).toBeDefined()
+    const matches = (line ?? "").match(/`\/[a-z][a-z-]*/g) ?? []
+    expect(matches.length).toBeGreaterThan(0)
+    for (const m of matches) {
+      const name = m.slice(2)
+      await expect(fs.access(path.join(COMMANDS_DIR, `${name}.md`))).resolves.toBeUndefined()
+    }
+  })
+})
