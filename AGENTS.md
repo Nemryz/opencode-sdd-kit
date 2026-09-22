@@ -202,6 +202,8 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 
 ## Available Tools — Call via Function
 
+**Project-root warning gate:** tools that operate on the project root return a `Warning` result when the root looks risky (kit installation directory, system directory, or very shallow path). The agent must ask the user to confirm, then re-run the same tool with `confirmed: true`.
+
 | Tool | Purpose | Key Arguments |
 |------|---------|---------------|
 | `speckit-scaffold` | Create `specs/NNN-name/` artifacts, constitution, steering, or project docs | `featureName`, `template` (spec/plan/tasks/constitution/steering/data-model/domain-map/glossary/research/contracts), `techStack`, `overwrite` (bool) |

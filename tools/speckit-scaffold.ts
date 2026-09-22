@@ -145,6 +145,7 @@ export default tool({
     template: tool.schema.enum(["spec", "plan", "tasks", "constitution", "steering", "data-model", "domain-map", "glossary", "research", "contracts"]).describe("Which template to use"),
     techStack: tool.schema.string().optional().describe("Tech stack description (for plan template)"),
     overwrite: tool.schema.boolean().optional().describe("Overwrite existing files if they exist"),
+    confirmed: tool.schema.boolean().optional().describe("Set to true only after the user explicitly confirms the project-root warning"),
   },
   async execute(args, context) {
     clearCorruptionWarnings()
@@ -153,10 +154,10 @@ export default tool({
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (args.template !== "constitution" && !await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const projectWarnings = await getProjectRootWarnings(projectRoot)
-      if (projectWarnings.length > 0) {
+      if (projectWarnings.length > 0 && !args.confirmed) {
         return {
           title: "Warning",
-          output: projectWarnings.map(w => w.message).join("\n\n"),
+          output: `${projectWarnings.map(w => w.message).join("\n\n")}\n\nAsk the user to confirm, then re-run with confirmed: true.`,
           metadata: { warnings: projectWarnings, requiresConfirmation: true },
         }
       }

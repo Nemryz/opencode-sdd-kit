@@ -39,10 +39,10 @@ export default tool({
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const projectWarnings = await getProjectRootWarnings(projectRoot)
-      if (projectWarnings.length > 0) {
+      if (projectWarnings.length > 0 && !args.confirmed) {
         return {
           title: "Warning",
-          output: projectWarnings.map(w => w.message).join("\n\n"),
+          output: `${projectWarnings.map(w => w.message).join("\n\n")}\n\nAsk the user to confirm, then re-run with confirmed: true.`,
           metadata: { warnings: projectWarnings, requiresConfirmation: true },
         }
       }

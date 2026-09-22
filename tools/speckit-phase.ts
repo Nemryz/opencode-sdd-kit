@@ -26,6 +26,7 @@ export default tool({
   description: "Advance the feature phase to impl or complete after implementation work",
   args: {
     phase: tool.schema.enum(["impl", "complete"]).describe("Target phase"),
+    confirmed: tool.schema.boolean().optional().describe("Set to true only after the user explicitly confirms the project-root warning"),
   },
   async execute(args, context) {
     try {
@@ -33,10 +34,10 @@ export default tool({
       if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
       if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
       const projectWarnings = await getProjectRootWarnings(projectRoot)
-      if (projectWarnings.length > 0) {
+      if (projectWarnings.length > 0 && !args.confirmed) {
         return {
           title: "Warning",
-          output: projectWarnings.map(w => w.message).join("\n\n"),
+          output: `${projectWarnings.map(w => w.message).join("\n\n")}\n\nAsk the user to confirm, then re-run with confirmed: true.`,
           metadata: { warnings: projectWarnings, requiresConfirmation: true },
         }
       }
