@@ -401,6 +401,18 @@ describe("Phase 3: Audit Module - Mutation Score Improvement", () => {
       const findings = result.metadata?.findings ?? []
       expect(findings.some((f: AuditFinding) => f.category === "tasks-boundary")).toBe(false)
     })
+
+    it("accepts the field boundary format", async () => {
+      await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+      await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
+      const featureDir = await getFeatureDir()
+      const tasksPath = path.join(featureDir, "tasks.md")
+      await fs.writeFile(tasksPath, "# Tasks\n- **Boundary**: Auth\n- **Boundary**: Auth")
+
+      const result = await auditTool.execute({}, ctx)
+      const findings = result.metadata?.findings ?? []
+      expect(findings.some((f: AuditFinding) => f.category === "tasks-boundary")).toBe(false)
+    })
   })
 
   describe("3.9 Auto-fix behavior", () => {

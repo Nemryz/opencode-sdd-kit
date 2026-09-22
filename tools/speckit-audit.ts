@@ -189,7 +189,7 @@ async function auditFeature(
   if (tasksOk) {
     const tasksContent = await fs.readFile(path.join(base, "tasks.md"), "utf-8").catch(() => "")
     const lines = tasksContent.split("\n")
-    const hasBoundary = lines.some(l => l.includes("Boundary:"))
+    const hasBoundary = lines.some(l => /Boundary\*{0,2}:/.test(l))
     if (!hasBoundary) {
       findings.push({
         severity: "info",
@@ -310,6 +310,22 @@ async function auditProject(projectRoot: string): Promise<AuditReport> {
     }
   } else {
     findings.push({ severity: "info", category: "steering", message: "No steering directory (optional)" })
+  }
+
+  const guardPath = path.join(projectRoot, ".opencode", "guard.json")
+  try {
+    const raw = await fs.readFile(guardPath, "utf-8")
+    const guard = JSON.parse(raw) as { debug?: unknown }
+    if (guard.debug === true) {
+      findings.push({
+        severity: "info",
+        category: "guard-debug",
+        message: "Guard debug mode is enabled — disable it with /guard debug off",
+        file: guardPath,
+      })
+    }
+  } catch {
+    // missing or unreadable guard.json is not an audit failure
   }
 
   const featureDirs = await getFeatureDirs(projectRoot)

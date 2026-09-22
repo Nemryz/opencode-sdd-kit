@@ -306,6 +306,35 @@ describe("audit per-feature findings", () => {
     expect(findings.some((f: AuditFinding) => f.category === "tasks-boundary" && f.severity === "info")).toBe(true)
   })
 
+  it("accepts the field boundary format in tasks.md", async () => {
+    await createConstitution(worktree)
+    await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
+    await scaffoldTool.execute({ featureName: "Auth", template: "plan" }, ctx)
+    const tasksPath = path.join(worktree, "specs", "001-auth", "tasks.md")
+    await fs.writeFile(tasksPath, "# Tasks\n- Task one\n- **Boundary**: Auth\n- Task two\n- **Boundary**: Auth")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: AuditFinding) => f.category === "tasks-boundary")).toBe(false)
+  })
+
+  it("reports info when guard debug mode is enabled", async () => {
+    await createConstitution(worktree)
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), JSON.stringify({ debug: true }), "utf-8")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: AuditFinding) => f.category === "guard-debug" && f.severity === "info")).toBe(true)
+  })
+
+  it("does not report guard debug when disabled", async () => {
+    await createConstitution(worktree)
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), JSON.stringify({ debug: false }), "utf-8")
+    const result = await auditTool.execute({}, ctx)
+    const findings = result.metadata?.findings ?? []
+    expect(findings.some((f: AuditFinding) => f.category === "guard-debug")).toBe(false)
+  })
+
   it("reports info for optional artifacts", async () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)

@@ -15,7 +15,7 @@ Every task entry:
 - **File**: <deliverable file path>
 - **Deliverable**: <what exists when done>
 - **Dependencies**: <T-NNN or "none">
-- **Boundary**: <what this task owns>
+- _Boundary: <what this task owns>_
 ```
 
 Parallel tasks get `[P]` prefix: `### T-NNN [P] <Task Name>`
