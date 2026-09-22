@@ -20,6 +20,7 @@ import {
   arbitrarySpecJson,
   arbitrarySDDConfig,
 } from "./arbitraries"
+import { removeDirWithRetry } from "../helpers/setup"
 
 let tmpDir: string
 
@@ -29,7 +30,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await fs.rm(tmpDir, { recursive: true, force: true })
+  await removeDirWithRetry(tmpDir)
 })
 
 describe("Property: writeSession → readSession roundtrip", () => {

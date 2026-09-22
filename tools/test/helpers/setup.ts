@@ -28,6 +28,25 @@ export async function createConstitution(worktree: string): Promise<void> {
   await fs.writeFile(path.join(specMemory, "constitution.md"), "# Test Constitution\n", "utf-8")
 }
 
+const REMOVE_RETRIES = 5
+const REMOVE_RETRY_DELAY_MS = 50
+
+export async function removeDirWithRetry(dir: string): Promise<void> {
+  for (let attempt = 0; attempt < REMOVE_RETRIES; attempt++) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true })
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      const transient = code === "ENOTEMPTY" || code === "EBUSY" || code === "EPERM"
+      if (!transient || attempt === REMOVE_RETRIES - 1) {
+        throw err
+      }
+      await new Promise((resolve) => setTimeout(resolve, REMOVE_RETRY_DELAY_MS * (attempt + 1)))
+    }
+  }
+}
+
 export async function destroyTempWorktree(dir: string): Promise<void> {
-  await fs.rm(dir, { recursive: true, force: true })
+  await removeDirWithRetry(dir)
 }
