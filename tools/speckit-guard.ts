@@ -143,10 +143,14 @@ export default tool({
           return { title: "Error", output: "Please specify a file to add to protection." }
         }
         const config = await readConfig()
-        if (!config.protectedFiles.includes(args.file)) {
-          config.protectedFiles.push(args.file)
-          await writeConfig(config)
+        if (config.protectedFiles.includes(args.file)) {
+          return {
+            title: "Already Protected",
+            output: `${args.file} is already in the always-protected list. Nothing changed.`,
+          }
         }
+        config.protectedFiles.push(args.file)
+        await writeConfig(config)
         return {
           title: "File Added",
           output: `${args.file} has been added to protected files.`,

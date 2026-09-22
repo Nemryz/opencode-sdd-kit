@@ -278,6 +278,19 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
       const count = config.protectedFiles.filter(f => f === "uniquefile.md").length
       expect(count).toBe(1)
     })
+
+    it("duplicate add returns Already Protected", async () => {
+      await runTool({ subcommand: "add", file: "dupe.md" })
+      const result = await runTool({ subcommand: "add", file: "dupe.md" })
+      expect(result.title).toBe("Already Protected")
+    })
+
+    it("duplicate add keeps a single entry", async () => {
+      await runTool({ subcommand: "add", file: "dupe.md" })
+      await runTool({ subcommand: "add", file: "dupe.md" })
+      const config = await readGuardConfig()
+      expect(config.protectedFiles.filter(f => f === "dupe.md")).toHaveLength(1)
+    })
   })
 
   describe("subcommands - remove", () => {

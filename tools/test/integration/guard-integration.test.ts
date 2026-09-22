@@ -81,6 +81,13 @@ describe("speckit-guard integration", () => {
       expect(result.title).toBe("Error")
       expect(result.output).toContain("specify a file")
     })
+
+    it("reports already protected on duplicate add", async () => {
+      await runTool({ subcommand: "add", file: "test.md" })
+      const result = await runTool({ subcommand: "add", file: "test.md" })
+      expect(result.title).toBe("Already Protected")
+      expect(result.output).toContain("Nothing changed")
+    })
   })
 
   describe("remove subcommand", () => {
