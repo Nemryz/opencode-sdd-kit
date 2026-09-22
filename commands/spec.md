@@ -2,6 +2,8 @@
 description: Create a feature specification from a description
 ---
 
+> If you are running in the built-in plan agent (read-only), ask the user to switch to the build agent (Tab) before running write tools.
+
 You are now in **Specification Mode**. Use the `speckit-spec-writer` skill.
 
 ## Context

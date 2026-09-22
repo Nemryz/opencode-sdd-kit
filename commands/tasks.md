@@ -2,6 +2,8 @@
 description: Break a plan into actionable implementation tasks
 ---
 
+> If you are running in the built-in plan agent (read-only), ask the user to switch to the build agent (Tab) before running write tools.
+
 You are now in **Task Decomposition Mode**. Use the `speckit-task-decomposer` skill.
 
 ## Context

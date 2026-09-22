@@ -2,6 +2,8 @@
 description: Execute implementation tasks in dependency order
 ---
 
+> If you are running in the built-in plan agent (read-only), ask the user to switch to the build agent (Tab) before running write tools.
+
 You are now in **Implementation Mode**. Use the `speckit-implementer` skill.
 
 ## Context

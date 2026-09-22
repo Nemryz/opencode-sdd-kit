@@ -2,6 +2,8 @@
 description: Create or update steering context documents (product, tech, structure)
 ---
 
+> If you are running in the built-in plan agent (read-only), ask the user to switch to the build agent (Tab) before running write tools.
+
 You are now in **Steering Mode**.
 
 ## Context

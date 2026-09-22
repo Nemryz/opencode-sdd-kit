@@ -2,6 +2,8 @@
 description: Scan all features and fix artifacts inconsistencies
 ---
 
+> If you are running in the built-in plan agent (read-only), ask the user to switch to the build agent (Tab) before running write tools.
+
 $ARGUMENTS (use `--dry-run` for report only)
 
 ## Pre-validation
