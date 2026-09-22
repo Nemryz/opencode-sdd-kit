@@ -7,6 +7,7 @@ import guardPlugin, {
   isProtectedFile,
   isProtectedAfterApproval,
   isProtectedByPhase,
+  isInFeatureDir,
   normalizeGuardPath,
   extractRedirectTargets,
 } from "../../plugins/speckit-guard"
@@ -272,6 +273,43 @@ describe("guard config schema robustness", () => {
     await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), "not json", "utf-8")
     const result = await guardTool.execute({ subcommand: "status" }, ctx)
     expect(result.title).toBe("Guard Status")
+  })
+})
+
+describe("guard artifact name scoping outside specs/", () => {
+  it("allows editing an agent definition named spec.md outside specs/", async () => {
+    const dir = path.join(worktree, "agents")
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, "spec.md"), "---\nmode: primary\n---\n", "utf-8")
+    expect(await runBefore("edit", { filePath: path.join(dir, "spec.md") })).toBeNull()
+  })
+
+  it("allows editing command docs named plan.md and tasks.md outside specs/", async () => {
+    const dir = path.join(worktree, "commands")
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, "plan.md"), "# Command\n", "utf-8")
+    await fs.writeFile(path.join(dir, "tasks.md"), "# Command\n", "utf-8")
+    expect(await runBefore("write", { filePath: path.join(dir, "plan.md") })).toBeNull()
+    expect(await runBefore("write", { filePath: path.join(dir, "tasks.md") })).toBeNull()
+  })
+
+  it("still denies spec.md inside a feature dir when spec.json is missing", async () => {
+    const featureDir = path.join(worktree, "specs", "001-test")
+    await fs.mkdir(featureDir, { recursive: true })
+    await fs.writeFile(path.join(featureDir, "spec.md"), "# Spec\n", "utf-8")
+    const message = await runBefore("edit", { filePath: path.join(featureDir, "spec.md") })
+    expect(message).not.toBeNull()
+    expect(message).toContain("Guard blocked")
+  })
+
+  it("does not treat a directory named myspecs as a feature dir", () => {
+    expect(isInFeatureDir(path.join(worktree, "myspecs", "001-a", "spec.md"))).toBe(false)
+  })
+
+  it("detects feature dirs at any depth", () => {
+    expect(isInFeatureDir(path.join(worktree, "specs", "001-a", "spec.md"))).toBe(true)
+    expect(isInFeatureDir("C:/specs/001-a/spec.md")).toBe(true)
+    expect(isInFeatureDir(path.join(worktree, "agents", "spec.md"))).toBe(false)
   })
 })
 

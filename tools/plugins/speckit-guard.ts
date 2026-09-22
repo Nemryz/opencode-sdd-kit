@@ -154,6 +154,10 @@ export function isListedInAnyPhase(filePath: string, config: GuardConfig): boole
   return Object.values(config.protectedByPhase).some(list => list.some(f => normalizeGuardPath(f) === base))
 }
 
+export function isInFeatureDir(filePath: string): boolean {
+  return /(^|\/)specs\//.test(normalizeGuardPath(filePath))
+}
+
 export function extractRedirectTargets(command: string): string[] {
   const targets: string[] = []
   const stripQuotes = (s: string) => s.replace(/^["']|["']$/g, "")
@@ -230,15 +234,16 @@ const guardPlugin: Plugin = async (input) => {
     }
 
     const spec = await getSpecJson(normalized, input.worktree)
+    const inFeatureDir = isInFeatureDir(normalized)
 
-    const afterApproval = isProtectedAfterApproval(normalized, config)
+    const afterApproval = inFeatureDir ? isProtectedAfterApproval(normalized, config) : null
     if (afterApproval) {
       if (!spec) return `${afterApproval} (spec.json unreadable, denied as a precaution)`
       if (isApprovedForFile(guardBasename(normalized), spec)) return `${afterApproval} (approved)`
     }
 
     if (!spec) {
-      if (isListedInAnyPhase(normalized, config)) {
+      if (inFeatureDir && isListedInAnyPhase(normalized, config)) {
         return "Phase-protected file with unreadable spec.json, denied as a precaution"
       }
       return null
