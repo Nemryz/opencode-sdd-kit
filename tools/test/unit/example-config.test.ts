@@ -25,6 +25,11 @@ describe("opencode.jsonc.example approval gate", () => {
     expect(config.permission?.external_directory?.["~/.config/opencode/**"]).toBe("allow")
   })
 
+  it("sets a small_model for titles and summaries", () => {
+    expect(typeof config.small_model).toBe("string")
+    expect(config.small_model.length).toBeGreaterThan(0)
+  })
+
   it("does not use local file paths in the plugin array", () => {
     const plugin = config.plugin
     if (plugin === undefined) return
