@@ -29,6 +29,7 @@ export default tool({
   description: "Approve a generated artifact so the workflow can advance to the next phase",
   args: {
     artifact: tool.schema.enum(["spec", "plan", "tasks"]).optional().describe("Artifact to approve"),
+    confirmed: tool.schema.boolean().optional().describe("Set to true only after the user explicitly confirms the approval"),
   },
   async execute(args, context) {
     try {
@@ -84,6 +85,14 @@ export default tool({
           title: `${artifact} already approved`,
           output: `${artifact} is already approved for ${featureDir}.`,
           metadata: { artifact, featureDir },
+        }
+      }
+
+      if (!args.confirmed) {
+        return {
+          title: "Confirm Approval",
+          output: `Approve ${artifact} for ${featureDir}? This records the approval and unlocks the next workflow phase. Ask the user to confirm, then re-run with confirmed: true.`,
+          metadata: { requiresConfirmation: true, artifact, featureDir },
         }
       }
 

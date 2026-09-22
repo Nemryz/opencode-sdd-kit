@@ -26,7 +26,7 @@ async function featureDirOf(name = "001-test-feature"): Promise<string> {
 describe("approve tool", () => {
   it("approves a generated spec", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    const result = await approveTool.execute({ artifact: "spec" }, ctx)
+    const result = await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     expect(result.title).toBe("spec approved")
     expect(result.metadata?.nextStep).toContain("/plan")
 
@@ -35,16 +35,27 @@ describe("approve tool", () => {
     expect(sj?.approvals.plan.approved).toBe(false)
   })
 
+  it("requires confirmed before approving", async () => {
+    await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
+    const result = await approveTool.execute({ artifact: "spec" }, ctx)
+    expect(result.title).toBe("Confirm Approval")
+    expect(result.metadata?.requiresConfirmation).toBe(true)
+    expect(result.metadata?.artifact).toBe("spec")
+
+    const sj = await readSpecJson(await featureDirOf())
+    expect(sj?.approvals.spec.approved).toBe(false)
+  })
+
   it("updates spec.md frontmatter status to approved", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const fm = await readFrontmatter(path.join(await featureDirOf(), "spec.md"))
     expect(fm?.status).toBe("approved")
   })
 
   it("records the approval in session state", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const session = await readSession(worktree)
     expect(session.command).toBe("/approve")
     expect(session.nextStep).toContain("/plan")
@@ -53,9 +64,9 @@ describe("approve tool", () => {
 
   it("approves plan after spec", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
-    const result = await approveTool.execute({ artifact: "plan" }, ctx)
+    const result = await approveTool.execute({ artifact: "plan", confirmed: true }, ctx)
     expect(result.title).toBe("plan approved")
     expect(result.metadata?.nextStep).toContain("/tasks")
 
@@ -67,7 +78,7 @@ describe("approve tool", () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "tasks" }, ctx)
-    const result = await approveTool.execute({ artifact: "tasks" }, ctx)
+    const result = await approveTool.execute({ artifact: "tasks", confirmed: true }, ctx)
     expect(result.title).toBe("tasks approved")
 
     const sj = await readSpecJson(await featureDirOf())
@@ -78,7 +89,7 @@ describe("approve tool", () => {
 
   it("reports already approved without changing anything", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const sjBefore = await readSpecJson(await featureDirOf())
     const result = await approveTool.execute({ artifact: "spec" }, ctx)
     expect(result.title).toBe("spec already approved")
@@ -100,7 +111,7 @@ describe("approve tool", () => {
   it("moves the pending hint to plan after spec is approved", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const result = await approveTool.execute({}, ctx)
     expect(result.title).toBe("Approval pending: plan")
     expect(result.output).toContain("spec: approved")
@@ -112,9 +123,9 @@ describe("approve tool", () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "plan" }, ctx)
     await scaffoldTool.execute({ featureName: "Test Feature", template: "tasks" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
-    await approveTool.execute({ artifact: "plan" }, ctx)
-    await approveTool.execute({ artifact: "tasks" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
+    await approveTool.execute({ artifact: "plan", confirmed: true }, ctx)
+    await approveTool.execute({ artifact: "tasks", confirmed: true }, ctx)
     const result = await approveTool.execute({}, ctx)
     expect(result.title).toBe("Approval status")
     expect(result.output).toContain("spec: approved")
@@ -153,7 +164,7 @@ describe("approve tool", () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
     const specPath = path.join(await featureDirOf(), "spec.md")
     const before = await fs.readFile(specPath, "utf-8")
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const after = await fs.readFile(specPath, "utf-8")
     const stripFm = (s: string) => s.split("---").slice(2).join("---")
     expect(stripFm(after)).toBe(stripFm(before))
@@ -162,7 +173,7 @@ describe("approve tool", () => {
   it("uses session.featureDir when multiple features exist", async () => {
     await scaffoldTool.execute({ featureName: "First", template: "spec" }, ctx)
     await scaffoldTool.execute({ featureName: "Second", template: "spec" }, ctx)
-    const result = await approveTool.execute({ artifact: "spec" }, ctx)
+    const result = await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     expect(result.metadata?.featureDir).toBe("002-second")
 
     const second = await readSpecJson(await featureDirOf("002-second"))
@@ -173,7 +184,7 @@ describe("approve tool", () => {
 
   it("writes a schema-valid spec.json", async () => {
     await scaffoldTool.execute({ featureName: "Test Feature", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const raw = JSON.parse(await fs.readFile(specJsonPath(await featureDirOf()), "utf-8"))
     expect(raw.approvals.spec.approved).toBe(true)
     expect(raw.updated_at).toBeDefined()

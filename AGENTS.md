@@ -19,7 +19,7 @@ You MUST follow this order. Never skip a phase.
 5. **Review** (`/review`) — Check cross-artifact consistency before implementation.
 6. **Implementation** (`/impl`) — Execute tasks in dependency order.
 
-**Approval gates:** each artifact must be approved before the next phase runs. Use `/approve spec` before `/plan`, `/approve plan` before `/tasks`, and `/approve tasks` before `/impl`. The pre-validation gates in the commands enforce this. Approvals are permission-gated (`speckit-approve: ask`), so opencode prompts the user to confirm — the agent must never approve on the user's behalf.
+**Approval gates:** each artifact must be approved before the next phase runs. Use `/approve spec` before `/plan`, `/approve plan` before `/tasks`, and `/approve tasks` before `/impl`. The pre-validation gates in the commands enforce this. The `speckit-approve` tool requires `confirmed: true` — the agent must ask the user first and must never approve on the user's behalf.
 
 Support: `/status` — show concise current phase and next step.
 
@@ -205,7 +205,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-delta` | Create incremental delta specs for existing features | `command`, `description`, `deltaId`, `featureDir` |
 | `speckit-perf` | Show performance statistics for all tools | `subcommand` (optional: "top N", "reset") |
 | `speckit-guard` | Manage file protection guard for critical SDD artifacts | `subcommand` (optional: "on", "off", "status", "add", "remove", "log", "debug"), `file` (for add/remove), `confirmed` (bool, for off/remove after user confirmation), `logOption` (optional: "all"), `debugOption` (optional: "on", "off") |
-| `speckit-approve` | Approve a generated artifact to unlock the next phase | `artifact` (spec/plan/tasks) |
+| `speckit-approve` | Approve a generated artifact to unlock the next phase | `artifact` (spec/plan/tasks), `confirmed` (bool, after user confirmation) |
 
 ---
 

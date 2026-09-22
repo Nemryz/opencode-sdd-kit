@@ -55,7 +55,7 @@ describe("status", () => {
   it("falls back to the phase next step once the spec is approved", async () => {
     await createConstitution(worktree)
     await scaffoldTool.execute({ featureName: "Auth", template: "spec" }, ctx)
-    await approveTool.execute({ artifact: "spec" }, ctx)
+    await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     const result = await statusTool.execute({}, ctx)
     expect(result.metadata?.nextCommand).toBe("/plan <tech stack>")
   })

@@ -11,8 +11,14 @@ describe("opencode.jsonc.example approval gate", () => {
     config = JSON.parse(await fs.readFile(EXAMPLE_PATH, "utf-8"))
   })
 
-  it("requires user confirmation for speckit-approve", () => {
-    expect(config.permission?.["speckit-approve"]).toBe("ask")
+  it("does not gate custom tools through the permission config", () => {
+    const supported = [
+      "read", "edit", "glob", "grep", "bash", "task", "skill", "lsp",
+      "question", "webfetch", "websearch", "external_directory", "doom_loop",
+    ]
+    for (const key of Object.keys(config.permission ?? {})) {
+      expect(supported).toContain(key)
+    }
   })
 
   it("keeps the external directory permission", () => {

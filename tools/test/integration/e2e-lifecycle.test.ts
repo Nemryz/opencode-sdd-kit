@@ -39,7 +39,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj1?.approvals.spec.generated).toBe(true)
     expect(sj1?.approvals.spec.approved).toBe(false)
 
-    const approveSpec = await approveTool.execute({ artifact: "spec" }, ctx)
+    const approveSpec = await approveTool.execute({ artifact: "spec", confirmed: true }, ctx)
     expect(approveSpec.title).toBe("spec approved")
     expect(approveSpec.metadata?.nextStep).toContain("/plan")
     const sj1b = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
@@ -60,7 +60,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj2?.approvals.spec.approved).toBe(true)
     expect(sj2?.approvals.plan.generated).toBe(true)
 
-    const approvePlan = await approveTool.execute({ artifact: "plan" }, ctx)
+    const approvePlan = await approveTool.execute({ artifact: "plan", confirmed: true }, ctx)
     expect(approvePlan.title).toBe("plan approved")
     const sj2b = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
     expect(sj2b?.approvals.plan.approved).toBe(true)
@@ -80,7 +80,7 @@ describe("full E2E lifecycle: spec, plan, tasks, validate, status, audit", () =>
     expect(sj3?.approvals.plan.approved).toBe(true)
     expect(sj3?.approvals.tasks.generated).toBe(true)
 
-    const approveTasks = await approveTool.execute({ artifact: "tasks" }, ctx)
+    const approveTasks = await approveTool.execute({ artifact: "tasks", confirmed: true }, ctx)
     expect(approveTasks.title).toBe("tasks approved")
     const sj4 = await readSpecJson(path.join(worktree, "specs", "001-user-auth"))
     expect(sj4?.approvals.tasks.approved).toBe(true)

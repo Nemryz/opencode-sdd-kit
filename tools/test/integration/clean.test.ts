@@ -207,7 +207,7 @@ describe("clean spec.json mismatch detection", () => {
     let after = await readSession(worktree)
     expect(after.phase).toBe("tasks")
 
-    await approveTool.execute({ artifact: "tasks" }, ctx)
+    await approveTool.execute({ artifact: "tasks", confirmed: true }, ctx)
     await cleanTool.execute({ fix: true }, ctx)
     after = await readSession(worktree)
     expect(after.phase).toBe("ready")
