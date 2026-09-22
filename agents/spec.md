@@ -8,13 +8,13 @@ permission:
   edit: ask
   glob: allow
   grep: allow
-  bash: deny
+  bash: ask
   webfetch: allow
   websearch: allow
   skill: allow
   list: allow
   task:
-    "*": deny
+    "*": ask
     speckit-reviewer: allow
     explore: allow
 ---
