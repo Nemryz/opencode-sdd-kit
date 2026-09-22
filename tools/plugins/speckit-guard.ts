@@ -58,6 +58,36 @@ export const DEFAULT_CONFIG: GuardConfig = {
 
 const MAX_DENIALS_LOG = 10
 
+const CONSTITUTION_PLACEHOLDERS = [
+  "[PROJECT NAME]",
+  "[add project-specific constraints]",
+  "[describe testing tools / patterns]",
+  "[document configuration approach]",
+  "[document integration test setup]",
+  "[list lint/format/type-check tools]",
+  "[document any doc conventions]",
+]
+
+export function isDraftConstitution(content: string): boolean {
+  for (const placeholder of CONSTITUTION_PLACEHOLDERS) {
+    if (content.includes(placeholder)) return true
+  }
+  return false
+}
+
+export function cloneConfig(config: GuardConfig): GuardConfig {
+  return {
+    ...config,
+    protectedFiles: [...config.protectedFiles],
+    protectedAfterApproval: [...config.protectedAfterApproval],
+    protectedByPhase: Object.fromEntries(
+      Object.entries(config.protectedByPhase).map(([phase, files]) => [phase, [...files]]),
+    ),
+    stats: { ...config.stats },
+    denials: config.denials.map(d => ({ ...d })),
+  }
+}
+
 const FILE_TOOLS = ["write", "edit", "apply_patch", "patch"]
 
 export function normalizeGuardPath(p: string): string {
@@ -159,10 +189,10 @@ const guardPlugin: Plugin = async (input) => {
     try {
       parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
     } catch {
-      return { ...DEFAULT_CONFIG }
+      return cloneConfig(DEFAULT_CONFIG)
     }
     const result = GuardConfigSchema.safeParse({ ...DEFAULT_CONFIG, ...(parsed as object) })
-    return result.success ? result.data : { ...DEFAULT_CONFIG }
+    return result.success ? result.data : cloneConfig(DEFAULT_CONFIG)
   }
 
   async function writeConfig(config: GuardConfig): Promise<void> {
@@ -187,7 +217,17 @@ const guardPlugin: Plugin = async (input) => {
     const normalized = await normalizePath(rawPath)
 
     const alwaysProtected = isProtectedFile(normalized, config)
-    if (alwaysProtected) return alwaysProtected
+    if (alwaysProtected) {
+      if (normalizeGuardPath(guardBasename(normalized)) === "constitution.md") {
+        try {
+          const content = await fs.readFile(normalized, "utf-8")
+          if (isDraftConstitution(content)) return null
+        } catch {
+          // unreadable constitution stays protected (fail closed)
+        }
+      }
+      return alwaysProtected
+    }
 
     const spec = await getSpecJson(normalized, input.worktree)
 

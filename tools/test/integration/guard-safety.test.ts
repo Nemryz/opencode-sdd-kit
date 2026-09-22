@@ -213,6 +213,36 @@ describe("guard steering docs stay writable for /steering", () => {
   })
 })
 
+describe("guard constitution draft window", () => {
+  const constitutionPath = (): string => path.join(worktree, ".opencode", "spec-memory", "constitution.md")
+
+  it("allows editing the constitution while template placeholders remain", async () => {
+    const draft = "# Project Constitution\n\n> Governing principles for [PROJECT NAME]\n\n- Simplicity: [add project-specific constraints]\n"
+    await fs.writeFile(constitutionPath(), draft, "utf-8")
+    expect(await runBefore("write", { filePath: constitutionPath() })).toBeNull()
+    expect(await runBefore("edit", { filePath: constitutionPath() })).toBeNull()
+  })
+
+  it("blocks editing the constitution once placeholders are gone", async () => {
+    await fs.writeFile(constitutionPath(), "# Project Constitution\n\nAll articles filled for this project.\n", "utf-8")
+    const message = await runBefore("edit", { filePath: constitutionPath() })
+    expect(message).not.toBeNull()
+    expect(message).toContain("Guard blocked")
+  })
+
+  it("stays protected when the constitution file is unreadable", async () => {
+    const message = await runBefore("write", { filePath: constitutionPath() })
+    expect(message).not.toBeNull()
+    expect(message).toContain("Guard blocked")
+  })
+
+  it("keeps reporting the constitution as always protected", () => {
+    const reason = isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "constitution.md"), DEFAULT_CONFIG)
+    expect(reason).not.toBeNull()
+    expect(reason).toContain("Always protected")
+  })
+})
+
 describe("guard config schema robustness", () => {
   it("falls back to defaults for invalid types", async () => {
     await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
