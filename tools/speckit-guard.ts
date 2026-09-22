@@ -6,6 +6,9 @@ import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
   cloneConfig,
+  guardBasename,
+  isProtectedFile,
+  normalizeGuardPath,
   type GuardConfig,
 } from "./plugins/speckit-guard"
 
@@ -162,11 +165,38 @@ export default tool({
           }
         }
         const config = await readConfig()
-        config.protectedFiles = config.protectedFiles.filter(f => f !== args.file)
-        await writeConfig(config)
+
+        if (config.protectedFiles.includes(args.file)) {
+          config.protectedFiles = config.protectedFiles.filter(f => f !== args.file)
+          await writeConfig(config)
+          return {
+            title: "Protection Removed",
+            output: `${args.file} has been removed from protected files.`,
+          }
+        }
+
+        const patternReason = isProtectedFile(args.file, config)
+        if (patternReason) {
+          return {
+            title: "Protected By Pattern",
+            output: `${args.file} matches an always-protected pattern (${patternReason}), so removing this exact string would have no effect. Remove the pattern entry itself, or use "/guard off" (with confirmation) to disable the guard temporarily. Nothing was removed.`,
+          }
+        }
+
+        const base = guardBasename(normalizeGuardPath(args.file))
+        const afterApproval = config.protectedAfterApproval.some(f => guardBasename(normalizeGuardPath(f)) === base)
+        const byPhase = Object.values(config.protectedByPhase).some(files => files.some(f => guardBasename(normalizeGuardPath(f)) === base))
+        if (afterApproval || byPhase) {
+          const how = afterApproval ? "after approval" : "by workflow phase"
+          return {
+            title: "Protected Dynamically",
+            output: `${args.file} is not in the always-protected list. It is protected ${how} based on spec.json state, so it cannot be removed individually. Use "/guard off" (with confirmation) to disable the guard temporarily, or leave the protection in place. Nothing was removed.`,
+          }
+        }
+
         return {
-          title: "Protection Removed",
-          output: `${args.file} has been removed from protected files.`,
+          title: "Not Protected",
+          output: `${args.file} is not in the always-protected list. Nothing was removed.`,
         }
       }
 

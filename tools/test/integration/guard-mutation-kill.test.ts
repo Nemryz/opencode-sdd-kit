@@ -329,6 +329,39 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
       expect(result.title).toBe("Error")
       expect(result.output).toContain("Please specify a file")
     })
+
+    it("confirmed remove of unknown file returns Not Protected", async () => {
+      const result = await runTool({ subcommand: "remove", file: "ghost.md", confirmed: true })
+      expect(result.title).toBe("Not Protected")
+      expect(result.output).toContain("Nothing was removed")
+    })
+
+    it("confirmed remove of pattern match returns Protected By Pattern", async () => {
+      const result = await runTool({ subcommand: "remove", file: "constitution.md", confirmed: true })
+      expect(result.title).toBe("Protected By Pattern")
+    })
+
+    it("confirmed remove of dynamic basename returns Protected Dynamically", async () => {
+      const result = await runTool({ subcommand: "remove", file: "spec.md", confirmed: true })
+      expect(result.title).toBe("Protected Dynamically")
+      expect(result.output).toContain("after approval")
+    })
+
+    it("reports phase-only protection with phase wording", async () => {
+      await writeGuardConfig({
+        ...DEFAULT_CONFIG,
+        protectedAfterApproval: [],
+        protectedByPhase: { ready: ["plan.md"] },
+      })
+      const result = await runTool({ subcommand: "remove", file: "plan.md", confirmed: true })
+      expect(result.title).toBe("Protected Dynamically")
+      expect(result.output).toContain("by workflow phase")
+    })
+
+    it("does not write config when nothing is removed", async () => {
+      await runTool({ subcommand: "remove", file: "ghost.md", confirmed: true })
+      await expect(fs.access(path.join(tmpDir, ".opencode", "guard.json"))).rejects.toThrow()
+    })
   })
 
   describe("subcommands - log", () => {

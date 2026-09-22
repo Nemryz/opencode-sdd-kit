@@ -108,6 +108,38 @@ describe("speckit-guard integration", () => {
       expect(result.title).toBe("Error")
       expect(result.output).toContain("specify a file")
     })
+
+    it("reports dynamically protected file instead of false success", async () => {
+      const result = await runTool({ subcommand: "remove", file: "spec.md", confirmed: true })
+      expect(result.title).toBe("Protected Dynamically")
+      expect(result.output).toContain("after approval")
+      expect(result.output).toContain("Nothing was removed")
+    })
+
+    it("reports dynamic protection for full paths by basename", async () => {
+      const result = await runTool({ subcommand: "remove", file: path.join(tmpDir, "specs", "001-x", "plan.md"), confirmed: true })
+      expect(result.title).toBe("Protected Dynamically")
+    })
+
+    it("reports always-protected pattern match without removing", async () => {
+      const result = await runTool({ subcommand: "remove", file: "constitution.md", confirmed: true })
+      expect(result.title).toBe("Protected By Pattern")
+      expect(result.output).toContain("Nothing was removed")
+    })
+
+    it("reports not protected file without claiming success", async () => {
+      const result = await runTool({ subcommand: "remove", file: "notes.md", confirmed: true })
+      expect(result.title).toBe("Not Protected")
+      expect(result.output).toContain("Nothing was removed")
+    })
+
+    it("keeps config unchanged when removing a dynamic entry", async () => {
+      await runTool({ subcommand: "add", file: "test.md" })
+      await runTool({ subcommand: "remove", file: "spec.md", confirmed: true })
+      const config = JSON.parse(await fs.readFile(path.join(tmpDir, ".opencode", "guard.json"), "utf-8"))
+      expect(config.protectedFiles).toContain("test.md")
+      expect(config.protectedFiles).not.toContain("spec.md")
+    })
   })
 
   describe("log subcommand", () => {
