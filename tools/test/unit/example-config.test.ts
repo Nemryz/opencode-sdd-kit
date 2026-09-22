@@ -19,8 +19,13 @@ describe("opencode.jsonc.example approval gate", () => {
     expect(config.permission?.external_directory?.["~/.config/opencode/**"]).toBe("allow")
   })
 
-  it("registers the runtime plugins", () => {
-    expect(Array.isArray(config.plugin)).toBe(true)
-    expect(config.plugin.length).toBeGreaterThanOrEqual(2)
+  it("does not use local file paths in the plugin array", () => {
+    const plugin = config.plugin
+    if (plugin === undefined) return
+    expect(Array.isArray(plugin)).toBe(true)
+    for (const entry of plugin) {
+      expect(typeof entry).toBe("string")
+      expect(entry).not.toMatch(/^[.~]|[\\/]/)
+    }
   })
 })

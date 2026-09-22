@@ -1,0 +1,28 @@
+import { describe, it, expect } from "vitest"
+import fs from "node:fs/promises"
+import path from "node:path"
+import guardShim from "../../../plugins/speckit-guard"
+import perfmonShim from "../../../plugins/speckit-perfmon"
+
+const PLUGINS_DIR = path.resolve(import.meta.dirname, "..", "..", "..", "plugins")
+
+describe("local plugin loading shims", () => {
+  it("guard shim exposes id and server", () => {
+    expect(guardShim.id).toBe("speckit-guard")
+    expect(typeof guardShim.server).toBe("function")
+  })
+
+  it("perfmon shim exposes id and server", () => {
+    expect(perfmonShim.id).toBe("speckit-perfmon")
+    expect(typeof perfmonShim.server).toBe("function")
+  })
+
+  it("plugins directory only contains loadable TypeScript shims", async () => {
+    const entries = await fs.readdir(PLUGINS_DIR)
+    for (const entry of entries) {
+      expect(entry.endsWith(".ts")).toBe(true)
+    }
+    expect(entries).toContain("speckit-guard.ts")
+    expect(entries).toContain("speckit-perfmon.ts")
+  })
+})

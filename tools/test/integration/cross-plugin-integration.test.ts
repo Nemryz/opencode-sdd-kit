@@ -156,4 +156,43 @@ describe("Cross-Plugin Integration", () => {
       expect(stored.stats).toHaveLength(0)
     })
   })
+
+  describe("Plugin load markers", () => {
+    const markerPath = () => path.join(worktree, ".opencode", "plugins-state.json")
+
+    it("guard plugin writes a load marker on startup", async () => {
+      await guardPlugin.server({ worktree } as any)
+      const state = JSON.parse(await fs.readFile(markerPath(), "utf-8"))
+      expect(state["speckit-guard"]?.loadedAt).toBeDefined()
+    })
+
+    it("perfmon plugin writes a load marker on startup", async () => {
+      await perfmonPlugin.server({ worktree } as any)
+      const state = JSON.parse(await fs.readFile(markerPath(), "utf-8"))
+      expect(state["speckit-perfmon"]?.loadedAt).toBeDefined()
+    })
+
+    it("merges markers from multiple plugins", async () => {
+      await guardPlugin.server({ worktree } as any)
+      await perfmonPlugin.server({ worktree } as any)
+      const state = JSON.parse(await fs.readFile(markerPath(), "utf-8"))
+      expect(state["speckit-guard"]).toBeDefined()
+      expect(state["speckit-perfmon"]).toBeDefined()
+    })
+
+    it("preserves existing marker entries on restart", async () => {
+      await guardPlugin.server({ worktree } as any)
+      await perfmonPlugin.server({ worktree } as any)
+      await guardPlugin.server({ worktree } as any)
+      const state = JSON.parse(await fs.readFile(markerPath(), "utf-8"))
+      expect(Object.keys(state).sort()).toEqual(["speckit-guard", "speckit-perfmon"])
+    })
+
+    it("recovers from a corrupt marker file", async () => {
+      await fs.writeFile(markerPath(), "not json", "utf-8")
+      await guardPlugin.server({ worktree } as any)
+      const state = JSON.parse(await fs.readFile(markerPath(), "utf-8"))
+      expect(state["speckit-guard"]?.loadedAt).toBeDefined()
+    })
+  })
 })

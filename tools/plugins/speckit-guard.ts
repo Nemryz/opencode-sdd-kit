@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
-import { withLock, atomicWriteFile } from "../shared/io"
+import { withLock, atomicWriteFile, markPluginLoaded } from "../shared/io"
 
 export const GuardConfigSchema = z.object({
   version: z.number(),
@@ -153,6 +153,7 @@ export function addDenial(config: GuardConfig, file: string, reason: string): vo
 
 const guardPlugin: Plugin = async (input) => {
   const configPath = path.join(input.worktree, ".opencode", "guard.json")
+  await markPluginLoaded(input.worktree, "speckit-guard")
 
   async function readConfig(): Promise<GuardConfig> {
     let parsed: unknown = null

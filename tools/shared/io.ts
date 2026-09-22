@@ -456,6 +456,29 @@ export function pushCorruptionWarning(fp: string, errorMsg: string, suggestion?:
   }
 }
 
+// ─────────────────────────── Plugin Diagnostics ───────────────────────────
+
+export async function markPluginLoaded(worktree: string, pluginId: string): Promise<void> {
+  try {
+    const markerPath = path.join(worktree, ".opencode", "plugins-state.json")
+    await withLock(markerPath, async () => {
+      let state: Record<string, { loadedAt: string }> = {}
+      try {
+        const parsed = JSON.parse(await fs.readFile(markerPath, "utf-8"))
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          state = parsed
+        }
+      } catch {
+        // first load, keep empty state
+      }
+      state[pluginId] = { loadedAt: new Date().toISOString() }
+      await atomicWriteFile(markerPath, JSON.stringify(state, null, 2))
+    })
+  } catch {
+    // markers are diagnostic only, plugin startup must never fail because of them
+  }
+}
+
 // ─────────────────────────── Session I/O ───────────────────────────
 
 export async function readSession(root: string): Promise<SessionState> {

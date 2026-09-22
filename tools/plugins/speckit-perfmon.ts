@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { markPluginLoaded } from "../shared/io"
 
 type PerfStats = {
   tool: string
@@ -44,6 +45,7 @@ function generateRecommendations(stats: PerfStats[]): string[] {
 
 const perfPlugin: Plugin = async (input) => {
   const perfPath = path.join(input.worktree, ".opencode", "perf.json")
+  await markPluginLoaded(input.worktree, "speckit-perfmon")
 
   return {
     "tool.execute.before": async (toolInput, toolOutput) => {

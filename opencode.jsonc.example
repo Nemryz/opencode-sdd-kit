@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-flash-free",
-  "plugin": ["./tools/plugins/speckit-perfmon.ts", "./tools/plugins/speckit-guard.ts"],
   "agent": {
     "spec": {
       "model": "opencode/mimo-v2.5-free",
