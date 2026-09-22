@@ -75,6 +75,7 @@ Creates `specs/NNN-slug/tasks.md` with phases, `[P]` parallel markers, and ASCII
 ### `/impl [task-id]`
 Execute implementation. Loads `speckit-implementer` skill.
 Pre-validates: spec, plan, and tasks must exist.
+Records the phase transition with `speckit-phase` (`impl` at start, `complete` after final verification).
 Executes in dependency order. Run tests after each phase.
 If task-id is specified, start from that task.
 
@@ -206,6 +207,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-perf` | Show performance statistics for all tools | `subcommand` (optional: "top N", "reset") |
 | `speckit-guard` | Manage file protection guard for critical SDD artifacts | `subcommand` (optional: "on", "off", "status", "add", "remove", "log", "debug"), `file` (for add/remove), `confirmed` (bool, for off/remove after user confirmation), `logOption` (optional: "all"), `debugOption` (optional: "on", "off") |
 | `speckit-approve` | Approve a generated artifact to unlock the next phase | `artifact` (spec/plan/tasks), `confirmed` (bool, after user confirmation) |
+| `speckit-phase` | Advance the feature phase to impl or complete after implementation | `phase` (impl/complete) |
 
 ---
 
@@ -300,7 +302,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-approve`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-approve`, `speckit-phase`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 

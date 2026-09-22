@@ -1,0 +1,108 @@
+import { tool } from "@opencode-ai/plugin"
+import path from "node:path"
+import {
+  getLatestFeatureDir,
+  getProjectRootWarnings,
+  isValidProjectRoot,
+  readSession,
+  readSpecJson,
+  specsDirPath,
+  syncFrontmatterFromSpecJson,
+  writeSession,
+  writeSpecJson,
+} from "./shared/types"
+
+const NEXT_STEPS: Record<string, string> = {
+  impl: "/impl (continue)",
+  complete: "/review or start a new feature",
+}
+
+const ALLOWED_FROM: Record<string, string> = {
+  impl: "ready",
+  complete: "impl",
+}
+
+export default tool({
+  description: "Advance the feature phase to impl or complete after implementation work",
+  args: {
+    phase: tool.schema.enum(["impl", "complete"]).describe("Target phase"),
+  },
+  async execute(args, context) {
+    try {
+      const projectRoot = context.worktree
+      if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
+      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const projectWarnings = await getProjectRootWarnings(projectRoot)
+      if (projectWarnings.length > 0) {
+        return {
+          title: "Warning",
+          output: projectWarnings.map(w => w.message).join("\n\n"),
+          metadata: { warnings: projectWarnings, requiresConfirmation: true },
+        }
+      }
+
+      const session = await readSession(projectRoot)
+      const featureDir = session.featureDir ?? await getLatestFeatureDir(projectRoot)
+      if (!featureDir) {
+        return { title: "Error", output: "No feature found. Run /spec first." }
+      }
+
+      const base = path.join(specsDirPath(projectRoot), featureDir)
+      const specJson = await readSpecJson(base)
+      if (!specJson) {
+        return { title: "Error", output: `spec.json not found in specs/${featureDir}` }
+      }
+
+      if (!specJson.approvals.tasks.approved) {
+        return { title: "Error", output: `Tasks are not approved for ${featureDir}. Run /approve tasks first.` }
+      }
+
+      const target = args.phase
+      const current = specJson.phase
+
+      if (current === target) {
+        return {
+          title: `Phase: ${target}`,
+          output: `Already in ${target} phase for ${featureDir}.  Next: ${NEXT_STEPS[target]}`,
+          metadata: { phase: target, featureDir, previousPhase: current },
+        }
+      }
+
+      if (current !== ALLOWED_FROM[target]) {
+        return {
+          title: "Error",
+          output: `Cannot move to ${target} from ${current} for ${featureDir}. Expected current phase: ${ALLOWED_FROM[target]}.`,
+          metadata: { phase: current, featureDir },
+        }
+      }
+
+      specJson.phase = target
+      await writeSpecJson(specJson, base)
+      await syncFrontmatterFromSpecJson(base, specJson)
+
+      const nextStep = NEXT_STEPS[target]
+      await writeSession(projectRoot, {
+        ...session,
+        command: "/phase",
+        phase: target,
+        featureDir,
+        nextStep,
+        lastResult: `phase ${current} -> ${target} for ${featureDir}`,
+        history: [...session.history, `/phase ${target}`],
+      })
+
+      return {
+        title: `Phase: ${target}`,
+        output: `${featureDir}: ${current} -> ${target}  Next: ${nextStep}`,
+        metadata: { phase: target, featureDir, previousPhase: current, nextStep },
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return {
+        title: "Error",
+        output: `phase: ${message}`,
+        metadata: { error: message },
+      }
+    }
+  },
+})

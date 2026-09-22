@@ -119,7 +119,7 @@ If tests fail, fix before proceeding to the next phase.
 
 ### Step 6: Completion metadata
 
-Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8). Phase and `updated_at` are managed by the suite tools (`speckit-scaffold` sets `spec`/`plan`/`tasks`, `speckit-approve` sets `ready`). No tool currently records the `complete` phase, so report completion to the user in your summary and suggest `/review`; leave spec.json untouched.
+After the final verification passes, call the `speckit-phase` tool with `phase: complete` to record the transition from impl. Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8); phase and `updated_at` are managed by the suite tools (`speckit-scaffold`, `speckit-approve`, `speckit-phase`). Then report completion and suggest `/review`.
 
 ### Step 7: Final Verification
 

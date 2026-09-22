@@ -22,20 +22,21 @@ Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.tasks.
 
 ## Task
 
-1. Load the `speckit-implementer` skill to guide your implementation
-2. Read spec.md, plan.md, and tasks.md
-3. Execute tasks **in dependency order**, phase by phase:
+1. Call `speckit-phase` with `phase: impl` to record the ready -> impl transition
+2. Load the `speckit-implementer` skill to guide your implementation
+3. Read spec.md, plan.md, and tasks.md
+4. Execute tasks **in dependency order**, phase by phase:
    - Phase 1 (Setup) first
    - Phase 2 (Foundational) second
    - Phases 3-5 (Stories) in priority order
    - Phase 6 (Polish) last
-4. For each task:
+5. For each task:
    - Read relevant spec sections for context
    - Implement the code
    - Run tests immediately after
    - If `[P]` marked, execute all parallel tasks together
-5. After each phase completes, run the full test suite
-6. If a task blocks, report what failed and suggest alternatives
+6. After each phase completes, run the full test suite
+7. If a task blocks, report what failed and suggest alternatives
 
 ## Rules
 
@@ -45,6 +46,7 @@ Additionally, read `specs/{metadata.featureDir}/spec.json`. If `approvals.tasks.
 - If tests fail, fix them before proceeding
 - Report progress after each phase
 - On completion, run: build check, full test suite, lint check, manual verification
+- When all phases pass final verification, call `speckit-phase` with `phase: complete`
 
 ## Optional task ID
 
