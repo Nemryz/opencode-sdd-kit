@@ -119,10 +119,9 @@ describe("speckit-guard mutation", () => {
       expect(result.metadata?.requiresConfirmation).toBe(true)
     })
 
-    it("onConfirm returns title", async () => {
-      const result = await runTool({ subcommand: "off" })
-      const confirm = await result.metadata?.onConfirm()
-      expect(confirm?.title).toBeDefined()
+    it("confirmed off returns title", async () => {
+      const result = await runTool({ subcommand: "off", confirmed: true })
+      expect(result.title).toBeDefined()
     })
 
     it("unknown subcommand returns error", async () => {

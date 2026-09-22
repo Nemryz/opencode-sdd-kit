@@ -5,6 +5,7 @@ import { isValidProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile }
 import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
+  cloneConfig,
   type GuardConfig,
 } from "./plugins/speckit-guard"
 
@@ -59,6 +60,7 @@ export default tool({
     file: tool.schema.string().optional().describe("File path for add/remove commands"),
     logOption: tool.schema.enum(["all"]).optional().describe("Log option for save all denials"),
     debugOption: tool.schema.enum(["on", "off"]).optional().describe("Debug option"),
+    confirmed: tool.schema.boolean().optional().describe("Set to true only after the user explicitly confirms a destructive operation"),
   },
   async execute(args, context) {
     try {
@@ -82,10 +84,10 @@ export default tool({
         try {
           parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
         } catch {
-          return { ...DEFAULT_CONFIG }
+          return cloneConfig(DEFAULT_CONFIG)
         }
         const result = GuardConfigSchema.safeParse({ ...DEFAULT_CONFIG, ...(parsed as object) })
-        return result.success ? result.data : { ...DEFAULT_CONFIG }
+        return result.success ? result.data : cloneConfig(DEFAULT_CONFIG)
       }
 
       async function writeConfig(config: GuardConfig): Promise<void> {
@@ -117,21 +119,19 @@ export default tool({
       }
 
       if (subcommand === "off") {
+        if (!args.confirmed) {
+          return {
+            title: "Confirm Guard Disable",
+            output: "Are you sure you want to disable the file protection guard? This will allow edits to all protected files. Ask the user to confirm, then re-run with confirmed: true.",
+            metadata: { requiresConfirmation: true },
+          }
+        }
+        const config = await readConfig()
+        config.enabled = false
+        await writeConfig(config)
         return {
-          title: "Confirm Guard Disable",
-          output: "Are you sure you want to disable the file protection guard? This will allow edits to all protected files.",
-          metadata: {
-            requiresConfirmation: true,
-            onConfirm: async () => {
-              const config = await readConfig()
-              config.enabled = false
-              await writeConfig(config)
-              return {
-                title: "Guard Disabled",
-                output: "File protection guard has been disabled.",
-              }
-            },
-          },
+          title: "Guard Disabled",
+          output: "File protection guard has been disabled.",
         }
       }
 
@@ -154,21 +154,19 @@ export default tool({
         if (!args.file) {
           return { title: "Error", output: "Please specify a file to remove from protection." }
         }
+        if (!args.confirmed) {
+          return {
+            title: "Confirm Remove Protection",
+            output: `Are you sure you want to remove protection for ${args.file}? This will allow edits to that file. Ask the user to confirm, then re-run with confirmed: true.`,
+            metadata: { requiresConfirmation: true },
+          }
+        }
+        const config = await readConfig()
+        config.protectedFiles = config.protectedFiles.filter(f => f !== args.file)
+        await writeConfig(config)
         return {
-          title: "Confirm Remove Protection",
-          output: `Are you sure you want to remove protection for ${args.file}?`,
-          metadata: {
-            requiresConfirmation: true,
-            onConfirm: async () => {
-              const config = await readConfig()
-              config.protectedFiles = config.protectedFiles.filter(f => f !== args.file)
-              await writeConfig(config)
-              return {
-                title: "Protection Removed",
-                output: `${args.file} has been removed from protected files.`,
-              }
-            },
-          },
+          title: "Protection Removed",
+          output: `${args.file} has been removed from protected files.`,
         }
       }
 

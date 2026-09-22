@@ -213,22 +213,19 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
       expect(result.metadata?.requiresConfirmation).toBe(true)
     })
 
-    it("onConfirm returns Guard Disabled title", async () => {
-      const result = await runTool({ subcommand: "off" })
-      const confirm = await result.metadata?.onConfirm()
-      expect(confirm?.title).toBe("Guard Disabled")
+    it("confirmed off returns Guard Disabled title", async () => {
+      const result = await runTool({ subcommand: "off", confirmed: true })
+      expect(result.title).toBe("Guard Disabled")
     })
 
-    it("onConfirm output contains disabled message", async () => {
-      const result = await runTool({ subcommand: "off" })
-      const confirm = await result.metadata?.onConfirm()
-      expect(confirm?.output).toContain("has been disabled")
+    it("confirmed off output contains disabled message", async () => {
+      const result = await runTool({ subcommand: "off", confirmed: true })
+      expect(result.output).toContain("has been disabled")
     })
 
-    it("onConfirm sets enabled to false", async () => {
+    it("confirmed off sets enabled to false", async () => {
       await runTool({ subcommand: "on" })
-      const result = await runTool({ subcommand: "off" })
-      await result.metadata?.onConfirm()
+      await runTool({ subcommand: "off", confirmed: true })
       const config = await readGuardConfig()
       expect(config.enabled).toBe(false)
     })
@@ -308,24 +305,21 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
       expect(result.metadata?.requiresConfirmation).toBe(true)
     })
 
-    it("onConfirm returns Protection Removed title", async () => {
+    it("confirmed remove returns Protection Removed title", async () => {
       await runTool({ subcommand: "add", file: "test.md" })
-      const result = await runTool({ subcommand: "remove", file: "test.md" })
-      const confirm = await result.metadata?.onConfirm()
-      expect(confirm?.title).toBe("Protection Removed")
+      const result = await runTool({ subcommand: "remove", file: "test.md", confirmed: true })
+      expect(result.title).toBe("Protection Removed")
     })
 
-    it("onConfirm output contains removed message", async () => {
+    it("confirmed remove output contains removed message", async () => {
       await runTool({ subcommand: "add", file: "test.md" })
-      const result = await runTool({ subcommand: "remove", file: "test.md" })
-      const confirm = await result.metadata?.onConfirm()
-      expect(confirm?.output).toContain("has been removed")
+      const result = await runTool({ subcommand: "remove", file: "test.md", confirmed: true })
+      expect(result.output).toContain("has been removed")
     })
 
-    it("onConfirm removes file from config", async () => {
+    it("confirmed remove removes file from config", async () => {
       await runTool({ subcommand: "add", file: "test.md" })
-      const result = await runTool({ subcommand: "remove", file: "test.md" })
-      await result.metadata?.onConfirm()
+      await runTool({ subcommand: "remove", file: "test.md", confirmed: true })
       const config = await readGuardConfig()
       expect(config.protectedFiles).not.toContain("test.md")
     })
@@ -1008,26 +1002,24 @@ describe("Guard Phase 2: Killing Mutants in speckit-guard.ts", () => {
   })
 
   describe("remove - filter callback verification", () => {
-    it("onConfirm removes only the specified file and keeps others", async () => {
+    it("confirmed remove removes only the specified file and keeps others", async () => {
       await writeGuardConfig({
         ...DEFAULT_CONFIG,
         protectedFiles: ["file1.md", "file2.md", "file3.md"],
       })
-      const result = await runTool({ subcommand: "remove", file: "file2.md" })
-      await result.metadata?.onConfirm()
+      await runTool({ subcommand: "remove", file: "file2.md", confirmed: true })
       const config = await readGuardConfig()
       expect(config.protectedFiles).not.toContain("file2.md")
       expect(config.protectedFiles).toContain("file1.md")
       expect(config.protectedFiles).toContain("file3.md")
     })
 
-    it("onConfirm with empty file list results in empty array", async () => {
+    it("confirmed remove with empty file list results in empty array", async () => {
       await writeGuardConfig({
         ...DEFAULT_CONFIG,
         protectedFiles: ["only.md"],
       })
-      const result = await runTool({ subcommand: "remove", file: "only.md" })
-      await result.metadata?.onConfirm()
+      await runTool({ subcommand: "remove", file: "only.md", confirmed: true })
       const config = await readGuardConfig()
       expect(config.protectedFiles).not.toContain("only.md")
       expect(config.protectedFiles.length).toBe(0)

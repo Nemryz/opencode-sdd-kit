@@ -56,10 +56,16 @@ describe("speckit-guard integration", () => {
       expect(result.metadata?.requiresConfirmation).toBe(true)
     })
 
-    it("executes onConfirm", async () => {
-      const result = await runTool({ subcommand: "off" })
-      const confirmResult = await result.metadata?.onConfirm()
-      expect(confirmResult?.title).toBe("Guard Disabled")
+    it("disables guard when confirmed", async () => {
+      const result = await runTool({ subcommand: "off", confirmed: true })
+      expect(result.title).toBe("Guard Disabled")
+    })
+
+    it("does not disable guard without confirmed", async () => {
+      await runTool({ subcommand: "on" })
+      await runTool({ subcommand: "off" })
+      const config = JSON.parse(await fs.readFile(path.join(tmpDir, ".opencode", "guard.json"), "utf-8"))
+      expect(config.enabled).toBe(true)
     })
   })
 
@@ -84,10 +90,17 @@ describe("speckit-guard integration", () => {
       expect(result.metadata?.requiresConfirmation).toBe(true)
     })
 
-    it("executes onConfirm", async () => {
-      const result = await runTool({ subcommand: "remove", file: "test.md" })
-      const confirmResult = await result.metadata?.onConfirm()
-      expect(confirmResult?.title).toBe("Protection Removed")
+    it("removes file when confirmed", async () => {
+      await runTool({ subcommand: "add", file: "test.md" })
+      const result = await runTool({ subcommand: "remove", file: "test.md", confirmed: true })
+      expect(result.title).toBe("Protection Removed")
+    })
+
+    it("does not remove file without confirmed", async () => {
+      await runTool({ subcommand: "add", file: "test.md" })
+      await runTool({ subcommand: "remove", file: "test.md" })
+      const config = JSON.parse(await fs.readFile(path.join(tmpDir, ".opencode", "guard.json"), "utf-8"))
+      expect(config.protectedFiles).toContain("test.md")
     })
 
     it("returns error without file", async () => {
