@@ -9,6 +9,7 @@
     }
   },
   "permission": {
+    "speckit-approve": "ask",
     "external_directory": {
       "~/.config/opencode/**": "allow"
     }
