@@ -56,7 +56,7 @@ For simple or obvious decisions, skip sub-agent dispatch entirely.
 
 ### Step 3: Conversational Proposal
 
-**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default architecture approach, then update spec.json.
+**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default architecture approach. spec.json metadata is recorded by the scaffold tool — never edit it manually.
 
 Propose the architecture approach before writing:
 
@@ -97,12 +97,9 @@ Wait for user confirmation before proceeding.
 8. Add `_Boundary: ComponentName_` annotations to each component description to document ownership and integration points
 9. Mark the plan as IMMUTABLE once written (do not modify after approval)
 
-### Step 5: Update spec.json
+### Step 5: spec.json is tool-managed
 
-After writing all plan artifacts, update `specs/NNN-feature-name/spec.json`:
-- Set `approvals.plan.generated = true`
-- Set `phase = "plan"`
-- Set `updated_at` to current UTC ISO-8601
+Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8). `speckit-scaffold` with `template: "plan"` already set `approvals.plan.generated = true`, `phase = "plan"`, and `updated_at`. If metadata looks missing or wrong, re-run the scaffold tool instead of editing the JSON.
 
 ## Safety & Fallback
 

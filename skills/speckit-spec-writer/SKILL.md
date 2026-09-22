@@ -39,7 +39,7 @@ If no steering documents exist, skip gracefully — do not fail.
 
 ### Step 2: Conversational Proposal
 
-**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default story structure, then update spec.json.
+**Express Mode**: Read SDD configuration from `.opencode/spec-memory/config.json`. If `expressMode` is `true`, skip this step and proceed directly to generation with default story structure. spec.json metadata is recorded by the scaffold tool — never edit it manually.
 
 Before writing any files, propose the spec structure to the user:
 
@@ -77,14 +77,9 @@ If the feature description is ambiguous or the domain is unfamiliar, dispatch su
 1. **`@explore` sub-agent**: Researches existing codebase patterns, similar features in specs/, or external references to resolve ambiguities
 2. **`@spec-writing` sub-agent** (future): Generates story candidates from research findings for review
 
-### Step 4: Update spec.json
+### Step 4: spec.json is tool-managed
 
-After writing the spec, update the feature's `spec.json`:
-- Set `approvals.spec.generated = true`
-- Set `updated_at` to current UTC ISO-8601
-- Keep `phase` as `"spec"` (scaffold already sets this)
-
-The spec.json is at `specs/NNN-feature-name/spec.json`. Read it first, modify fields, then write back.
+Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8). The `speckit-scaffold` tool already set `approvals.spec.generated = true`, `phase = "spec"`, and `updated_at` when it created the file. Approval is recorded later by `speckit-approve`. If metadata looks missing or wrong, re-run the corresponding tool instead of editing the JSON.
 
 ## Safety & Fallback
 

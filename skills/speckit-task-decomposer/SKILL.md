@@ -76,7 +76,7 @@ Wait for user confirmation before writing.
 
 ### Step 4: Task-Graph Sanity Review
 
-Before writing spec.json, run a lightweight review:
+Before finishing the tasks phase, run a lightweight review:
 
 1. Every user story has at least one task
 2. Every task has a verifiable deliverable
@@ -94,12 +94,9 @@ Use `_Boundary: ComponentName_` annotations to assign scope to each sub-agent.
 
 If issues found, repair once and re-check. If still failing, report the gap.
 
-### Step 5: Update spec.json
+### Step 5: spec.json is tool-managed
 
-Only after the sanity review passes, update `specs/NNN-feature-name/spec.json`:
-- Set `approvals.tasks.generated = true`
-- Set `phase = "tasks"`
-- Set `updated_at` to current UTC ISO-8601
+Only after the sanity review passes, confirm the metadata is in place. Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8). `speckit-scaffold` with `template: "tasks"` already set `approvals.tasks.generated = true`, `phase = "tasks"`, and `updated_at`. If metadata looks missing or wrong, re-run the scaffold tool instead of editing the JSON.
 
 ## Task format
 

@@ -117,11 +117,9 @@ After all tasks in a phase complete, run:
 
 If tests fail, fix before proceeding to the next phase.
 
-### Step 6: Update spec.json
+### Step 6: Completion metadata
 
-After all phases complete, update `specs/NNN-feature-name/spec.json`:
-- Set `phase = "complete"`
-- Set `updated_at` to current UTC ISO-8601
+Do NOT edit `specs/NNN-feature-name/spec.json` manually — the file protection guard blocks it (AGENTS.md rule 8). Phase and `updated_at` are managed by the suite tools (`speckit-scaffold` sets `spec`/`plan`/`tasks`, `speckit-approve` sets `ready`). No tool currently records the `complete` phase, so report completion to the user in your summary and suggest `/review`; leave spec.json untouched.
 
 ### Step 7: Final Verification
 
