@@ -58,6 +58,8 @@ export const DEFAULT_CONFIG: GuardConfig = {
 
 const MAX_DENIALS_LOG = 10
 
+const FILE_TOOLS = ["write", "edit", "apply_patch", "patch"]
+
 export function normalizeGuardPath(p: string): string {
   const unified = p.replace(/\\/g, "/")
   return process.platform === "win32" || process.platform === "darwin" ? unified.toLowerCase() : unified
@@ -215,7 +217,41 @@ const guardPlugin: Plugin = async (input) => {
     await writeConfig(config)
   }
 
+  async function block(config: GuardConfig, displayPath: string, reason: string): Promise<never> {
+    config.stats.denied++
+    addDenial(config, displayPath, reason)
+    if (config.debug) {
+      console.log(`[Guard] BLOCKED: ${displayPath} - ${reason}`)
+    }
+    await writeConfig(config)
+    throw new Error(`Guard blocked protected file: ${displayPath} (${reason})`)
+  }
+
   return {
+    "tool.execute.before": async (toolInput, toolOutput) => {
+      const config = await readConfig()
+      if (!config.enabled) return
+
+      const args = (toolOutput?.args ?? {}) as Record<string, unknown>
+      const tool = toolInput?.tool
+
+      if (FILE_TOOLS.includes(tool)) {
+        const rawPath = args.filePath ?? args.path
+        if (typeof rawPath !== "string" || rawPath.length === 0) return
+        const reason = await evaluatePath(rawPath, config)
+        if (reason) await block(config, rawPath, reason)
+        return
+      }
+
+      if (tool === "bash") {
+        const command = typeof args.command === "string" ? args.command : ""
+        for (const target of extractRedirectTargets(command)) {
+          const reason = await evaluatePath(target, config)
+          if (reason) await block(config, target, `shell redirect target: ${reason}`)
+        }
+      }
+    },
+
     "permission.ask": async (permission, output) => {
       const config = await readConfig()
       if (!config.enabled) return

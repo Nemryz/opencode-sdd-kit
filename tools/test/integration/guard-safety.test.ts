@@ -39,6 +39,40 @@ function sessionFile(): string {
   return path.join(worktree, ".opencode", "spec-memory", "session.json")
 }
 
+async function runBefore(tool: string, args: Record<string, unknown>): Promise<string | null> {
+  const hooks = await guardPlugin.server({ worktree } as never)
+  try {
+    await hooks["tool.execute.before"]!(
+      { tool, sessionID: "s1", callID: "c1" } as never,
+      { args } as never,
+    )
+    return null
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function writeFeatureSpecJson(planApproved: boolean): Promise<string> {
+  const featureDir = path.join(worktree, "specs", "001-test")
+  await fs.mkdir(featureDir, { recursive: true })
+  await fs.writeFile(path.join(featureDir, "plan.md"), "# Plan\n", "utf-8")
+  const spec = {
+    feature_name: "test",
+    feature_number: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    phase: "plan",
+    approvals: {
+      spec: { generated: true, approved: true },
+      plan: { generated: true, approved: planApproved },
+      tasks: { generated: false, approved: false },
+    },
+    ready_for_implementation: false,
+  }
+  await fs.writeFile(path.join(featureDir, "spec.json"), JSON.stringify(spec), "utf-8")
+  return featureDir
+}
+
 describe("guard case sensitivity and normalization", () => {
   it.skipIf(process.platform === "linux")("matches protected files case-insensitively", () => {
     const reason = isProtectedFile(path.join(worktree, ".opencode", "spec-memory", "SESSION.JSON"), DEFAULT_CONFIG)
@@ -257,5 +291,59 @@ describe("guard shell redirect interception", () => {
     const raw = JSON.parse(await fs.readFile(path.join(worktree, ".opencode", "guard.json"), "utf-8"))
     expect(raw.stats.denied).toBeGreaterThanOrEqual(1)
     expect(raw.denials.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe("guard tool.execute.before enforcement", () => {
+  it("blocks write to spec.json even when permissions allow", async () => {
+    const message = await runBefore("write", { filePath: path.join(worktree, "specs", "001-test", "spec.json") })
+    expect(message).not.toBeNull()
+    expect(message).toContain("Guard blocked")
+    expect(message).toContain("spec.json")
+  })
+
+  it("blocks apply_patch and edit to protected state files", async () => {
+    expect(await runBefore("apply_patch", { filePath: sessionFile() })).toContain("Guard blocked")
+    expect(await runBefore("edit", { filePath: path.join(worktree, ".opencode", "guard.json") })).toContain("Guard blocked")
+  })
+
+  it("blocks editing an approved plan.md", async () => {
+    const featureDir = await writeFeatureSpecJson(true)
+    const message = await runBefore("write", { filePath: path.join(featureDir, "plan.md") })
+    expect(message).not.toBeNull()
+    expect(message).toContain("approved")
+  })
+
+  it("allows editing a plan.md that is not approved yet", async () => {
+    const featureDir = await writeFeatureSpecJson(false)
+    expect(await runBefore("write", { filePath: path.join(featureDir, "plan.md") })).toBeNull()
+  })
+
+  it("blocks bash redirects to protected files", async () => {
+    const message = await runBefore("bash", { command: "echo forged > .opencode/spec-memory/session.json" })
+    expect(message).not.toBeNull()
+    expect(message).toContain("Guard blocked")
+  })
+
+  it("allows writes to unprotected files", async () => {
+    expect(await runBefore("write", { filePath: path.join(worktree, "specs", "001-test", "notes.md") })).toBeNull()
+  })
+
+  it("allows everything when the guard is disabled", async () => {
+    await fs.mkdir(path.join(worktree, ".opencode"), { recursive: true })
+    await fs.writeFile(path.join(worktree, ".opencode", "guard.json"), JSON.stringify({ ...DEFAULT_CONFIG, enabled: false }), "utf-8")
+    expect(await runBefore("write", { filePath: sessionFile() })).toBeNull()
+  })
+
+  it("records the blocked denial in guard.json", async () => {
+    await runBefore("write", { filePath: sessionFile() })
+    const raw = JSON.parse(await fs.readFile(path.join(worktree, ".opencode", "guard.json"), "utf-8"))
+    expect(raw.stats.denied).toBeGreaterThanOrEqual(1)
+    expect(raw.denials.some((d: { file: string }) => d.file.includes("session.json"))).toBe(true)
+  })
+
+  it.skipIf(process.platform === "linux")("blocks uppercase protected paths", async () => {
+    const message = await runBefore("write", { filePath: path.join(worktree, ".opencode", "spec-memory", "SESSION.JSON") })
+    expect(message).toContain("Guard blocked")
   })
 })
