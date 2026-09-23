@@ -114,6 +114,7 @@ Show the status of incremental delta specs. Uses `speckit-delta` tool with `comm
 
 ### `/snapshot [create|list|verify <id>|preview <id>|restore <id>|pin <id> [label]|unpin <id>|drill <id>|prune|recover]`
 Manage point-in-time snapshots of the SDD state. Uses `speckit-snapshot` tool.
+Automatic verified snapshots run before phase transitions, tasks approval, and `--fix` operations (audit, clean, health, selfheal). If the snapshot fails, the operation is blocked and nothing changes; failed fixes leave a post-failure snapshot. `/health` recovers interrupted restores with `--fix`.
 `restore` requires user confirmation (`confirmed: true`); `list` reports Recovery Readiness.
 
 ---

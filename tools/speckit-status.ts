@@ -21,6 +21,7 @@ import {
   corruptionWarnings,
   clearCorruptionWarnings,
 } from "./shared/types"
+import { readRestoreJournal } from "./shared/snapshot"
 
 export default tool({
   description: "Show the current Spec-Driven Development workflow state across all features",
@@ -110,11 +111,14 @@ export default tool({
       const corruptionLines = corruptionWarnings.map(w => `[CORRUPTION] ${w.file}: ${w.message}`)
       clearCorruptionWarnings()
 
+      const journal = await readRestoreJournal(projectRoot)
+      const journalPart = journal ? "\n[INTERRUPTED RESTORE] pending — run /snapshot recover" : ""
+
       const dashboard = featurePhases.map(f => `${f.dir} (${f.phase})`).join("  ")
       const corruptionPart = corruptionLines.length > 0 ? "\n" + corruptionLines.join("\n") : ""
       const line = dirs.length === 0
-        ? "No features yet. Next: /spec <description>" + corruptionPart
-        : `${summary}  ${dashboard}  Next: ${computedNext}${corruptionPart}`
+        ? "No features yet. Next: /spec <description>" + corruptionPart + journalPart
+        : `${summary}  ${dashboard}  Next: ${computedNext}${corruptionPart}${journalPart}`
 
       return {
         title: `Status: ${dirs.length} feature(s)` + (corruptionLines.length > 0 ? " [corruption detected]" : ""),
@@ -127,6 +131,7 @@ export default tool({
           constitutionExists,
           phaseCounts,
           nextCommand: computedNext,
+          interruptedRestore: journal !== null,
         },
       }
     } catch (err) {

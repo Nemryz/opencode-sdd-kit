@@ -45,7 +45,10 @@ exports[`Snapshot: /health (corrupted) > matches snapshot for corrupted state 2`
 "Session Health: CRITICAL
   session.json: healthy
   config.json: missing
+  guard.json: missing (defaults apply)
   Features: 0/0 healthy
+  Snapshots: 0 | Recovery Readiness: NOT READY
+    - no snapshots yet — run create
   Overall: CRITICAL"
 `;
 
@@ -55,8 +58,11 @@ exports[`Snapshot: /health (healthy) > matches snapshot for healthy state 2`] = 
 "Session Health: CRITICAL
   session.json: healthy
   config.json: missing
+  guard.json: missing (defaults apply)
   Features: 1/1 healthy
     001-test-feature: healthy
+  Snapshots: 0 | Recovery Readiness: NOT READY
+    - no snapshots yet — run create
   Overall: CRITICAL"
 `;
 

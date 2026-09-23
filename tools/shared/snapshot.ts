@@ -3,7 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import crypto from "node:crypto"
 import type { Dirent } from "node:fs"
-import { atomicWriteFile, stripBom } from "./io"
+import { atomicWriteFile, readSession, stripBom } from "./io"
 import {
   RestoreJournalSchema,
   SnapshotDrillSchema,
@@ -706,5 +706,156 @@ export async function pruneSnapshots(root: string): Promise<PruneReport> {
     unreadable,
     aborted: false,
     abortReason: null,
+  }
+}
+
+// ─────────────────────────── Recovery readiness ───────────────────────────
+
+export function computeRecoveryReadiness(
+  entries: SnapshotListEntry[],
+  journalPending: boolean,
+): { status: string; reasons: string[] } {
+  if (journalPending) {
+    return { status: "NOT READY", reasons: ["interrupted restore pending — run recover"] }
+  }
+  if (entries.length === 0) {
+    return { status: "NOT READY", reasons: ["no snapshots yet — run create"] }
+  }
+  const newest = entries[0]
+  if (newest && newest.status !== "verified") {
+    return { status: "NOT READY", reasons: [`newest snapshot ${newest.id} failed verification`] }
+  }
+  const reasons: string[] = []
+  if (!entries.some((entry) => entry.drill === "ok")) {
+    reasons.push("no snapshot has been drilled yet")
+  }
+  const autosPerFeature = new Map<string, number>()
+  for (const entry of entries) {
+    if ((entry.trigger ?? "") === "manual") continue
+    const key = entry.feature ?? ""
+    autosPerFeature.set(key, (autosPerFeature.get(key) ?? 0) + 1)
+  }
+  const overFeatureCap = [...autosPerFeature.values()].some((count) => count > AUTO_CAP_PER_FEATURE)
+  if (overFeatureCap || entries.length > TOTAL_CAP) {
+    reasons.push("retention over caps — run prune")
+  }
+  return { status: reasons.length === 0 ? "READY" : "DEGRADED", reasons }
+}
+
+// ─────────────────────────── Pre-operation triggers ───────────────────────────
+
+export interface TriggerSnapshotOptions {
+  feature?: string | null
+  phase?: string | null
+  now?: Date
+  skipIfUnchanged?: boolean
+}
+
+export interface TriggerSnapshotResult {
+  ok: boolean
+  snapshotId: string | null
+  reused: boolean
+  error: string | null
+}
+
+async function scopeMatchesManifest(root: string, manifest: SnapshotManifest): Promise<boolean> {
+  const relPaths = await collectScope(root)
+  if (relPaths.length !== manifest.files.length) return false
+  const expected = new Map(manifest.files.map((file) => [file.path, file.sha256]))
+  for (const rel of relPaths) {
+    const sha = expected.get(rel)
+    if (!sha) return false
+    try {
+      const content = await fs.readFile(path.join(root, ...rel.split("/")))
+      if (sha256(content) !== sha) return false
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+export async function snapshotBeforeOperation(
+  root: string,
+  trigger: string,
+  options?: TriggerSnapshotOptions,
+): Promise<TriggerSnapshotResult> {
+  try {
+    let feature = options?.feature ?? null
+    let phase = options?.phase ?? null
+    if (feature === null || phase === null) {
+      const session = await readSession(root)
+      if (feature === null) feature = session.featureDir ?? null
+      if (phase === null) phase = session.phase ?? null
+    }
+
+    let snapshotId: string | null = null
+    let reused = false
+    if (options?.skipIfUnchanged !== false) {
+      const entries = await listSnapshots(root)
+      const newest = entries[0]
+      if (newest && newest.status === "verified") {
+        const manifest = await readSnapshotManifest(root, newest.id)
+        if (manifest && await scopeMatchesManifest(root, manifest)) {
+          snapshotId = newest.id
+          reused = true
+        }
+      }
+    }
+
+    if (!snapshotId) {
+      const created = await createSnapshot(root, { trigger, feature, phase, now: options?.now })
+      snapshotId = created.id
+    }
+
+    const existingDrill = await readDrillInfo(root, snapshotId)
+    if (existingDrill?.ok !== true) {
+      const drill = await drillSnapshot(root, snapshotId, { now: options?.now })
+      if (!drill.ok) {
+        return {
+          ok: false,
+          snapshotId,
+          reused,
+          error: `snapshot ${snapshotId} drill failed: ${drill.error ?? "unknown error"}`,
+        }
+      }
+    }
+    return { ok: true, snapshotId, reused, error: null }
+  } catch (err) {
+    return {
+      ok: false,
+      snapshotId: null,
+      reused: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+export interface FailureSnapshotResult {
+  snapshotId: string | null
+  error: string | null
+}
+
+export function postFailureNote(failure: FailureSnapshotResult): string {
+  if (failure.snapshotId) return ` Post-failure snapshot: ${failure.snapshotId}.`
+  if (failure.error) return ` Post-failure snapshot failed: ${failure.error}.`
+  return ""
+}
+
+export async function snapshotAfterFailure(
+  root: string,
+  trigger: string,
+  options?: { feature?: string | null; phase?: string | null; now?: Date },
+): Promise<FailureSnapshotResult> {
+  try {
+    const created = await createSnapshot(root, {
+      trigger,
+      feature: options?.feature ?? null,
+      phase: options?.phase ?? null,
+      now: options?.now,
+    })
+    return { snapshotId: created.id, error: null }
+  } catch (err) {
+    return { snapshotId: null, error: err instanceof Error ? err.message : String(err) }
   }
 }

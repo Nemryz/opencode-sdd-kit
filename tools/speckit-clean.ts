@@ -27,6 +27,7 @@ import {
   clearCorruptionWarnings,
   stripBom,
 } from "./shared/types"
+import { postFailureNote, snapshotAfterFailure, snapshotBeforeOperation } from "./shared/snapshot"
 
 export default tool({
   description: "Scan all feature directories and report inconsistencies in artifact states",
@@ -159,6 +160,7 @@ export default tool({
           }
         }
 
+      let fixBlockedNote = ""
       if (args.fix) {
         // ── Phase 1: Collect spec.json changes ──
         interface PendingSpecChange {
@@ -202,9 +204,22 @@ export default tool({
         }
 
         // ── Phase 3: Apply all spec.json changes ──
-        for (const change of specChanges) {
-          await writeSpecJson(change.sj, change.base)
-          await syncFrontmatterFromSpecJson(change.base, change.sj)
+        if (specChanges.length > 0) {
+          const recovery = await snapshotBeforeOperation(projectRoot, "pre-fix:clean")
+          if (!recovery.ok) {
+            fixBlockedNote = `Fix blocked: pre-fix snapshot failed (${recovery.error ?? "unknown error"}). No repairs applied.`
+          } else {
+            try {
+              for (const change of specChanges) {
+                await writeSpecJson(change.sj, change.base)
+                await syncFrontmatterFromSpecJson(change.base, change.sj)
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              const failure = await snapshotAfterFailure(projectRoot, "post-failure:clean")
+              fixBlockedNote = `Fix failed: ${message}.${postFailureNote(failure)}`
+            }
+          }
         }
 
         // ── Phase 4: Collect session.json changes ──
@@ -290,20 +305,36 @@ export default tool({
         }
 
         // ── Phase 5: Apply session.json changes ──
-        if (sessionChanges.length > 0) {
-          s.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
-          s.history.push("/clean")
-          await withLock(sessionPath(projectRoot), async () => {
-            const liveS = await readSession(projectRoot)
-            for (const change of sessionChanges) {
-              change.apply(liveS)
+        if (sessionChanges.length > 0 && !fixBlockedNote) {
+          if (specChanges.length === 0) {
+            const recovery = await snapshotBeforeOperation(projectRoot, "pre-fix:clean")
+            if (!recovery.ok) {
+              fixBlockedNote = `Fix blocked: pre-fix snapshot failed (${recovery.error ?? "unknown error"}). No repairs applied.`
             }
-            liveS.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
-            liveS.history.push("/clean")
-            await writeSession(projectRoot, liveS)
-          })
+          }
+          if (!fixBlockedNote) {
+            try {
+              s.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
+              s.history.push("/clean")
+              await withLock(sessionPath(projectRoot), async () => {
+                const liveS = await readSession(projectRoot)
+                for (const change of sessionChanges) {
+                  change.apply(liveS)
+                }
+                liveS.lastResult = "repaired: " + sessionChanges.map(c => c.field).join(", ")
+                liveS.history.push("/clean")
+                await writeSession(projectRoot, liveS)
+              })
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              const failure = await snapshotAfterFailure(projectRoot, "post-failure:clean")
+              fixBlockedNote = `Fix failed: ${message}.${postFailureNote(failure)}`
+            }
+          }
         }
       }
+
+      if (fixBlockedNote) issues.push(fixBlockedNote)
 
       for (const w of corruptionWarnings) {
         issues.push(`[corruption] ${w.file}: ${w.message}`)

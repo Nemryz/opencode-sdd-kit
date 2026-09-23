@@ -24,6 +24,7 @@ import {
 } from "./shared/types"
 import { DeltasIndexSchema, type Delta } from "./shared/schemas"
 import { computeBodyChecksum, stripBom } from "./shared/io"
+import { postFailureNote, snapshotAfterFailure, snapshotBeforeOperation } from "./shared/snapshot"
 
 export interface AuditFinding {
   severity: "info" | "warn" | "error"
@@ -398,94 +399,111 @@ export default tool({
 
       const report = await auditProject(projectRoot)
 
+      let fixBlockedNote = ""
+      let fixAllowed = true
       if (args.fix && report.findings.length > 0) {
-        let fixedCount = 0
-        let fixedErrorCount = 0
-        const fixedBases: string[] = []
-        for (const finding of report.findings) {
-          if (finding.severity === "error" && finding.category === "phase-mismatch") {
-            const sjPath = finding.file
-            if (sjPath && sjPath.endsWith("spec.json")) {
-              const base = path.dirname(sjPath)
-              const specOk = await exists(path.join(base, "spec.md"))
-              const planOk = await exists(path.join(base, "plan.md"))
-              const tasksOk = await exists(path.join(base, "tasks.md"))
-              const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
-              await withLock(specJsonPath(base), async () => {
-                const sjPrev = await readSpecJson(base)
-                if (sjPrev && sjPrev.phase !== newPhase) {
-                  sjPrev.phase = parsePhase(newPhase)
-                  await writeSpecJson(sjPrev, base)
-                  await syncFrontmatterFromSpecJson(base, sjPrev)
-                  fixedBases.push(base)
-                  finding.message += " (auto-fixed)"
-                  fixedCount++
-                  fixedErrorCount++
-                }
-              })
-            }
-          } else if (finding.severity === "error" && finding.category === "ready-violation") {
-            const sjPath = finding.file
-            if (sjPath && sjPath.endsWith("spec.json")) {
-              const base = path.dirname(sjPath)
-              await withLock(specJsonPath(base), async () => {
-                const sjPrev = await readSpecJson(base)
-                if (sjPrev && sjPrev.ready_for_implementation) {
-                  sjPrev.ready_for_implementation = false
-                  await writeSpecJson(sjPrev, base)
-                  await syncFrontmatterFromSpecJson(base, sjPrev)
-                  fixedBases.push(base)
-                  finding.message += " (auto-fixed)"
-                  fixedCount++
-                  fixedErrorCount++
-                }
-              })
-            }
-          } else if (finding.severity === "info" && finding.category === "approval") {
-            const sjPath = finding.file
-            if (sjPath && sjPath.endsWith("spec.json")) {
-              const base = path.dirname(sjPath)
-              await withLock(specJsonPath(base), async () => {
-                const sjPrev = await readSpecJson(base)
-                if (sjPrev) {
-                  let changed = false
-                  if (!sjPrev.approvals.spec.generated && finding.artifact === "spec") {
-                    sjPrev.approvals.spec.generated = true
-                    changed = true
-                  }
-                  if (!sjPrev.approvals.plan.generated && finding.artifact === "plan") {
-                    sjPrev.approvals.plan.generated = true
-                    changed = true
-                  }
-                  if (!sjPrev.approvals.tasks.generated && finding.artifact === "tasks") {
-                    sjPrev.approvals.tasks.generated = true
-                    changed = true
-                  }
-                  if (changed) {
+        const recovery = await snapshotBeforeOperation(projectRoot, "pre-fix:audit")
+        if (!recovery.ok) {
+          fixAllowed = false
+          fixBlockedNote = `Fix blocked: pre-fix snapshot failed (${recovery.error ?? "unknown error"}). No changes applied.`
+        }
+      }
+
+      if (args.fix && fixAllowed && report.findings.length > 0) {
+        try {
+          let fixedCount = 0
+          let fixedErrorCount = 0
+          const fixedBases: string[] = []
+          for (const finding of report.findings) {
+            if (finding.severity === "error" && finding.category === "phase-mismatch") {
+              const sjPath = finding.file
+              if (sjPath && sjPath.endsWith("spec.json")) {
+                const base = path.dirname(sjPath)
+                const specOk = await exists(path.join(base, "spec.md"))
+                const planOk = await exists(path.join(base, "plan.md"))
+                const tasksOk = await exists(path.join(base, "tasks.md"))
+                const newPhase = detectPhaseFromFiles(specOk, planOk, tasksOk)
+                await withLock(specJsonPath(base), async () => {
+                  const sjPrev = await readSpecJson(base)
+                  if (sjPrev && sjPrev.phase !== newPhase) {
+                    sjPrev.phase = parsePhase(newPhase)
                     await writeSpecJson(sjPrev, base)
                     await syncFrontmatterFromSpecJson(base, sjPrev)
                     fixedBases.push(base)
                     finding.message += " (auto-fixed)"
                     fixedCount++
+                    fixedErrorCount++
                   }
-                }
-              })
+                })
+              }
+            } else if (finding.severity === "error" && finding.category === "ready-violation") {
+              const sjPath = finding.file
+              if (sjPath && sjPath.endsWith("spec.json")) {
+                const base = path.dirname(sjPath)
+                await withLock(specJsonPath(base), async () => {
+                  const sjPrev = await readSpecJson(base)
+                  if (sjPrev && sjPrev.ready_for_implementation) {
+                    sjPrev.ready_for_implementation = false
+                    await writeSpecJson(sjPrev, base)
+                    await syncFrontmatterFromSpecJson(base, sjPrev)
+                    fixedBases.push(base)
+                    finding.message += " (auto-fixed)"
+                    fixedCount++
+                    fixedErrorCount++
+                  }
+                })
+              }
+            } else if (finding.severity === "info" && finding.category === "approval") {
+              const sjPath = finding.file
+              if (sjPath && sjPath.endsWith("spec.json")) {
+                const base = path.dirname(sjPath)
+                await withLock(specJsonPath(base), async () => {
+                  const sjPrev = await readSpecJson(base)
+                  if (sjPrev) {
+                    let changed = false
+                    if (!sjPrev.approvals.spec.generated && finding.artifact === "spec") {
+                      sjPrev.approvals.spec.generated = true
+                      changed = true
+                    }
+                    if (!sjPrev.approvals.plan.generated && finding.artifact === "plan") {
+                      sjPrev.approvals.plan.generated = true
+                      changed = true
+                    }
+                    if (!sjPrev.approvals.tasks.generated && finding.artifact === "tasks") {
+                      sjPrev.approvals.tasks.generated = true
+                      changed = true
+                    }
+                    if (changed) {
+                      await writeSpecJson(sjPrev, base)
+                      await syncFrontmatterFromSpecJson(base, sjPrev)
+                      fixedBases.push(base)
+                      finding.message += " (auto-fixed)"
+                      fixedCount++
+                    }
+                  }
+                })
+              }
             }
           }
-        }
-        if (fixedCount > 0) {
-          const auditMeta: import("./shared/schemas").AuditMetadata = {
-            date: new Date().toISOString(),
-            findings: fixedCount,
-            severity: report.summary.error > 0 ? "high" : report.summary.warn > 0 ? "medium" : "low",
+          if (fixedCount > 0) {
+            const auditMeta: import("./shared/schemas").AuditMetadata = {
+              date: new Date().toISOString(),
+              findings: fixedCount,
+              severity: report.summary.error > 0 ? "high" : report.summary.warn > 0 ? "medium" : "low",
+            }
+            for (const base of fixedBases) {
+              const sj = await readSpecJson(base)
+              if (sj) await syncFrontmatterFromSpecJson(base, sj, { last_audit: auditMeta })
+            }
+            report.summary.error -= fixedErrorCount
+            if (report.summary.error < 0) report.summary.error = 0
+            report.passed = report.summary.error === 0
           }
-          for (const base of fixedBases) {
-            const sj = await readSpecJson(base)
-            if (sj) await syncFrontmatterFromSpecJson(base, sj, { last_audit: auditMeta })
-          }
-          report.summary.error -= fixedErrorCount
-          if (report.summary.error < 0) report.summary.error = 0
-          report.passed = report.summary.error === 0
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          const failure = await snapshotAfterFailure(projectRoot, "post-failure:audit")
+          const note = postFailureNote(failure)
+          fixBlockedNote = `Fix failed: ${message}.${note}`
         }
       }
 
@@ -494,6 +512,7 @@ export default tool({
         const tag = f.severity === "error" ? "ERR" : f.severity === "warn" ? "WRN" : "INF"
         lines.push(`[${tag}] ${f.category}: ${f.message}`)
       }
+      if (fixBlockedNote) lines.push(fixBlockedNote)
 
       const status = report.passed ? "PASS" : "FAIL"
       const output = lines.length === 0

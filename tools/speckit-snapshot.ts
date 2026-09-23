@@ -5,9 +5,8 @@ import {
   resolveProjectRoot,
 } from "./shared/types"
 import {
-  AUTO_CAP_PER_FEATURE,
-  TOTAL_CAP,
   createSnapshot,
+  computeRecoveryReadiness,
   drillSnapshot,
   listSnapshots,
   pinSnapshot,
@@ -41,34 +40,6 @@ function formatEntry(entry: SnapshotListEntry): string {
     entry.pinned ? `pinned${entry.label ? `:${entry.label}` : ""}` : "unpinned",
     `drill:${entry.drill}`,
   ].join(" | ")
-}
-
-function computeReadiness(entries: SnapshotListEntry[], journalPending: boolean): { status: string; reasons: string[] } {
-  if (journalPending) {
-    return { status: "NOT READY", reasons: ["interrupted restore pending — run recover"] }
-  }
-  if (entries.length === 0) {
-    return { status: "NOT READY", reasons: ["no snapshots yet — run create"] }
-  }
-  const newest = entries[0]
-  if (newest && newest.status !== "verified") {
-    return { status: "NOT READY", reasons: [`newest snapshot ${newest.id} failed verification`] }
-  }
-  const reasons: string[] = []
-  if (!entries.some((entry) => entry.drill === "ok")) {
-    reasons.push("no snapshot has been drilled yet")
-  }
-  const autosPerFeature = new Map<string, number>()
-  for (const entry of entries) {
-    if ((entry.trigger ?? "") === "manual") continue
-    const key = entry.feature ?? ""
-    autosPerFeature.set(key, (autosPerFeature.get(key) ?? 0) + 1)
-  }
-  const overFeatureCap = [...autosPerFeature.values()].some((count) => count > AUTO_CAP_PER_FEATURE)
-  if (overFeatureCap || entries.length > TOTAL_CAP) {
-    reasons.push("retention over caps — run prune")
-  }
-  return { status: reasons.length === 0 ? "READY" : "DEGRADED", reasons }
 }
 
 export default tool({
@@ -130,7 +101,7 @@ export default tool({
       if (subcommand === "list") {
         const entries = await listSnapshots(projectRoot)
         const journal = await readRestoreJournal(projectRoot)
-        const readiness = computeReadiness(entries, journal !== null)
+        const readiness = computeRecoveryReadiness(entries, journal !== null)
         const lines = [
           `Recovery Readiness: ${readiness.status}`,
           ...readiness.reasons.map((reason) => `  - ${reason}`),

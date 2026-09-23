@@ -14,6 +14,7 @@ import {
   writeSpecJson,
 } from "./shared/types"
 import { computeBodyChecksum } from "./shared/io"
+import { postFailureNote, snapshotAfterFailure, snapshotBeforeOperation } from "./shared/snapshot"
 
 const ARTIFACT_FILES: Record<string, string> = {
   spec: "spec.md",
@@ -127,32 +128,62 @@ export default tool({
         }
       }
 
-      specJson.approvals[artifact].approved = true
+      let recoverySnapshot: string | null = null
       if (artifact === "tasks") {
-        specJson.phase = "ready"
-        specJson.ready_for_implementation = true
+        const recovery = await snapshotBeforeOperation(projectRoot, "phase:tasks->ready", {
+          feature: featureDir,
+          phase: specJson.phase,
+        })
+        if (!recovery.ok) {
+          return {
+            title: "Error",
+            output: `approve: BLOCKED — pre-approval snapshot failed (${recovery.error ?? "unknown error"}). tasks not approved. Fix .opencode/snapshots (space/permissions) or run /snapshot create, then retry.`,
+            metadata: { error: recovery.error, blocked: true, artifact, featureDir },
+          }
+        }
+        recoverySnapshot = recovery.snapshotId
       }
-      const approvedContent = await fs.readFile(artifactPath, "utf-8")
-      specJson.approvals[artifact].hash = computeBodyChecksum(approvedContent)
-      specJson.approvals[artifact].approved_at = new Date().toISOString()
-      await writeSpecJson(specJson, base)
-      await syncFrontmatterFromSpecJson(base, specJson)
 
       const nextStep = ARTIFACT_NEXT_STEPS[artifact]
-      await writeSession(projectRoot, {
-        ...session,
-        command: "/approve",
-        phase: session.phase,
-        featureDir,
-        nextStep,
-        lastResult: `${artifact} approved for ${featureDir}`,
-        history: [...session.history, `/approve ${artifact}`],
-      })
+      try {
+        specJson.approvals[artifact].approved = true
+        if (artifact === "tasks") {
+          specJson.phase = "ready"
+          specJson.ready_for_implementation = true
+        }
+        const approvedContent = await fs.readFile(artifactPath, "utf-8")
+        specJson.approvals[artifact].hash = computeBodyChecksum(approvedContent)
+        specJson.approvals[artifact].approved_at = new Date().toISOString()
+        await writeSpecJson(specJson, base)
+        await syncFrontmatterFromSpecJson(base, specJson)
+
+        await writeSession(projectRoot, {
+          ...session,
+          command: "/approve",
+          phase: session.phase,
+          featureDir,
+          nextStep,
+          lastResult: `${artifact} approved for ${featureDir}`,
+          history: [...session.history, `/approve ${artifact}`],
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const failure = await snapshotAfterFailure(projectRoot, `post-failure:approve-${artifact}`, {
+          feature: featureDir,
+          phase: specJson.phase,
+        })
+        const note = postFailureNote(failure)
+        return {
+          title: "Error",
+          output: `approve: ${message}.${note}`,
+          metadata: { error: message, postFailureSnapshot: failure.snapshotId },
+        }
+      }
 
       return {
         title: `${artifact} approved`,
         output: `${artifact} approved for ${featureDir}  Next: ${nextStep}`,
-        metadata: { artifact, featureDir, nextStep },
+        metadata: { artifact, featureDir, nextStep, recoverySnapshot },
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

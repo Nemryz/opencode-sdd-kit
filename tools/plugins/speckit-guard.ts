@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
-import { withLock, atomicWriteFile, markPluginLoaded, stripBom } from "../shared/io"
+import { withLock, writeWithBackup, markPluginLoaded, stripBom } from "../shared/io"
 import { pickProjectRoot } from "../shared/types"
 
 export const GuardConfigSchema = z.object({
@@ -205,7 +205,7 @@ const guardPlugin: Plugin = async (input) => {
     const result = GuardConfigSchema.safeParse(config)
     if (!result.success) return
     await withLock(configPath, async () => {
-      await atomicWriteFile(configPath, JSON.stringify(result.data, null, 2))
+      await writeWithBackup(configPath, JSON.stringify(result.data, null, 2), projectRoot)
     })
   }
 

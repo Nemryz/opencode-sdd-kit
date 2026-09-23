@@ -5,6 +5,7 @@ import {
   findLatestValidBackup,
   writeSession,
   writeConfigWithBackup,
+  writeWithBackup,
   clearCorruptionWarnings,
   corruptionWarnings,
   resolveProjectRoot,
@@ -14,6 +15,7 @@ import {
   configPath,
   specsDirPath,
   specJsonPath,
+  stripBom,
   SessionStateSchema,
   ConfigSchema,
   SpecJsonSchema,
@@ -21,6 +23,26 @@ import {
 import path from "node:path"
 import fs from "node:fs/promises"
 import { exists } from "./shared/types"
+import { DEFAULT_CONFIG, GuardConfigSchema } from "./plugins/speckit-guard"
+import {
+  computeRecoveryReadiness,
+  listSnapshots,
+  postFailureNote,
+  readRestoreJournal,
+  recoverInterruptedRestore,
+  snapshotAfterFailure,
+  snapshotBeforeOperation,
+} from "./shared/snapshot"
+
+async function guardConfigStatus(fp: string): Promise<"healthy" | "corrupted" | "missing"> {
+  try {
+    const raw = await fs.readFile(fp, "utf-8")
+    const parsed = GuardConfigSchema.safeParse({ ...DEFAULT_CONFIG, ...(JSON.parse(stripBom(raw)) as object) })
+    return parsed.success ? "healthy" : "corrupted"
+  } catch {
+    return "missing"
+  }
+}
 
 export default tool({
   description: "Run health check, analyze findings, and apply fixes with auto-rollback protection",
@@ -51,57 +73,99 @@ export default tool({
         }
       }
 
+      const recoveryLines: string[] = []
+      const pendingJournal = await readRestoreJournal(projectRoot)
+      if (pendingJournal) {
+        if (args.fix) {
+          const recovery = await recoverInterruptedRestore(projectRoot)
+          if (recovery.recovered) {
+            recoveryLines.push(`  Interrupted restore recovered from safety snapshot ${recovery.safetySnapshotId}`)
+          } else {
+            recoveryLines.push(`  Interrupted restore recovery FAILED: ${recovery.error ?? "unknown error"}`)
+          }
+        } else {
+          recoveryLines.push("  Interrupted restore pending — run /health --fix or /snapshot recover")
+        }
+      }
+
       const report = await runHealthCheck(projectRoot)
 
+      const guardFp = path.join(projectRoot, ".opencode", "guard.json")
+      let guardStatus: "healthy" | "corrupted" | "missing" | "restored" = await guardConfigStatus(guardFp)
+
+      let fixBlockedNote = ""
       if (args.fix) {
-        let fixedCount = 0
+        const recovery = await snapshotBeforeOperation(projectRoot, "pre-fix:health")
+        if (!recovery.ok) {
+          fixBlockedNote = `  Fix blocked: pre-fix snapshot failed (${recovery.error ?? "unknown error"}). No changes applied.`
+        } else {
+          try {
+            let fixedCount = 0
 
-        // Fix session.json
-        if (report.session.status === "corrupted" || report.session.status === "missing") {
-          const restored = await findLatestValidBackup(report.session.file, projectRoot, SessionStateSchema)
-          if (restored) {
-            await writeSession(projectRoot, restored)
-            report.session.status = "restored"
-            fixedCount++
-          }
-        }
-
-        // Fix config.json
-        if (report.config.status === "corrupted" || report.config.status === "missing") {
-          const restored = await findLatestValidBackup(report.config.file, projectRoot, ConfigSchema)
-          if (restored) {
-            await writeConfigWithBackup(projectRoot, restored)
-            report.config.status = "restored"
-            fixedCount++
-          }
-        }
-
-        // Fix features
-        const sDir = specsDirPath(projectRoot)
-        for (const feature of report.features) {
-          if (feature.spec_json === "corrupted" || feature.spec_json === "missing") {
-            const base = path.join(sDir, feature.dir)
-            const sjFp = specJsonPath(base)
-            const restored = await findLatestValidBackup(sjFp, projectRoot, SpecJsonSchema)
-            if (restored) {
-              const { writeSpecJson } = await import("./shared/io")
-              await writeSpecJson(restored, base)
-              feature.spec_json = "restored"
-              fixedCount++
+            // Fix session.json
+            if (report.session.status === "corrupted" || report.session.status === "missing") {
+              const restored = await findLatestValidBackup(report.session.file, projectRoot, SessionStateSchema)
+              if (restored) {
+                await writeSession(projectRoot, restored)
+                report.session.status = "restored"
+                fixedCount++
+              }
             }
-          }
-        }
 
-        if (fixedCount > 0) {
-          const hasMissing = report.session.status === "missing" || report.config.status === "missing"
-            || report.features.some(f => f.spec_json === "missing")
-          const hasCorrupted = report.session.status === "corrupted" || report.config.status === "corrupted"
-            || report.features.some(f => f.spec_json === "corrupted")
-          const hasRestored = report.session.status === "restored" || report.config.status === "restored"
-            || report.features.some(f => f.spec_json === "restored")
-          if (hasMissing) report.overall = "critical"
-          else if (hasCorrupted || hasRestored) report.overall = "degraded"
-          else report.overall = "healthy"
+            // Fix config.json
+            if (report.config.status === "corrupted" || report.config.status === "missing") {
+              const restored = await findLatestValidBackup(report.config.file, projectRoot, ConfigSchema)
+              if (restored) {
+                await writeConfigWithBackup(projectRoot, restored)
+                report.config.status = "restored"
+                fixedCount++
+              }
+            }
+
+            // Fix guard.json
+            if (guardStatus === "corrupted" || guardStatus === "missing") {
+              const restored = await findLatestValidBackup(guardFp, projectRoot, GuardConfigSchema)
+              if (restored) {
+                await writeWithBackup(guardFp, JSON.stringify(restored, null, 2), projectRoot)
+                guardStatus = "restored"
+                fixedCount++
+              }
+            }
+
+            // Fix features
+            const sDir = specsDirPath(projectRoot)
+            for (const feature of report.features) {
+              if (feature.spec_json === "corrupted" || feature.spec_json === "missing") {
+                const base = path.join(sDir, feature.dir)
+                const sjFp = specJsonPath(base)
+                const restored = await findLatestValidBackup(sjFp, projectRoot, SpecJsonSchema)
+                if (restored) {
+                  const { writeSpecJson } = await import("./shared/io")
+                  await writeSpecJson(restored, base)
+                  feature.spec_json = "restored"
+                  fixedCount++
+                }
+              }
+            }
+
+            if (fixedCount > 0) {
+              const hasMissing = report.session.status === "missing" || report.config.status === "missing"
+                || report.features.some(f => f.spec_json === "missing")
+              const hasCorrupted = report.session.status === "corrupted" || report.config.status === "corrupted"
+                || guardStatus === "corrupted"
+                || report.features.some(f => f.spec_json === "corrupted")
+              const hasRestored = report.session.status === "restored" || report.config.status === "restored"
+                || guardStatus === "restored"
+                || report.features.some(f => f.spec_json === "restored")
+              if (hasMissing) report.overall = "critical"
+              else if (hasCorrupted || hasRestored) report.overall = "degraded"
+              else report.overall = "healthy"
+            }
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            const failure = await snapshotAfterFailure(projectRoot, "post-failure:health")
+            fixBlockedNote = `  Fix failed: ${message}.${postFailureNote(failure)}`
+          }
         }
       }
 
@@ -111,6 +175,9 @@ export default tool({
 
       const configTag = report.config.status === "healthy" ? "healthy" : report.config.status === "restored" ? "restored from backup" : report.config.status
       lines.push(`  config.json: ${configTag}`)
+
+      const guardTag = guardStatus === "healthy" ? "healthy" : guardStatus === "restored" ? "restored from backup" : guardStatus === "missing" ? "missing (defaults apply)" : guardStatus
+      lines.push(`  guard.json: ${guardTag}`)
 
       const healthyFeatures = report.features.filter(f => f.spec_json === "healthy").length
       const totalFeatures = report.features.length
@@ -122,6 +189,14 @@ export default tool({
         lines.push(`    ${feature.dir}: ${statusTag}${backupInfo}`)
       }
 
+      const journalAfter = await readRestoreJournal(projectRoot)
+      const snapshotEntries = await listSnapshots(projectRoot)
+      const readiness = computeRecoveryReadiness(snapshotEntries, journalAfter !== null)
+      lines.push(`  Snapshots: ${snapshotEntries.length} | Recovery Readiness: ${readiness.status}`)
+      for (const reason of readiness.reasons) {
+        lines.push(`    - ${reason}`)
+      }
+
       const corruptionLines = corruptionWarnings.map(w => `  [CORRUPTION] ${w.file}: ${w.message}`)
       clearCorruptionWarnings()
 
@@ -129,7 +204,9 @@ export default tool({
       const title = `Session Health: ${overallTag}`
       const output = [
         title,
+        ...recoveryLines,
         ...lines,
+        ...(fixBlockedNote ? [fixBlockedNote] : []),
         ...corruptionLines,
         `  Overall: ${report.overall.toUpperCase()}`,
       ].join("\n")
@@ -137,7 +214,7 @@ export default tool({
       return {
         title,
         output,
-        metadata: report,
+        metadata: { ...report, guard: guardStatus, readiness: readiness.status },
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

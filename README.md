@@ -136,7 +136,7 @@ The toolkit organizes its components into a clear directory hierarchy that separ
   tools/                 TypeScript tool modules (15 files)
   tools/shared/          Shared modules (io.ts, schemas.ts, types.ts, snapshot.ts)
   tools/plugins/         Runtime plugins (2 files)
-  tools/test/            Test suite (85 test files)
+  tools/test/            Test suite (88 test files)
   templates/             Artifact templates (12 templates)
   docs/                  Reference documentation
 ```
@@ -492,9 +492,9 @@ The toolkit maintains state through several interconnected files that track work
 
 ### Resilience Layer
 
-The resilience layer operates through three interconnected mechanisms that protect your work against data corruption and accidental deletion.
+The resilience layer operates through four interconnected mechanisms that protect your work against data corruption and accidental deletion.
 
-**Automatic Backups.** Before any write to session.json, spec.json, or config.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Backups are grouped per source file and trimmed to a maximum of ten per source, ensuring that recent history is preserved without consuming excessive storage.
+**Automatic Backups.** Before any write to session.json, spec.json, config.json, or guard.json, the system reads the existing content and saves it as a timestamped .bak file in the .opencode/backups/ directory. Backups are grouped per source file and trimmed to a maximum of ten per source, ensuring that recent history is preserved without consuming excessive storage.
 
 **Checksum Verification.** Each backup receives a SHA-256 checksum stored in a companion .sha256 file. When restoration is triggered, the system verifies the checksum matches before attempting to restore. This prevents restoring from corrupted backups that might cause additional problems.
 
@@ -521,6 +521,10 @@ Snapshots capture the entire SDD working state at a point in time: core files (s
 **Pinning and retention.** Manual snapshots can be pinned with a label to create a golden state that retention never removes. Automatic retention keeps at most five automatic snapshots per feature and ten snapshots in total, pruning lower-value triggers first (pre-fix before pre-restore before phase transitions) and never removing the newest snapshot or the last drilled snapshot.
 
 **Recovery readiness.** The list command reports a single readiness verdict. READY means a verified snapshot exists and was drilled. DEGRADED means retention is over its caps or no snapshot has been drilled yet. NOT READY means an interrupted restore is pending or the newest snapshot failed verification.
+
+**Automatic triggers.** The system takes a verified snapshot before every risky operation: phase transitions, tasks approval, and any --fix run (audit, clean, health, and selfheal through inheritance). If the state is unchanged since the newest snapshot, that snapshot is reused instead of creating a duplicate, and every automatic snapshot is drilled in a sandbox before the operation proceeds. If the snapshot cannot be created or fails its drill, the operation is blocked and nothing changes. When a fix fails partway, a best-effort post-failure snapshot preserves the broken state for forensics.
+
+**Recovery integration.** /health reports pending interrupted restores, recovers them with --fix, restores a corrupted guard.json from backup, and includes the recovery readiness verdict in its report. /status warns when an interrupted restore is pending.
 
 | Subcommand | Purpose |
 |------------|---------|
@@ -583,7 +587,7 @@ This file defines which models to use for different agent roles, which plugins t
 
 ## Test Suite
 
-The project includes 2278 automated tests distributed across 74 test files. The test suite covers multiple quality dimensions, each designed to validate a specific aspect of the system's correctness and reliability.
+The project includes 2482 automated tests distributed across 88 test files. The test suite covers multiple quality dimensions, each designed to validate a specific aspect of the system's correctness and reliability.
 
 ### Unit Tests
 

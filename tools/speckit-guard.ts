@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { resolveProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile, stripBom } from "./shared/types"
+import { resolveProjectRoot, getProjectRootWarnings, withLock, writeWithBackup, stripBom } from "./shared/types"
 import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
@@ -97,7 +97,7 @@ export default tool({
         const result = GuardConfigSchema.safeParse(config)
         if (!result.success) return
         await withLock(configPath, async () => {
-          await atomicWriteFile(configPath, JSON.stringify(result.data, null, 2))
+          await writeWithBackup(configPath, JSON.stringify(result.data, null, 2), projectRoot)
         })
       }
 
