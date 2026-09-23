@@ -3,6 +3,7 @@ node_modules/
 .opencode/spec-memory/session.json.sha256
 .opencode/spec-memory/config.json
 .opencode/backups/
+.opencode/snapshots/
 .opencode/plugins-state.json
 .opencode/perf.json
 opencode.jsonc

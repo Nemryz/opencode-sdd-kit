@@ -194,6 +194,22 @@ export const RestoreJournalSchema = z.object({
 
 export type RestoreJournal = z.infer<typeof RestoreJournalSchema>
 
+export const SnapshotPinSchema = z.object({
+  pinned_at: z.string(),
+  label: z.string().nullable(),
+})
+
+export type SnapshotPin = z.infer<typeof SnapshotPinSchema>
+
+export const SnapshotDrillSchema = z.object({
+  drilled_at: z.string(),
+  ok: z.boolean(),
+  files_checked: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+})
+
+export type SnapshotDrill = z.infer<typeof SnapshotDrillSchema>
+
 // ─────────────────────────── Delta Schemas ───────────────────────────
 
 export const DeltaStatusSchema = z.enum(["draft", "planned", "ready", "implementing", "consolidated", "cancelled"])

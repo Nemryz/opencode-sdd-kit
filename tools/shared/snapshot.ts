@@ -1,9 +1,19 @@
 import fs from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 import crypto from "node:crypto"
 import type { Dirent } from "node:fs"
 import { atomicWriteFile, stripBom } from "./io"
-import { RestoreJournalSchema, SnapshotManifestSchema, type RestoreJournal, type SnapshotManifest } from "./schemas"
+import {
+  RestoreJournalSchema,
+  SnapshotDrillSchema,
+  SnapshotManifestSchema,
+  SnapshotPinSchema,
+  type RestoreJournal,
+  type SnapshotDrill,
+  type SnapshotManifest,
+  type SnapshotPin,
+} from "./schemas"
 
 const SNAPSHOTS_DIR_NAME = "snapshots"
 const EXCLUDED_DIRS = [".opencode/backups", ".opencode/snapshots"]
@@ -185,6 +195,9 @@ export interface SnapshotListEntry {
   fileCount: number
   totalSize: number
   status: "verified" | "mismatched" | "unreadable"
+  pinned: boolean
+  label: string | null
+  drill: "ok" | "failed" | "never"
 }
 
 export async function listSnapshots(root: string): Promise<SnapshotListEntry[]> {
@@ -195,6 +208,9 @@ export async function listSnapshots(root: string): Promise<SnapshotListEntry[]> 
     if (!dirent.isDirectory()) continue
     const id = dirent.name
     const verification = await verifySnapshot(root, id)
+    const pin = await readPinInfo(root, id)
+    const drill = await readDrillInfo(root, id)
+    const drillStatus: SnapshotListEntry["drill"] = drill === null ? "never" : drill.ok ? "ok" : "failed"
     if (!verification.manifest) {
       entries.push({
         id,
@@ -204,6 +220,9 @@ export async function listSnapshots(root: string): Promise<SnapshotListEntry[]> 
         fileCount: 0,
         totalSize: 0,
         status: "unreadable",
+        pinned: pin !== null,
+        label: pin?.label ?? null,
+        drill: drillStatus,
       })
       continue
     }
@@ -216,6 +235,9 @@ export async function listSnapshots(root: string): Promise<SnapshotListEntry[]> 
       fileCount: verification.manifest.files.length,
       totalSize,
       status: verification.ok ? "verified" : "mismatched",
+      pinned: pin !== null,
+      label: pin?.label ?? null,
+      drill: drillStatus,
     })
   }
   entries.sort((a, b) => b.id.localeCompare(a.id))
@@ -468,5 +490,221 @@ export async function recoverInterruptedRestore(root: string): Promise<RestoreRe
       safetySnapshotId: journal.safety_snapshot_id,
       error: err instanceof Error ? err.message : String(err),
     }
+  }
+}
+
+// ─────────────────────────── Pin & label ───────────────────────────
+
+const PIN_FILE_NAME = ".pin.json"
+const DRILL_FILE_NAME = ".drill.json"
+
+export function pinPath(root: string, id: string): string {
+  return path.join(snapshotsDirPath(root), id, PIN_FILE_NAME)
+}
+
+export function drillPath(root: string, id: string): string {
+  return path.join(snapshotsDirPath(root), id, DRILL_FILE_NAME)
+}
+
+export async function readPinInfo(root: string, id: string): Promise<SnapshotPin | null> {
+  try {
+    const raw = await fs.readFile(pinPath(root, id), "utf-8")
+    const parsed = SnapshotPinSchema.safeParse(JSON.parse(stripBom(raw)))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+export async function readDrillInfo(root: string, id: string): Promise<SnapshotDrill | null> {
+  try {
+    const raw = await fs.readFile(drillPath(root, id), "utf-8")
+    const parsed = SnapshotDrillSchema.safeParse(JSON.parse(stripBom(raw)))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+export async function pinSnapshot(
+  root: string,
+  id: string,
+  label?: string | null,
+  options?: { now?: Date },
+): Promise<SnapshotPin> {
+  const manifest = await readSnapshotManifest(root, id)
+  if (!manifest) {
+    throw new Error(`snapshot ${id} is unreadable`)
+  }
+  const pin = SnapshotPinSchema.parse({
+    pinned_at: (options?.now ?? new Date()).toISOString(),
+    label: label ?? null,
+  })
+  await atomicWriteFile(pinPath(root, id), JSON.stringify(pin, null, 2))
+  return pin
+}
+
+export async function unpinSnapshot(root: string, id: string): Promise<boolean> {
+  const existed = (await readPinInfo(root, id)) !== null
+  await fs.rm(pinPath(root, id), { force: true })
+  return existed
+}
+
+// ─────────────────────────── Restore drill ───────────────────────────
+
+export async function drillSnapshot(root: string, id: string, options?: { now?: Date }): Promise<SnapshotDrill> {
+  const manifest = await readSnapshotManifest(root, id)
+  if (!manifest) {
+    throw new Error(`snapshot ${id} is unreadable`)
+  }
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), "sdd-drill-"))
+  let filesChecked = 0
+  let error: string | null = null
+  try {
+    for (const file of manifest.files) {
+      assertSafeManifestPath(file.path)
+      const content = await fs.readFile(path.join(snapshotsDirPath(root), id, ...file.path.split("/")))
+      if (sha256(content) !== file.sha256) {
+        error = `checksum mismatch: ${file.path}`
+        break
+      }
+      const dest = path.join(sandbox, ...file.path.split("/"))
+      await fs.mkdir(path.dirname(dest), { recursive: true })
+      await fs.writeFile(dest, content)
+      filesChecked++
+    }
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err)
+  } finally {
+    await fs.rm(sandbox, { recursive: true, force: true })
+  }
+  const drill = SnapshotDrillSchema.parse({
+    drilled_at: (options?.now ?? new Date()).toISOString(),
+    ok: error === null,
+    files_checked: filesChecked,
+    error,
+  })
+  await atomicWriteFile(drillPath(root, id), JSON.stringify(drill, null, 2))
+  return drill
+}
+
+// ─────────────────────────── Retention pruning ───────────────────────────
+
+export const AUTO_CAP_PER_FEATURE = 5
+export const TOTAL_CAP = 10
+
+export interface PruneReport {
+  removed: string[]
+  kept: number
+  protectedIds: string[]
+  unreadable: string[]
+  aborted: boolean
+  abortReason: string | null
+}
+
+interface PruneCandidate {
+  id: string
+  trigger: string
+  feature: string | null
+  pinned: boolean
+  drillOk: boolean
+}
+
+function triggerValue(trigger: string): number {
+  if (trigger === "manual") return 3
+  if (trigger.startsWith("phase")) return 2
+  if (trigger.startsWith("pre-restore")) return 1
+  return 0
+}
+
+function pruneOrder(list: PruneCandidate[]): PruneCandidate[] {
+  return [...list].sort((a, b) => {
+    const valueDiff = triggerValue(a.trigger) - triggerValue(b.trigger)
+    if (valueDiff !== 0) return valueDiff
+    return a.id.localeCompare(b.id)
+  })
+}
+
+export async function pruneSnapshots(root: string): Promise<PruneReport> {
+  const journal = await readRestoreJournal(root)
+  if (journal) {
+    return {
+      removed: [],
+      kept: 0,
+      protectedIds: [journal.snapshot_id, journal.safety_snapshot_id],
+      unreadable: [],
+      aborted: true,
+      abortReason: "restore journal present — run recoverInterruptedRestore first",
+    }
+  }
+
+  const dir = snapshotsDirPath(root)
+  const dirents = await fs.readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])
+  const unreadable: string[] = []
+  const candidates: PruneCandidate[] = []
+  for (const dirent of dirents) {
+    if (!dirent.isDirectory()) continue
+    const manifest = await readSnapshotManifest(root, dirent.name)
+    if (!manifest) {
+      unreadable.push(dirent.name)
+      continue
+    }
+    const pin = await readPinInfo(root, dirent.name)
+    const drill = await readDrillInfo(root, dirent.name)
+    candidates.push({
+      id: dirent.name,
+      trigger: manifest.trigger,
+      feature: manifest.feature,
+      pinned: pin !== null,
+      drillOk: drill?.ok === true,
+    })
+  }
+
+  const protectedIds = new Set<string>()
+  const idsAscending = candidates.map((c) => c.id).sort()
+  const newest = idsAscending[idsAscending.length - 1]
+  if (newest) protectedIds.add(newest)
+  for (const candidate of candidates) {
+    if (candidate.pinned) protectedIds.add(candidate.id)
+  }
+  const drilledOk = candidates.filter((c) => c.drillOk).map((c) => c.id).sort()
+  const lastDrilled = drilledOk[drilledOk.length - 1]
+  if (lastDrilled) protectedIds.add(lastDrilled)
+
+  const remaining = new Map(candidates.map((c) => [c.id, c]))
+  const removed: string[] = []
+  const tryRemove = async (candidate: PruneCandidate): Promise<boolean> => {
+    if (protectedIds.has(candidate.id)) return false
+    await fs.rm(path.join(dir, candidate.id), { recursive: true, force: true })
+    removed.push(candidate.id)
+    remaining.delete(candidate.id)
+    return true
+  }
+
+  const features = new Set([...remaining.values()].map((c) => c.feature ?? ""))
+  for (const feature of features) {
+    const autos = pruneOrder(
+      [...remaining.values()].filter((c) => (c.feature ?? "") === feature && c.trigger !== "manual"),
+    )
+    let count = autos.length
+    for (const candidate of autos) {
+      if (count <= AUTO_CAP_PER_FEATURE) break
+      if (await tryRemove(candidate)) count--
+    }
+  }
+
+  let total = remaining.size
+  for (const candidate of pruneOrder([...remaining.values()])) {
+    if (total <= TOTAL_CAP) break
+    if (await tryRemove(candidate)) total--
+  }
+
+  return {
+    removed,
+    kept: remaining.size,
+    protectedIds: [...protectedIds].filter((id) => remaining.has(id)),
+    unreadable,
+    aborted: false,
+    abortReason: null,
   }
 }
