@@ -265,3 +265,30 @@ describe("B-14: report tools referenced in AGENTS.md exist", () => {
     }
   })
 })
+
+describe("B-15: snapshot.md command", () => {
+  let content: string
+  beforeAll(async () => { content = await readCommand("snapshot.md") })
+
+  it("calls the speckit-snapshot tool", () => {
+    expect(content).toMatch(/speckit-snapshot/)
+  })
+
+  it("documents the core subcommands", () => {
+    expect(content).toMatch(/create/)
+    expect(content).toMatch(/restore/)
+    expect(content).toMatch(/drill/)
+    expect(content).toMatch(/prune/)
+    expect(content).toMatch(/recover/)
+  })
+
+  it("requires confirmation for restore", () => {
+    expect(content).toMatch(/confirmed: true/)
+    expect(content).toMatch(/confirm/i)
+  })
+
+  it("recommends preview before restore and recover for interrupted restores", () => {
+    expect(content).toMatch(/preview/)
+    expect(content).toMatch(/interrupted restore/i)
+  })
+})

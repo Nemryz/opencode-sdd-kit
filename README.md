@@ -58,6 +58,8 @@ The toolkit provides a complete set of capabilities that cover every aspect of t
 
 **Resilience.** Automatic backups with SHA-256 checksum verification, corruption detection with warning channels, and automatic restoration from valid backups when state files become unreadable. This layer protects your work against data corruption and accidental deletion.
 
+**Snapshots and Restore.** Point-in-time snapshots of the entire SDD state with per-file SHA-256 manifests, integrity verification, a crash-safe restore journal with automatic rollback, sandboxed restore drills that prove restorability, pinned golden states, and value-aware retention. This capability provides whole-state recovery beyond per-file backups.
+
 **Mutation Testing.** Continuous quality assurance through Stryker mutation testing, ensuring test suites catch real code changes and maintain high mutation scores across all source modules. This capability validates that the test suite itself is effective.
 
 ## Architecture
@@ -79,7 +81,7 @@ The system follows a plugin-based architecture where each tool operates as a sel
 |  + speckit-reviewer                                                  |
 |  + rules/ (design principles, spec standards, task guidelines)       |
 +---------------------------------------------------------------------+
-|  Tools Layer (13 TypeScript modules)                                 |
+|  Tools Layer (15 TypeScript modules)                                 |
 |  + speckit-scaffold                                                  |
 |  + speckit-validate                                                  |
 |  + speckit-audit                                                     |
@@ -93,7 +95,9 @@ The system follows a plugin-based architecture where each tool operates as a sel
 |  + speckit-health                                                    |
 |  + speckit-guard                                                     |
 |  + speckit-approve                                                   |
-|  + shared/ (io.ts, schemas.ts, types.ts)                            |
+|  + speckit-phase                                                     |
+|  + speckit-snapshot                                                  |
+|  + shared/ (io.ts, schemas.ts, types.ts, snapshot.ts)               |
 +---------------------------------------------------------------------+
 |  Plugins Layer (2 runtime plugins)                                   |
 |  + speckit-perfmon (performance monitoring)                          |
@@ -106,6 +110,7 @@ The system follows a plugin-based architecture where each tool operates as a sel
 |  + guard.json (permission rules)                                     |
 |  + perf.json (performance statistics)                                |
 |  + backups/ (with SHA-256 checksums)                                 |
+|  + snapshots/ (point-in-time state with manifests)                   |
 +---------------------------------------------------------------------+
 ```
 
@@ -117,7 +122,7 @@ The system follows a plugin-based architecture where each tool operates as a sel
 
 **Plugins Layer.** Contains runtime plugins that intercept system events and add functionality transparently. Unlike tools, which require explicit invocation, plugins operate automatically in the background, monitoring performance, caching data, and protecting files without user intervention.
 
-**State Layer.** Maintains all persistent data including workflow state, feature metadata, configuration settings, and backup files. This layer ensures continuity across sessions and provides the foundation for the resilience mechanisms.
+**State Layer.** Maintains all persistent data including workflow state, feature metadata, configuration settings, backup files, and point-in-time snapshots. This layer ensures continuity across sessions and provides the foundation for the resilience mechanisms.
 
 ## Directory Structure
 
@@ -126,12 +131,12 @@ The toolkit organizes its components into a clear directory hierarchy that separ
 ```
 ~/.config/opencode/
   AGENTS.md              Workflow orchestration and agent definitions
-  commands/              CLI command handlers (11 files)
+  commands/              CLI command handlers (15 files)
   skills/                Skill instructions (6 skills plus shared rules)
-  tools/                 TypeScript tool modules (13 files)
-  tools/shared/          Shared modules (io.ts, schemas.ts, types.ts)
+  tools/                 TypeScript tool modules (15 files)
+  tools/shared/          Shared modules (io.ts, schemas.ts, types.ts, snapshot.ts)
   tools/plugins/         Runtime plugins (2 files)
-  tools/test/            Test suite (74 test files)
+  tools/test/            Test suite (85 test files)
   templates/             Artifact templates (12 templates)
   docs/                  Reference documentation
 ```
@@ -158,7 +163,7 @@ The toolkit organizes its components into a clear directory hierarchy that separ
 
 ## Tools Reference
 
-The toolkit includes thirteen specialized tools, each designed for a specific purpose within the workflow. All tools follow consistent patterns for input validation, error handling, and state management.
+The toolkit includes fifteen specialized tools, each designed for a specific purpose within the workflow. All tools follow consistent patterns for input validation, error handling, and state management.
 
 | Tool | Purpose |
 |------|---------|
@@ -175,16 +180,20 @@ The toolkit includes thirteen specialized tools, each designed for a specific pu
 | speckit-perf | Performance statistics collection and analysis |
 | speckit-guard | File protection management with permission tiers |
 | speckit-approve | Approves generated artifacts to unlock the next workflow phase |
+| speckit-phase | Advances the feature phase to impl or complete after implementation |
+| speckit-snapshot | Creates, inspects, restores, and prunes point-in-time snapshots of the SDD state |
 
 ### Shared Modules
 
-Three shared modules provide common functionality used across all tools:
+Four shared modules provide common functionality used across all tools:
 
 **io.ts** handles all file operations including atomic writes, backup creation, checksum generation and verification, corruption detection, and automatic restoration from valid backups. This module ensures data integrity throughout the system.
 
 **schemas.ts** defines Zod schemas for all state files including session.json, spec.json, config.json, and their associated sub-structures. These schemas validate data at both read and write times, catching errors before they corrupt state.
 
 **types.ts** provides TypeScript type definitions, re-exports from schemas, phase detection utilities, project root validation, and helper functions for creating default data structures.
+
+**snapshot.ts** implements the point-in-time snapshot system: scoped state collection, SHA-256 manifests, integrity verification, the crash-safe restore journal with rollback and recovery, sandboxed restore drills, pinning, and value-aware retention.
 
 ## Skills Reference
 
@@ -398,9 +407,22 @@ tasks approved. Next: /impl or /review
 > /review
 Agent checks specification, plan, and tasks for consistency.
 Review complete, 0 issues found. Ready for /impl
+
+> /snapshot create
+Agent captures the entire SDD state as a point-in-time snapshot.
+Snapshot created. Next: /snapshot drill <id>
+
+> /snapshot drill <id>
+Drill passed: every file was restored and verified in a sandbox.
+
+> /snapshot restore <id>
+Agent shows the impact and asks for confirmation before touching anything.
+restore complete, safety snapshot taken.
 ```
 
 Each step validates the prerequisites before proceeding. The system prevents you from jumping ahead without completing the required artifacts and approvals, ensuring that every feature follows the complete development lifecycle.
+
+Snapshots complement the workflow at any point: create one before risky operations, drill it to prove restorability, and restore it when something goes wrong. See State Management for the full command set.
 
 ## Workflow Deep Dive
 
@@ -478,11 +500,45 @@ The resilience layer operates through three interconnected mechanisms that prote
 
 **Corruption Detection.** Read operations validate JSON structure and Zod schema compliance. Invalid data triggers console warnings with a `[SDD]` prefix and accumulates in a global warning channel that feeds into audit and status output. This early detection system alerts you to problems before they cascade into data loss.
 
+**Point-in-Time Snapshots.** Beyond per-file backups, the snapshot system captures the entire SDD state as one coherent unit with per-file SHA-256 manifests. Restores run through a verify, safety-snapshot, journal, apply sequence and roll back automatically on failure; orphan journals are recovered on the next run.
+
 ### Session Recovery
 
 When the system detects inconsistencies between state files and the actual filesystem, it attempts automatic repair. If a session references a feature directory that no longer exists, the system clears the reference and resets to a neutral state. If a specification phase falls out of sync with the actual artifacts, the system recalculates the correct phase based on file presence.
 
 This recovery process operates transparently during status checks and validation operations. You see the repaired state in the output, and the system logs the repair for audit purposes. Manual intervention is only required when the system cannot determine the correct state automatically.
+
+### Snapshots and Restore
+
+Snapshots capture the entire SDD working state at a point in time: core files (session.json, config.json, constitution.md, guard.json), every feature directory under specs/, and the steering documents. Each snapshot stores a manifest with the project-relative path, byte size, and SHA-256 checksum for every captured file, so integrity can be verified at any moment.
+
+**Scope and exclusions.** Backups (.opencode/backups/), snapshots themselves, and transient files (*.lock, *.tmp, *.bak, *.sha256) are never captured. A snapshot of a project without features or steering documents still succeeds with the core files that exist.
+
+**Restore safety.** A restore always runs through the same sequence: verify the snapshot, take a pre-restore safety snapshot, write a restore journal, apply the changes, and clear the journal on success. If anything fails mid-apply, the system rolls back from the safety snapshot. If the process is killed, the next run detects the orphan journal and recovers automatically.
+
+**Restore drill.** The drill command restores a snapshot into a temporary sandbox outside the project, verifies every hash, and records the result. Drills prove that a snapshot is actually restorable without touching your project.
+
+**Pinning and retention.** Manual snapshots can be pinned with a label to create a golden state that retention never removes. Automatic retention keeps at most five automatic snapshots per feature and ten snapshots in total, pruning lower-value triggers first (pre-fix before pre-restore before phase transitions) and never removing the newest snapshot or the last drilled snapshot.
+
+**Recovery readiness.** The list command reports a single readiness verdict. READY means a verified snapshot exists and was drilled. DEGRADED means retention is over its caps or no snapshot has been drilled yet. NOT READY means an interrupted restore is pending or the newest snapshot failed verification.
+
+| Subcommand | Purpose |
+|------------|---------|
+| create | Capture a point-in-time snapshot of the current state |
+| list | Show snapshots, verification status, pins, drills, and recovery readiness |
+| verify | Recompute hashes and report mismatched or missing files |
+| preview | Show what a restore would change without writing anything |
+| restore | Restore a snapshot with confirmation, safety snapshot, and rollback |
+| pin / unpin | Protect a snapshot from retention, optionally with a label |
+| drill | Rehearse a restore in a sandbox and record the result |
+| prune | Apply retention caps and report removed, protected, and unreadable entries |
+| recover | Roll back an interrupted restore from its journal |
+
+```
+/snapshot create
+/snapshot drill 20260102-030405-manual
+/snapshot restore 20260102-030405-manual
+```
 
 ## Configuration
 
@@ -571,6 +627,10 @@ Corruption recovery tests validate backup creation, checksum verification, and a
 
 These tests provide confidence that the resilience layer actually protects against data loss. They validate the complete corruption detection pipeline from initial read through warning generation to successful restoration.
 
+### Snapshot Tests
+
+Snapshot tests cover the point-in-time system end to end: creation scope and manifest integrity, listing with verification status and recovery readiness, confirmed restore with safety snapshots and rollback under injected failures, interrupted-restore recovery from the journal, selective restore path safety, restore drills in sandboxes, pinning, and value-aware retention caps.
+
 ### Property-Based Tests
 
 Property-based tests utilize fast-check to discover edge cases through random input generation. Instead of testing specific inputs, they generate thousands of random values and verify that certain properties hold true for all of them.
@@ -600,6 +660,7 @@ The project utilizes Stryker mutation testing to measure test suite effectivenes
 | shared/io.ts | File I/O operations, backup management, corruption detection |
 | shared/schemas.ts | Zod schema definitions for all state files |
 | shared/types.ts | Re-exports, phase detection, project validation |
+| shared/snapshot.ts | Snapshots, restore journal, drills, retention |
 | speckit-scaffold | Feature directory and artifact creation |
 | speckit-validate | Artifact existence validation |
 | speckit-audit | Project audit with auto-fix capabilities |
@@ -612,6 +673,8 @@ The project utilizes Stryker mutation testing to measure test suite effectivenes
 | speckit-status | Workflow state reporting |
 | speckit-guard | Permission management |
 | speckit-approve | Artifact approval gate |
+| speckit-phase | Feature phase transitions (impl, complete) |
+| speckit-snapshot | Snapshot management with recovery readiness |
 | speckit-perf | Performance statistics |
 | plugins/speckit-perfmon | Performance monitoring plugin |
 | plugins/speckit-guard | Permission protection plugin |

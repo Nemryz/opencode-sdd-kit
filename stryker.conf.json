@@ -12,6 +12,7 @@
     "tools/shared/io.ts",
     "tools/shared/schemas.ts",
     "tools/shared/types.ts",
+    "tools/shared/snapshot.ts",
     "tools/speckit-audit.ts",
     "tools/speckit-clean.ts",
     "tools/speckit-delta.ts",
@@ -24,6 +25,9 @@
     "tools/speckit-status.ts",
     "tools/speckit-guard.ts",
     "tools/speckit-perf.ts",
+    "tools/speckit-approve.ts",
+    "tools/speckit-phase.ts",
+    "tools/speckit-snapshot.ts",
     "tools/plugins/speckit-perfmon.ts",
     "tools/plugins/speckit-guard.ts"
   ],

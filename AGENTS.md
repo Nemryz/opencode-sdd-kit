@@ -112,6 +112,10 @@ Check SDD state integrity and restore corrupted files from backups. Uses `specki
 ### `/delta-status [featureDir]`
 Show the status of incremental delta specs. Uses `speckit-delta` tool with `command: "delta-status"`.
 
+### `/snapshot [create|list|verify <id>|preview <id>|restore <id>|pin <id> [label]|unpin <id>|drill <id>|prune|recover]`
+Manage point-in-time snapshots of the SDD state. Uses `speckit-snapshot` tool.
+`restore` requires user confirmation (`confirmed: true`); `list` reports Recovery Readiness.
+
 ---
 
 ## Agent Roles — Tab-Switchable
@@ -222,6 +226,7 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 | `speckit-guard` | Manage file protection guard for critical SDD artifacts | `subcommand` (optional: "on", "off", "status", "add", "remove", "log", "debug"), `file` (for add/remove), `confirmed` (bool, for off/remove after user confirmation), `logOption` (optional: "all"), `debugOption` (optional: "on", "off") |
 | `speckit-approve` | Approve a generated artifact to unlock the next phase | `artifact` (spec/plan/tasks), `confirmed` (bool, after user confirmation) |
 | `speckit-phase` | Advance the feature phase to impl or complete after implementation | `phase` (impl/complete) |
+| `speckit-snapshot` | Create, inspect, restore, and prune point-in-time snapshots of the SDD state | `subcommand` (create/list/verify/preview/restore/pin/unpin/drill/prune/recover), `id` (or "latest"), `mode`, `files`, `label`, `confirmed` |
 
 ---
 
@@ -316,7 +321,7 @@ Examples:
 
 ## Custom Tool Error Handling
 
-Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-approve`, `speckit-phase`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
+Custom tools (`speckit-scaffold`, `speckit-validate`, `speckit-audit`, `speckit-clean`, `speckit-config`, `speckit-status`, `speckit-complexity`, `speckit-selfheal`, `speckit-health`, `speckit-delta`, `speckit-perf`, `speckit-approve`, `speckit-phase`, `speckit-snapshot`, `speckit-guard`) are TypeScript files compiled at runtime by opencode. If a tool has compilation errors, opencode may fail to start or crash on each prompt.
 
 ### If a tool crashes opencode
 
