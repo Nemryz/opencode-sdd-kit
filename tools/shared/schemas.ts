@@ -182,6 +182,18 @@ export const SnapshotManifestSchema = z.object({
 export type SnapshotFileEntry = z.infer<typeof SnapshotFileEntrySchema>
 export type SnapshotManifest = z.infer<typeof SnapshotManifestSchema>
 
+export const RestoreJournalSchema = z.object({
+  format: z.literal(1),
+  snapshot_id: z.string().min(1),
+  safety_snapshot_id: z.string().min(1),
+  mode: z.enum(["full", "selective"]),
+  started_at: z.string(),
+  files: z.array(z.string()),
+  removed: z.array(z.string()),
+})
+
+export type RestoreJournal = z.infer<typeof RestoreJournalSchema>
+
 // ─────────────────────────── Delta Schemas ───────────────────────────
 
 export const DeltaStatusSchema = z.enum(["draft", "planned", "ready", "implementing", "consolidated", "cancelled"])

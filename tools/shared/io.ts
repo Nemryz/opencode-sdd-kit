@@ -308,7 +308,7 @@ export async function writeWithBackup(fp: string, data: string, root: string): P
 const TRANSIENT_RENAME_CODES = new Set(["EPERM", "EBUSY", "EACCES"])
 const RENAME_ATTEMPTS = 5
 
-export async function atomicWriteFile(fp: string, data: string): Promise<void> {
+export async function atomicWriteFile(fp: string, data: string | Buffer): Promise<void> {
   const tmp = fp + ".tmp"
   const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
