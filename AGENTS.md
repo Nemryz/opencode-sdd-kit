@@ -204,6 +204,8 @@ Call a skill with: `skill({ name: "speckit-spec-writer" })`
 
 **Project-root warning gate:** tools that operate on the project root return a `Warning` result when the root looks risky (kit installation directory, system directory, or very shallow path). The agent must ask the user to confirm, then re-run the same tool with `confirmed: true`.
 
+**Project root resolution:** tools resolve the project root from the session worktree, falling back to the session directory; filesystem roots (`/`, `C:\`) are never used. If no valid project directory exists, the tool errors — open opencode inside your project (`cd <project> && opencode`).
+
 | Tool | Purpose | Key Arguments |
 |------|---------|---------------|
 | `speckit-scaffold` | Create `specs/NNN-name/` artifacts, constitution, steering, or project docs | `featureName`, `template` (spec/plan/tasks/constitution/steering/data-model/domain-map/glossary/research/contracts), `techStack`, `overwrite` (bool) |

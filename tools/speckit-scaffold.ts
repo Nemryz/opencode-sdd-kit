@@ -16,7 +16,8 @@ import {
   sessionPath,
   exists,
   isENOENT,
-  isValidProjectRoot,
+  resolveProjectRoot,
+  pickProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   withLock,
@@ -150,9 +151,10 @@ export default tool({
   async execute(args, context) {
     clearCorruptionWarnings()
     try {
-      const projectRoot = context.worktree
-      if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (args.template !== "constitution" && !await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const resolved = await resolveProjectRoot(context)
+      const bootstrapRoot = resolved.root ?? (args.template === "constitution" ? pickProjectRoot(context) : null)
+      if (!bootstrapRoot) return { title: "Error", output: resolved.error ?? "Not a valid project directory" }
+      const projectRoot = bootstrapRoot
       const projectWarnings = await getProjectRootWarnings(projectRoot)
       if (projectWarnings.length > 0 && !args.confirmed) {
         return {

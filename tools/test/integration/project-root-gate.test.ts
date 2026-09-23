@@ -35,6 +35,13 @@ describe("project-root warning gate", () => {
     expect(result.title).not.toBe("Warning")
   })
 
+  it("falls back to the session directory when worktree is a filesystem root", async () => {
+    const ctx = { ...mockContext(sysRoot), worktree: "/" } as never
+    const result = await statusTool.execute({ confirmed: true }, ctx)
+    expect(result.title).not.toBe("Error")
+    expect(result.title).not.toBe("Warning")
+  })
+
   it("audit proceeds with confirmed: true", async () => {
     const result = await auditTool.execute({ confirmed: true }, mockContext(sysRoot))
     expect(result.title).not.toBe("Warning")

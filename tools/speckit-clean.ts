@@ -11,7 +11,7 @@ import {
   detectPhaseFromFiles,
   detectPhase,
   getFeatureDirs,
-  isValidProjectRoot,
+  resolveProjectRoot,
   getProjectRootWarnings,
   detectParentProjectWithoutSession,
   reconstructFromFrontmatter,
@@ -35,9 +35,9 @@ export default tool({
   },
   async execute(args, context) {
     try {
-      const projectRoot = context.worktree
-      if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const resolved = await resolveProjectRoot(context)
+      if (!resolved.root) return { title: "Error", output: resolved.error ?? "Not a valid project directory" }
+      const projectRoot = resolved.root
       const projectWarnings = await getProjectRootWarnings(projectRoot)
       if (projectWarnings.length > 0 && !args.confirmed) {
         return {

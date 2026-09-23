@@ -168,3 +168,16 @@ The `corruption.test.ts` file covers:
 - Valid files → no warnings
 - `clearCorruptionWarnings()` resets the array
 - Manual `pushCorruptionWarning` adds to the array
+
+### R-11: Filesystem-root worktree scattered SDD state to the drive root
+
+**Introduced in:** opencode workspace behavior (worktree = `/` for sessions without a project)
+**Fixed in:** current
+
+Sessions whose tool-context `worktree` was `/` resolved every state path to the drive root on Windows: SDD state landed in `C:\.opencode` and features in `C:\specs`, outside any project. Tools also loaded `guard.json` from the wrong root.
+
+**Root cause:** Tools trusted `context.worktree` without validation. On Windows, `path.join("/", ".opencode")` resolves to the current drive root (`C:\.opencode`), and `isValidProjectRoot` passed because that directory happened to exist.
+
+**Fix:** `resolveProjectRoot(context)` skips filesystem roots, falls back to `context.directory` (the session directory), and errors when no valid project directory exists. Applied to all tools; both plugins resolve their root via `pickProjectRoot`.
+
+**Test coverage:** `project-root.test.ts` (resolver unit tests) and `project-root-gate.test.ts` (tool fallback + gate bypass).

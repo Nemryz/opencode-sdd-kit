@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
 import { withLock, atomicWriteFile, markPluginLoaded } from "../shared/io"
+import { pickProjectRoot } from "../shared/types"
 
 export const GuardConfigSchema = z.object({
   version: z.number(),
@@ -185,8 +186,9 @@ export function addDenial(config: GuardConfig, file: string, reason: string): vo
 }
 
 const guardPlugin: Plugin = async (input) => {
-  const configPath = path.join(input.worktree, ".opencode", "guard.json")
-  await markPluginLoaded(input.worktree, "speckit-guard")
+  const projectRoot = pickProjectRoot(input) ?? input.worktree
+  const configPath = path.join(projectRoot, ".opencode", "guard.json")
+  await markPluginLoaded(projectRoot, "speckit-guard")
 
   async function readConfig(): Promise<GuardConfig> {
     let parsed: unknown = null
@@ -208,7 +210,7 @@ const guardPlugin: Plugin = async (input) => {
   }
 
   async function normalizePath(filePath: string): Promise<string> {
-    let resolved = path.isAbsolute(filePath) ? filePath : path.resolve(input.worktree, filePath)
+    let resolved = path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath)
     try {
       resolved = await fs.realpath(resolved)
     } catch {
@@ -233,7 +235,7 @@ const guardPlugin: Plugin = async (input) => {
       return alwaysProtected
     }
 
-    const spec = await getSpecJson(normalized, input.worktree)
+    const spec = await getSpecJson(normalized, projectRoot)
     const inFeatureDir = isInFeatureDir(normalized)
 
     const afterApproval = inFeatureDir ? isProtectedAfterApproval(normalized, config) : null

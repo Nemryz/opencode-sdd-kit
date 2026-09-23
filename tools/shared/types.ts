@@ -124,6 +124,57 @@ export async function getProjectRootWarnings(root: string): Promise<ProjectRootW
   return warnings
 }
 
+// ─────────────────────────── Project root resolution ───────────
+
+export function isFilesystemRoot(p: string): boolean {
+  const trimmed = p.trim()
+  if (trimmed === "") return true
+  return DRIVE_ROOT_RE.test(trimmed) || trimmed === "/" || trimmed === "\\"
+}
+
+export interface ResolvedProjectRoot {
+  root: string | null
+  error: string | null
+}
+
+export function pickProjectRoot(context: { worktree?: string | null; directory?: string | null }): string | null {
+  for (const value of [context.worktree, context.directory]) {
+    if (typeof value !== "string") continue
+    const trimmed = value.trim()
+    if (trimmed === "" || isFilesystemRoot(trimmed)) continue
+    return trimmed
+  }
+  return null
+}
+
+export async function resolveProjectRoot(context: {
+  worktree?: string | null
+  directory?: string | null
+}): Promise<ResolvedProjectRoot> {
+  const candidates: string[] = []
+  let hadRawCandidate = false
+  for (const value of [context.worktree, context.directory]) {
+    if (typeof value !== "string") continue
+    const trimmed = value.trim()
+    if (trimmed === "") continue
+    hadRawCandidate = true
+    if (isFilesystemRoot(trimmed)) continue
+    candidates.push(trimmed)
+  }
+  if (!hadRawCandidate) {
+    return { root: null, error: "No worktree path provided" }
+  }
+  for (const candidate of candidates) {
+    if (await isValidProjectRoot(candidate)) {
+      return { root: candidate, error: null }
+    }
+  }
+  return {
+    root: null,
+    error: "Not a valid project directory. Open opencode inside your project directory (cd <project> && opencode).",
+  }
+}
+
 // ─────────────────────────── Project Discovery ───────────────────────────
 
 export interface ProjectContext {

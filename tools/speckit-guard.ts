@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { isValidProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile } from "./shared/types"
+import { resolveProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile } from "./shared/types"
 import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
@@ -67,9 +67,9 @@ export default tool({
   },
   async execute(args, context) {
     try {
-      const projectRoot = context.worktree
-      if (!projectRoot) return { title: "Error", output: "No worktree path provided" }
-      if (!await isValidProjectRoot(projectRoot)) return { title: "Error", output: "Not a valid project directory" }
+      const resolved = await resolveProjectRoot(context)
+      if (!resolved.root) return { title: "Error", output: resolved.error ?? "Not a valid project directory" }
+      const projectRoot = resolved.root
 
       const projectWarnings = await getProjectRootWarnings(projectRoot)
       if (projectWarnings.length > 0 && !args.confirmed) {
