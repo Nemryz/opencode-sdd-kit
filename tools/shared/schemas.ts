@@ -161,6 +161,27 @@ export const FrontmatterSchema = z.object({
 export type AuditMetadata = z.infer<typeof AuditMetadataSchema>
 export type FrontmatterData = z.infer<typeof FrontmatterSchema>
 
+// ─────────────────────────── Snapshot Schemas ───────────────────────────
+
+export const SnapshotFileEntrySchema = z.object({
+  path: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  sha256: z.string().length(64),
+})
+
+export const SnapshotManifestSchema = z.object({
+  format: z.literal(1),
+  id: z.string().min(1),
+  created_at: z.string(),
+  trigger: z.string().min(1),
+  feature: z.string().nullable(),
+  phase: z.string().nullable(),
+  files: z.array(SnapshotFileEntrySchema),
+})
+
+export type SnapshotFileEntry = z.infer<typeof SnapshotFileEntrySchema>
+export type SnapshotManifest = z.infer<typeof SnapshotManifestSchema>
+
 // ─────────────────────────── Delta Schemas ───────────────────────────
 
 export const DeltaStatusSchema = z.enum(["draft", "planned", "ready", "implementing", "consolidated", "cancelled"])

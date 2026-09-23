@@ -16,4 +16,5 @@ opencode.jsonc
 reports/
 coverage/
 specs/*-test/
+specs/003-sdd-state-snapshots-restore/
 agents/novel.md
