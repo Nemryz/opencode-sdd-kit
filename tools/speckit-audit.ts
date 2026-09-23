@@ -23,7 +23,7 @@ import {
   clearCorruptionWarnings,
 } from "./shared/types"
 import { DeltasIndexSchema, type Delta } from "./shared/schemas"
-import { computeBodyChecksum } from "./shared/io"
+import { computeBodyChecksum, stripBom } from "./shared/io"
 
 export interface AuditFinding {
   severity: "info" | "warn" | "error"
@@ -231,7 +231,7 @@ async function auditFeature(
   if (await exists(deltasIndexFp)) {
     try {
       const raw = await fs.readFile(deltasIndexFp, "utf-8")
-      const parsed = JSON.parse(raw)
+      const parsed = JSON.parse(stripBom(raw))
       const result = DeltasIndexSchema.safeParse(parsed)
       if (result.success) {
         const activeDeltas = result.data.deltas.filter(d => d.status !== "consolidated" && d.status !== "cancelled")
@@ -315,7 +315,7 @@ async function auditProject(projectRoot: string): Promise<AuditReport> {
   const guardPath = path.join(projectRoot, ".opencode", "guard.json")
   try {
     const raw = await fs.readFile(guardPath, "utf-8")
-    const guard = JSON.parse(raw) as { debug?: unknown }
+    const guard = JSON.parse(stripBom(raw)) as { debug?: unknown }
     if (guard.debug === true) {
       findings.push({
         severity: "info",

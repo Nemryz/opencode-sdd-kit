@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { markPluginLoaded } from "../shared/io"
+import { markPluginLoaded, stripBom } from "../shared/io"
 import { pickProjectRoot } from "../shared/types"
 
 type PerfStats = {
@@ -67,7 +67,7 @@ const perfPlugin: Plugin = async (input) => {
       let perf: PerfData = { lastUpdated: new Date().toISOString(), stats: [] }
       try {
         const existing = await fs.readFile(perfPath, "utf-8")
-        perf = JSON.parse(existing)
+        perf = JSON.parse(stripBom(existing))
       } catch {
         // File doesn't exist yet, use default
       }

@@ -20,6 +20,7 @@ import {
   makeDeltaIndex,
   makeDelta,
   getNextDeltaId,
+  stripBom,
 } from "./shared/types"
 import type {
   Delta,
@@ -57,7 +58,7 @@ async function readDeltasIndex(featureDir: string): Promise<DeltasIndexRead> {
     return { ok: true, index: makeDeltaIndex(path.basename(featureDir)) }
   }
   try {
-    const result = DeltasIndexSchema.safeParse(JSON.parse(data))
+    const result = DeltasIndexSchema.safeParse(JSON.parse(stripBom(data)))
     if (result.success) return { ok: true, index: result.data }
   } catch { /* fall through to corrupt */ }
   return { ok: false }

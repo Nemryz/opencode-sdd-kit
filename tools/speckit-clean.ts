@@ -25,6 +25,7 @@ import {
   SpecJsonSchema,
   corruptionWarnings,
   clearCorruptionWarnings,
+  stripBom,
 } from "./shared/types"
 
 export default tool({
@@ -100,7 +101,7 @@ export default tool({
           if (await exists(deltasIndexFp)) {
             try {
               const raw = await fs.readFile(deltasIndexFp, "utf-8")
-              const parsed = JSON.parse(raw)
+              const parsed = JSON.parse(stripBom(raw))
               const result = (await import("./shared/schemas")).DeltasIndexSchema.safeParse(parsed)
               if (result.success) {
                 const cancelled = result.data.deltas.filter(d => d.status === "cancelled")

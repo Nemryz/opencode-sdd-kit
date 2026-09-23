@@ -181,3 +181,16 @@ Sessions whose tool-context `worktree` was `/` resolved every state path to the 
 **Fix:** `resolveProjectRoot(context)` skips filesystem roots, falls back to `context.directory` (the session directory), and errors when no valid project directory exists. Applied to all tools; both plugins resolve their root via `pickProjectRoot`.
 
 **Test coverage:** `project-root.test.ts` (resolver unit tests) and `project-root-gate.test.ts` (tool fallback + gate bypass).
+
+### R-12: JSON state files rejected when written with a UTF-8 BOM
+
+**Introduced in:** external tooling (PowerShell `Set-Content`/`Out-File` writes a BOM by default)
+**Fixed in:** current
+
+`config.json` (and potentially `session.json`/`spec.json`) written with a UTF-8 BOM failed `JSON.parse` ("Unrecognized token '﻿'"), so the kit silently fell back to defaults and emitted a corruption warning on every read. `speckit-config` updates were ignored.
+
+**Root cause:** JSON reads called `JSON.parse` directly on file content; `\uFEFF` is not valid JSON. The kit's own writers never emit a BOM, but externally edited state files can.
+
+**Fix:** `stripBom()` in `shared/io.ts` applied to every JSON parse site (session, config, spec.json, deltas index, guard config, perf, package.json, backup readers, plugin reads).
+
+**Test coverage:** `bom-tolerance.test.ts` reads BOM-prefixed config/session/spec.json and asserts no corruption warnings.

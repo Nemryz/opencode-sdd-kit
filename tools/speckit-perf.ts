@@ -2,7 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { getRecommendations } from "./plugins/speckit-perfmon"
-import { resolveProjectRoot } from "./shared/types"
+import { resolveProjectRoot, stripBom } from "./shared/types"
 
 type PerfStats = {
   tool: string
@@ -23,7 +23,7 @@ type PerfData = {
 async function readPerfData(perfPath: string): Promise<PerfData | null> {
   try {
     const content = await fs.readFile(perfPath, "utf-8")
-    const parsed = JSON.parse(content)
+    const parsed = JSON.parse(stripBom(content))
     if (!parsed || !Array.isArray(parsed.stats)) return null
     return parsed as PerfData
   } catch {

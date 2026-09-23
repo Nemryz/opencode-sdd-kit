@@ -123,28 +123,28 @@ describe("Fuzz: BOM + CRLF", () => {
     expect(() => JSON.parse(withBOM)).toThrow()
   })
 
-  it("readSession returns default when BOM in file", async () => {
+  it("readSession parses a BOM-prefixed file", async () => {
     const fp = path.join(tmpDir, ".opencode", "spec-memory", "session.json")
     await fs.writeFile(fp, "\uFEFF" + JSON.stringify(validSession()), "utf-8")
     const result = await readSession(tmpDir)
     expect(result).toBeDefined()
-    expect(result.phase).toBe("init")
+    expect(result.phase).toBe(validSession().phase)
   })
 
-  it("readSpecJson returns null when BOM in file", async () => {
+  it("readSpecJson parses a BOM-prefixed file", async () => {
     const featureDir = path.join(tmpDir, "specs", "001-test")
     await fs.mkdir(featureDir, { recursive: true })
     const fp = path.join(featureDir, "spec.json")
     await fs.writeFile(fp, "\uFEFF" + JSON.stringify(validSpecJson()), "utf-8")
     const result = await readSpecJson(featureDir)
-    expect(result).toBeNull()
+    expect(result?.feature_name).toBe(validSpecJson().feature_name)
   })
 
-  it("readConfig returns default when BOM in file", async () => {
+  it("readConfig parses a BOM-prefixed file", async () => {
     const fp = path.join(tmpDir, ".opencode", "spec-memory", "config.json")
     await fs.writeFile(fp, "\uFEFF" + JSON.stringify(validConfig()), "utf-8")
     const result = await readConfig(tmpDir)
-    expect(result.expressMode).toBe(false)
+    expect(result.expressMode).toBe(validConfig().expressMode)
   })
 
   it("SessionStateSchema handles CRLF in string values", () => {

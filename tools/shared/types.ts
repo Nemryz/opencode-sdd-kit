@@ -2,7 +2,7 @@ import path from "node:path"
 import os from "node:os"
 import fs from "node:fs/promises"
 import { PATHS, SpecJson, SessionState, specsDirPath, DeltasIndex, Delta } from "./schemas"
-import { isENOENT } from "./io"
+import { isENOENT, stripBom } from "./io"
 
 // Re-export everything from schemas and io for backward compatibility
 export * from "./schemas"
@@ -261,7 +261,7 @@ export async function detectScripts(root: string): Promise<{ scripts: string[]; 
   }
   try {
     const raw = await fs.readFile(pkgPath, "utf-8")
-    const pkg = JSON.parse(raw)
+    const pkg = JSON.parse(stripBom(raw))
     const scripts = pkg.scripts ? Object.keys(pkg.scripts) : []
     const dependencies = pkg.dependencies ? Object.keys(pkg.dependencies) : []
     const devDependencies = pkg.devDependencies ? Object.keys(pkg.devDependencies) : []

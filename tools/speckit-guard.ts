@@ -1,7 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { resolveProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile } from "./shared/types"
+import { resolveProjectRoot, getProjectRootWarnings, withLock, atomicWriteFile, stripBom } from "./shared/types"
 import {
   DEFAULT_CONFIG,
   GuardConfigSchema,
@@ -85,7 +85,7 @@ export default tool({
       async function readConfig(): Promise<GuardConfig> {
         let parsed: unknown = null
         try {
-          parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
+          parsed = JSON.parse(stripBom(await fs.readFile(configPath, "utf-8")))
         } catch {
           return cloneConfig(DEFAULT_CONFIG)
         }

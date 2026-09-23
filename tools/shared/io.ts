@@ -65,6 +65,10 @@ function computeSha256(data: string): string {
   return crypto.createHash("sha256").update(data).digest("hex")
 }
 
+export function stripBom(data: string): string {
+  return data.charCodeAt(0) === 0xfeff ? data.slice(1) : data
+}
+
 async function writeChecksumFile(bakPath: string, data: string): Promise<void> {
   const hash = computeSha256(data)
   await fs.writeFile(`${bakPath}.sha256`, hash, "utf-8")
@@ -122,7 +126,7 @@ export function sleep(ms: number): Promise<void> {
 async function readLockJson(lockDir: string): Promise<LockInfo | null> {
   try {
     const data = await fs.readFile(path.join(lockDir, "lock.json"), "utf-8")
-    return JSON.parse(data)
+    return JSON.parse(stripBom(data))
   } catch {
     return null
   }
@@ -301,16 +305,26 @@ export async function writeWithBackup(fp: string, data: string, root: string): P
   await atomicWriteFile(fp, data)
 }
 
+const TRANSIENT_RENAME_CODES = new Set(["EPERM", "EBUSY", "EACCES"])
+const RENAME_ATTEMPTS = 5
+
 export async function atomicWriteFile(fp: string, data: string): Promise<void> {
   const tmp = fp + ".tmp"
   const dir = path.dirname(fp)
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(tmp, data, "utf-8")
-  try {
-    await fs.rename(tmp, fp)
-  } catch {
-    await fs.rm(tmp, { force: true })
-    throw new Error(`atomicWriteFile: rename failed for ${fp}`)
+  for (let attempt = 0; attempt < RENAME_ATTEMPTS; attempt++) {
+    try {
+      await fs.rename(tmp, fp)
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? ""
+      if (!TRANSIENT_RENAME_CODES.has(code) || attempt === RENAME_ATTEMPTS - 1) {
+        await fs.rm(tmp, { force: true })
+        throw new Error(`atomicWriteFile: rename failed for ${fp}`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)))
+    }
   }
 }
 
@@ -341,7 +355,7 @@ export async function findLatestValidBackup<T>(
       const content = await fs.readFile(bakPath, "utf-8")
       const checksumValid = await verifyChecksum(bakPath, content)
       if (!checksumValid) continue
-      const parsed = JSON.parse(content)
+      const parsed = JSON.parse(stripBom(content))
       const result = schema.safeParse(parsed)
       if (result.success) {
         return result.data as T
@@ -405,7 +419,7 @@ export async function verifyBackupIntegrity(
       const basename = bak.replace(/\.\w{8}\.\d+\.bak$/, "").replace(/\.\d+\.bak$/, "")
       const schema = schemas[basename]
       if (schema) {
-        const parsed = JSON.parse(content)
+        const parsed = JSON.parse(stripBom(content))
         if (schema.safeParse(parsed).success) {
           report.valid++
           report.details.push({ file: bak, status: "valid" })
@@ -464,7 +478,7 @@ export async function markPluginLoaded(worktree: string, pluginId: string): Prom
     await withLock(markerPath, async () => {
       let state: Record<string, { loadedAt: string }> = {}
       try {
-        const parsed = JSON.parse(await fs.readFile(markerPath, "utf-8"))
+        const parsed = JSON.parse(stripBom(await fs.readFile(markerPath, "utf-8")))
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           state = parsed
         }
@@ -490,7 +504,7 @@ export async function readSession(root: string): Promise<SessionState> {
     }
 
     const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
+    const parsed = JSON.parse(stripBom(data))
     const merged = { ...DEFAULT_SESSION, ...parsed }
     const result = SessionStateSchema.safeParse(merged)
     if (result.success) {
@@ -534,7 +548,7 @@ export async function writeSession(root: string, s: SessionState): Promise<void>
     await writeFileChecksum(fp)
     
     const written = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(written)
+    const parsed = JSON.parse(stripBom(written))
     const verify = SessionStateSchema.safeParse(parsed)
     if (!verify.success) {
       throw new Error(`writeSession: post-write verification failed: ${String(verify.error)}`)
@@ -560,7 +574,7 @@ export async function readSpecJson(featureDir: string): Promise<SpecJson | null>
     }
 
     const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
+    const parsed = JSON.parse(stripBom(data))
     const result = SpecJsonSchema.safeParse(parsed)
     if (result.success) {
       if (!checksumValid) await writeFileChecksum(fp)
@@ -600,7 +614,7 @@ export async function writeSpecJson(sj: SpecJson, featureDir: string): Promise<v
     await writeFileChecksum(fp)
     
     const written = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(written)
+    const parsed = JSON.parse(stripBom(written))
     const verify = SpecJsonSchema.safeParse(parsed)
     if (!verify.success) {
       throw new Error(`writeSpecJson: post-write verification failed: ${String(verify.error)}`)
@@ -626,7 +640,7 @@ export async function readConfig(root: string): Promise<SDDConfig> {
     }
 
     const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
+    const parsed = JSON.parse(stripBom(data))
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
     if (result.success) {
@@ -860,7 +874,7 @@ export async function readConfigWithRestore(root: string): Promise<SDDConfig> {
     }
 
     const data = await fs.readFile(fp, "utf-8")
-    const parsed = JSON.parse(data)
+    const parsed = JSON.parse(stripBom(data))
     const merged = { ...DEFAULT_CONFIG, ...parsed }
     const result = ConfigSchema.safeParse(merged)
     if (result.success) {

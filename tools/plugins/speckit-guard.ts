@@ -2,7 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
-import { withLock, atomicWriteFile, markPluginLoaded } from "../shared/io"
+import { withLock, atomicWriteFile, markPluginLoaded, stripBom } from "../shared/io"
 import { pickProjectRoot } from "../shared/types"
 
 export const GuardConfigSchema = z.object({
@@ -127,7 +127,7 @@ export async function getSpecJson(filePath: string, worktree: string): Promise<S
   const specJsonPath = path.join(featureDir, "spec.json")
   try {
     const content = await fs.readFile(specJsonPath, "utf-8")
-    return JSON.parse(content)
+    return JSON.parse(stripBom(content))
   } catch {
     return null
   }
@@ -193,7 +193,7 @@ const guardPlugin: Plugin = async (input) => {
   async function readConfig(): Promise<GuardConfig> {
     let parsed: unknown = null
     try {
-      parsed = JSON.parse(await fs.readFile(configPath, "utf-8"))
+      parsed = JSON.parse(stripBom(await fs.readFile(configPath, "utf-8")))
     } catch {
       return cloneConfig(DEFAULT_CONFIG)
     }

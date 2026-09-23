@@ -115,20 +115,22 @@ describe("Chaos: EACCES in acquireLock", () => {
 // EBUSY in fs.rename
 
 describe("Chaos: EBUSY in fs.rename", () => {
-  it("atomicWriteFile throws when rename fails with EBUSY", async () => {
+  it("atomicWriteFile retries a transient EBUSY and succeeds", async () => {
     const { atomicWriteFile } = await import("../../shared/io")
+    const fp = path.join(tmpDir, "test.json")
     const renameSpy = vi.spyOn(fs, "rename").mockRejectedValueOnce(Object.assign(new Error("EBUSY"), { code: "EBUSY" }))
 
-    await expect(atomicWriteFile(path.join(tmpDir, "test.json"), "{}")).rejects.toThrow()
+    await atomicWriteFile(fp, '{"ok":true}')
 
+    expect(await fs.readFile(fp, "utf-8")).toBe('{"ok":true}')
     renameSpy.mockRestore()
   })
 
-  it("atomicWriteFile cleans up tmp file on EBUSY", async () => {
+  it("atomicWriteFile throws and cleans up tmp when rename keeps failing", async () => {
     const { atomicWriteFile } = await import("../../shared/io")
     const fp = path.join(tmpDir, "test.json")
 
-    const renameSpy = vi.spyOn(fs, "rename").mockRejectedValueOnce(Object.assign(new Error("EBUSY"), { code: "EBUSY" }))
+    const renameSpy = vi.spyOn(fs, "rename").mockRejectedValue(Object.assign(new Error("EBUSY"), { code: "EBUSY" }))
 
     await expect(atomicWriteFile(fp, "{}")).rejects.toThrow()
 
